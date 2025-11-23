@@ -1,11 +1,13 @@
 # 外部リポジトリの使用
 
 `rust-lang/rust` Git リポジトリは、`rust-lang` 組織内のいくつかの他のリポジトリに依存しています。依存関係を使用する主な方法は3つあります：
+
 1. crates.io 経由の Cargo 依存関係として（例：`rustc-rayon`）
 2. Git（例：`clippy`）または [josh]（例：`miri`）のサブツリーとして
 3. Git サブモジュールとして（例：`cargo`）
 
 一般的なルールとして：
+
 - エコシステムの他の人にとって有用な可能性があるライブラリには crates.io を使用する
 - コンパイラの内部に依存し、破壊的変更がある場合に更新する必要があるツールにはサブツリーを使用する
 - コンパイラから独立したツールにはサブモジュールを使用する
@@ -14,31 +16,31 @@
 
 以下の外部プロジェクトは、何らかの形式の `subtree` を使用して管理されています：
 
-* [clippy](https://github.com/rust-lang/rust-clippy)
-* [miri](https://github.com/rust-lang/miri)
-* [portable-simd](https://github.com/rust-lang/portable-simd)
-* [rustfmt](https://github.com/rust-lang/rustfmt)
-* [rust-analyzer](https://github.com/rust-lang/rust-analyzer)
-* [rustc_codegen_cranelift](https://github.com/rust-lang/rustc_codegen_cranelift)
-* [rustc-dev-guide](https://github.com/rust-lang/rustc-dev-guide)
-* [compiler-builtins](https://github.com/rust-lang/compiler-builtins)
-* [stdarch](https://github.com/rust-lang/stdarch)
+- [clippy](https://github.com/rust-lang/rust-clippy)
+- [miri](https://github.com/rust-lang/miri)
+- [portable-simd](https://github.com/rust-lang/portable-simd)
+- [rustfmt](https://github.com/rust-lang/rustfmt)
+- [rust-analyzer](https://github.com/rust-lang/rust-analyzer)
+- [rustc_codegen_cranelift](https://github.com/rust-lang/rustc_codegen_cranelift)
+- [rustc-dev-guide](https://github.com/rust-lang/rustc-dev-guide)
+- [compiler-builtins](https://github.com/rust-lang/compiler-builtins)
+- [stdarch](https://github.com/rust-lang/stdarch)
 
 `submodule` 依存関係（以下を参照）とは対照的に、`subtree` 依存関係は単なる通常のファイルとディレクトリであり、ツリー内で更新できます。ただし、可能であれば、これらのツールに固有の機能強化、バグ修正などは、それぞれのアップストリームリポジトリ内のツールに対して直接提出する必要があります。例外として、新しいツール機能やテストを実装するために rustc の変更が必要な場合は、1つの集合的な rustc PR で行う必要があります。
 
 `subtree` 依存関係は現在、2つの異なるアプローチで管理されています：
 
-* `git subtree` を使用
-    * `clippy`（[同期ガイド](https://doc.rust-lang.org/nightly/clippy/development/infrastructure/sync.html#performing-the-sync-from-rust-langrust-to-clippy)）
-    * `portable-simd`（[同期スクリプト](https://github.com/rust-lang/portable-simd/blob/master/subtree-sync.sh)）
-    * `rustfmt`
-    * `rustc_codegen_cranelift`（[同期スクリプト](https://github.com/rust-lang/rustc_codegen_cranelift/blob/113af154d459e41b3dc2c5d7d878e3d3a8f33c69/scripts/rustup.sh#L7)）
-* [josh](#synchronizing-a-josh-subtree) ツールを使用
-    * `miri`
-    * `rust-analyzer`
-    * `rustc-dev-guide`
-    * `compiler-builtins`
-    * `stdarch`
+- `git subtree` を使用
+  - `clippy`（[同期ガイド](https://doc.rust-lang.org/nightly/clippy/development/infrastructure/sync.html#performing-the-sync-from-rust-langrust-to-clippy)）
+  - `portable-simd`（[同期スクリプト](https://github.com/rust-lang/portable-simd/blob/master/subtree-sync.sh)）
+  - `rustfmt`
+  - `rustc_codegen_cranelift`（[同期スクリプト](https://github.com/rust-lang/rustc_codegen_cranelift/blob/113af154d459e41b3dc2c5d7d878e3d3a8f33c69/scripts/rustup.sh#L7)）
+- [josh](#synchronizing-a-josh-subtree) ツールを使用
+  - `miri`
+  - `rust-analyzer`
+  - `rustc-dev-guide`
+  - `compiler-builtins`
+  - `stdarch`
 
 ### Josh サブツリー
 
@@ -49,6 +51,7 @@
 Josh サブツリーの更新を実行するために、[`rustc-josh-sync`][josh-sync] という専用ツールを使用します。以下のコマンドは、すべての Josh サブツリーに使用できますが、`miri` では pull 中にいくつかの[追加手順](https://github.com/rust-lang/miri/blob/master/CONTRIBUTING.md#advanced-topic-syncing-with-the-rustc-repo)を実行する必要があることに注意してください。
 
 次のコマンドを使用してツールをインストールできます：
+
 ```
 cargo install --locked --git https://github.com/rust-lang/josh-sync
 ```
@@ -56,11 +59,14 @@ cargo install --locked --git https://github.com/rust-lang/josh-sync
 プル（rust-lang/rust からサブツリーへの変更を同期）とプッシュ（サブツリーから rust-lang/rust への変更を同期）の両方は、サブツリーリポジトリから実行されます（したがって、まずターミナルでそのリポジトリのチェックアウトディレクトリに切り替えます）。
 
 #### プルの実行
+
 1) サブツリーへの PR を作成するために使用される新しいブランチをチェックアウトします
 2) pull コマンドを実行します
+
     ```
     rustc-josh-sync pull
     ```
+
 3) ブランチをフォークにプッシュし、サブツリーリポジトリへの PR を作成します
     - `gh` CLI がインストールされている場合、`rustc-josh-sync` が PR を作成できます。
 
@@ -70,9 +76,11 @@ cargo install --locked --git https://github.com/rust-lang/josh-sync
 > 続行する前に、[on josh-sync README] の Git に関するガイダンスをご覧ください。
 
 1) push コマンドを実行して、`<gh-username>` アカウントの `rustc` フォークに `<branch-name>` という名前のブランチを作成します
+
     ```
     rustc-josh-sync push <branch-name> <gh-username>
     ```
+
 2) `<branch-name>` から `rust-lang/rust` への PR を作成します
 
 ### 新しい Josh サブツリー依存関係の作成

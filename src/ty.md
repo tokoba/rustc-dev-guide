@@ -187,7 +187,6 @@ use ty::{self, Ty, TyCtxt};
 [terr]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.Ty.html#method.new_error
 [terrmsg]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.Ty.html#method.new_error_with_message
 
-
 ## `TyKind` バリアントの簡略構文
 
 `Ty` のデバッグ出力を見ているとき、または単にコンパイラ内の異なる型について話しているときに、有効な Rust ではないが、型に関する内部情報を簡潔に表現するために使用される構文に遭遇することがあります。以下は、さまざまな構文が実際に何を意味するかを示すクイックリファレンスチートシートです。これらはより詳しく後の章でカバーされるべきです。

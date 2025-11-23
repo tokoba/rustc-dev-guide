@@ -33,7 +33,6 @@
 [`library/`]: https://github.com/rust-lang/rust/tree/HEAD/library
 [`proc_macro`]: https://github.com/rust-lang/rust/tree/HEAD/library/proc_macro
 [`rtstartup`]: https://github.com/rust-lang/rust/tree/HEAD/library/rtstartup
-[`rust-lang/rust`]: https://github.com/rust-lang/rust
 [`rustdoc`]: https://github.com/rust-lang/rust/tree/HEAD/src/tools/rustdoc
 [`src/`]: https://github.com/rust-lang/rust/tree/HEAD/src
 [`std`]: https://github.com/rust-lang/rust/tree/HEAD/library/std
@@ -76,7 +75,6 @@ cargo tree --package rustc_driver
 
 [`compiler/rustc_llvm`]: https://github.com/rust-lang/rust/tree/HEAD/compiler/rustc_llvm
 [`src/llvm-project`]: https://github.com/rust-lang/rust/tree/HEAD/src/
-[`Cargo.toml`]: https://github.com/rust-lang/rust/blob/HEAD/Cargo.toml
 
 ### 全体像
 
@@ -120,7 +118,6 @@ cargo tree --package rustc_driver
 
 テストハーネスは[`src/tools/compiletest/`][`compiletest/`]にあります。
 
-[`tests/`]: https://github.com/rust-lang/rust/tree/HEAD/tests
 [testsch]: ./tests/intro.md
 
 ## ビルドシステム
@@ -148,11 +145,5 @@ cargo tree --package rustc_driver
 `rust-lang/rust`リポジトリには、完全なRustディストリビューションのビルドに関連する他の多くのものがあります。ほとんどの場合、これらについて心配する必要はありません。
 
 これらには次のものが含まれます:
-- [`src/ci`]: CI設定。多くのプラットフォームで多くのテストを実行するため、これは実際にはかなり広範囲にわたります。
-- [`src/doc`]: サブモジュールを含む様々なドキュメント。
-- [`src/etc`]: その他のユーティリティ。
 - その他...
 
-[`src/ci`]: https://github.com/rust-lang/rust/tree/HEAD/src/ci
-[`src/doc`]: https://github.com/rust-lang/rust/tree/HEAD/src/doc
-[`src/etc`]: https://github.com/rust-lang/rust/tree/HEAD/src/etc

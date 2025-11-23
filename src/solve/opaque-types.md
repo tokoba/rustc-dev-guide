@@ -50,7 +50,6 @@ borrowckの最後にのみチェックされる領域を無視します。成功
 [norm]: https://github.com/rust-lang/rust/blob/384d26fc7e3bdd7687cc17b2662b091f6017ec2a/compiler/rustc_trait_selection/src/solve/normalizes_to/opaque_types.rs#L13
 [coherence-example]: https://github.com/rust-lang/rust/blob/HEAD/tests/ui/type-alias-impl-trait/coherence/coherence_different_hidden_ty.rs
 [placeholder-ck]: https://github.com/rust-lang/rust/blob/384d26fc7e3bdd7687cc17b2662b091f6017ec2a/compiler/rustc_trait_selection/src/solve/normalizes_to/opaque_types.rs#L33
-[check-storage]: https://github.com/rust-lang/rust/blob/384d26fc7e3bdd7687cc17b2662b091f6017ec2a/compiler/rustc_trait_selection/src/solve/normalizes_to/opaque_types.rs#L51-L52
 [eq-prev]: https://github.com/rust-lang/rust/blob/384d26fc7e3bdd7687cc17b2662b091f6017ec2a/compiler/rustc_trait_selection/src/solve/normalizes_to/opaque_types.rs#L51-L59
 [insert-storage]: https://github.com/rust-lang/rust/blob/384d26fc7e3bdd7687cc17b2662b091f6017ec2a/compiler/rustc_trait_selection/src/solve/normalizes_to/opaque_types.rs#L68
 [item-bounds-ck]: https://github.com/rust-lang/rust/blob/384d26fc7e3bdd7687cc17b2662b091f6017ec2a/compiler/rustc_trait_selection/src/solve/normalizes_to/opaque_types.rs#L69-L74
@@ -60,7 +59,7 @@ borrowckの最後にのみチェックされる領域を無視します。成功
 
 ### 正規化可能なエイリアスのエイリアス境界を使用する
 
-https://github.com/rust-lang/trait-system-refactor-initiative/issues/77
+<https://github.com/rust-lang/trait-system-refactor-initiative/issues/77>
 
 正規化可能なエイリアスに対して`AliasBound`候補を使用することは、一般的には不可能です。なぜなら、関連型は、
 `ParamEnv`候補を介して正規化する際の結果の型よりも強い境界を持つことができるからです。

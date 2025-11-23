@@ -19,6 +19,7 @@ running: RUSTC_BOOTSTRAP="1" "/home/jyn/src/rust2/build/x86_64-unknown-linux-gnu
 ## ブートストラップにおける `tracing`
 
 ブートストラップには条件付きの `tracing` 機能があり、以下の機能を提供します：
+
 - [`tracing`][tracing] のイベントとスパンを使用した構造化ロギングを有効にします。
 - 実行されたステップとコマンドの階層と期間を視覚化するために使用できる [Chrome trace file] を生成します。
   - 生成された `chrome-trace.json` ファイルは、Chrome の `chrome://tracing` タブで開くか、例えば [Perfetto] を使用して開くことができます。
@@ -41,10 +42,9 @@ running: RUSTC_BOOTSTRAP="1" "/home/jyn/src/rust2/build/x86_64-unknown-linux-gnu
 
 条件付き `tracing` 機能を有効にするには、`BOOTSTRAP_TRACING` 環境変数を使用してブートストラップを実行します。
 
-[tracing_subscriber filter]: https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html
 
 ```bash
-$ BOOTSTRAP_TRACING=trace ./x build library --stage 1
+BOOTSTRAP_TRACING=trace ./x build library --stage 1
 ```
 
 出力例[^unstable]：
@@ -90,7 +90,7 @@ Build completed successfully in 0:00:00
 もちろん、それらを組み合わせることもできます（カスタムターゲットログは通常、追加で `TRACE` ログレベルの後ろにゲートされています）：
 
 ```bash
-$ BOOTSTRAP_TRACING=CONFIG_HANDLING=trace,STEP=info,COMMAND=trace ./x build library --stage 1
+BOOTSTRAP_TRACING=CONFIG_HANDLING=trace,STEP=info,COMMAND=trace ./x build library --stage 1
 ```
 
 [tracing-env-filter]: https://docs.rs/tracing-subscriber/0.3.19/tracing_subscriber/filter/struct.EnvFilter.html

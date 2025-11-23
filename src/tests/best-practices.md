@@ -52,7 +52,7 @@
 ## テストの整理
 
 - ほとんどのテストスイートについて、テストをホームする意味的に意味のあるサブディレクトリを見つけるようにしてください。
-    - 例えば、RFC 2093の実装特有のものについては、`tests/ui/rfc-2093-infer-outlives/`の下にテストのコレクションをグループ化できます。ディレクトリ名には、RFCが何についてのものかを含めてください。
+  - 例えば、RFC 2093の実装特有のものについては、`tests/ui/rfc-2093-infer-outlives/`の下にテストのコレクションをグループ化できます。ディレクトリ名には、RFCが何についてのものかを含めてください。
 - [`run-make`]/`run-make-support`テストスイートの場合、各`rmake.rs`は`tests/run-make/`または`tests/run-make-cargo/`の直下のサブディレクトリ内に含まれている必要があります。さらなるネストは現在サポートされていません。テスト名として問題番号_のみ_を使用することも避けてください。
 
 ## テストの説明
@@ -138,7 +138,6 @@ fn main() {
 >
 > 具体的なアドバイスを待っています。
 
-[compiletest]: ./compiletest.md
 [compiletestディレクティブ]: ./directives.md
 [`run-make`]: ./compiletest.md#run-make-tests
 [FileCheck]: https://llvm.org/docs/CommandGuide/FileCheck.html

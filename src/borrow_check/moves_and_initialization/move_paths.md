@@ -83,5 +83,4 @@ MIR borrow check で最初に行うことの 1 つは、move paths のセット�
 
 上記で述べたように、move-paths は大きなベクターに格納され、[`MovePathIndex`] を介して参照されます。しかし、このベクター内では、それらもツリー構造になっています。したがって、例えば `a.b.c` の [`MovePathIndex`] がある場合、その親の move-path `a.b` に移動できます。すべての子パスを反復することもできます: したがって、`a.b` から、パス `a.b.c` を見つけるために反復できます（ここでは、ソースで**実際に参照されている**パス上でのみ反復しており、参照されている**可能性のある**すべてのパス上で反復しているわけではありません）。これらの参照は、例えば [`find_in_move_path_or_its_descendants`] 関数で使用されます。この関数は、move-path（例えば、`a.b`）またはその move-path の子（例えば、`a.b.c`）が与えられた述語に一致するかどうかを判断します。
 
-[`Place`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/mir/struct.Place.html
 [`find_in_move_path_or_its_descendants`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_dataflow/move_paths/struct.MoveData.html#method.find_in_move_path_or_its_descendants

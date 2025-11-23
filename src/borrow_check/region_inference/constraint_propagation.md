@@ -40,7 +40,6 @@
 生存性の値は型チェックで計算され、作成時に `liveness_constraints` 引数で領域推論に渡されます。
 これらは `R live at E` のような個別の制約としては表現されていません; 代わりに、領域変数ごとに（[`LivenessValues`] 型の）（スパース）bitset を格納します。このようにして、各生存性制約に 1 ビットしか必要ありません。
 
-[`liveness_constraints`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#structfield.liveness_constraints
 [`LivenessValues`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/values/struct.LivenessValues.html
 
 言及する価値があることの 1 つ: すべてのライフタイムパラメータは常に関数本体全体で生きていると見なされます。これは、それらが*呼び出し元の*実行の一部に対応するためで、その実行には明らかにこの関数で過ごす時間が含まれます。なぜなら、呼び出し元は私たちが返るのを待っているからです。

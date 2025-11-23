@@ -34,7 +34,7 @@
 安定化レポートには以下がまとめられます：
 
 - RFCが受け入れられてからの主な設計決定と逸脱。langチームによってFCPされたか、その他の方法で受け入れられた決定と、初めてlangチームに提示される決定の両方を含みます。
-    - 多くの場合、最終的に安定化される言語機能は、元のRFCから大幅な設計の逸脱があります。それは問題ありませんが、これらの逸脱は慎重に強調され、説明される必要があります。
+  - 多くの場合、最終的に安定化される言語機能は、元のRFCから大幅な設計の逸脱があります。それは問題ありませんが、これらの逸脱は慎重に強調され、説明される必要があります。
 - RFCが受け入れられてから行われた作業を、言語機能を前進させた主要なコントリビューターを認めながらまとめます。
 
 [*安定化テンプレート*][srt]には、この機能とlangのサブチーム（例：types、opsem、lang-docsなど）との間のつながりを浮き彫りにし、一般的に見落とされがちな項目を特定することを目的とした一連の質問が含まれています。
@@ -103,11 +103,6 @@ if something { /* XXX */ }
 ```
 
 [rust-lang/rust#32409]: https://github.com/rust-lang/rust/issues/32409
-[std-guide-stabilization]: https://std-dev-guide.rust-lang.org/feature-lifecycle/stabilization.html
-[src-version]: https://github.com/rust-lang/rust/blob/HEAD/src/version
-[forge-versions]: https://forge.rust-lang.org/#current-release-versions
-[forge-release-process]: https://forge.rust-lang.org/release/process.html
-[`compiler/rustc_feature`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_feature/index.html
 [`compiler/rustc_feature/src/accepted.rs`]: https://github.com/rust-lang/rust/tree/HEAD/compiler/rustc_feature/src/accepted.rs
 [`compiler/rustc_feature/src/unstable.rs`]: https://github.com/rust-lang/rust/tree/HEAD/compiler/rustc_feature/src/unstable.rs
 [The Reference]: https://github.com/rust-lang/reference

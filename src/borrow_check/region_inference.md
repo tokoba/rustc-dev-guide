@@ -127,19 +127,15 @@ fn foo<'a, 'b>(x: &'a /* '#1 */ usize) -> &'b /* '#3 */ usize {
 構造体のいくつかのフィールドは次のとおりです:
 
 - [`constraints`]: すべての outlives 制約が含まれます。
-- [`liveness_constraints`]: すべての生存性制約が含まれます。
 - [`universal_regions`]: [`replace_regions_in_mir`] によって返される `UniversalRegions` が含まれます。
 - [`universal_region_relations`]: 全称領域について真であることが知られている関係が含まれます。例えば、`'a: 'b` という where 句がある場合、その関係は実装の borrow check 中に真であると仮定されます（呼び出し元でチェックされます）。したがって、`universal_region_relations` には `'a: 'b` が含まれます。
 - [`type_tests`]: 推論後にチェックする必要がある型に関するいくつかの制約が含まれます（例えば、`T: 'a`）。
-- [`closure_bounds_mapping`]: クロージャからクロージャの作成者に領域制約を伝播するために使用されます。
 
 [`constraints`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#structfield.constraints
-[`liveness_constraints`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#structfield.liveness_constraints
 [`location`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/mir/struct.Location.html
 [`universal_regions`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#structfield.universal_regions
 [`universal_region_relations`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#structfield.universal_region_relations
 [`type_tests`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#structfield.type_tests
-[`closure_bounds_mapping`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#structfield.closure_bounds_mapping
 
 TODO: 他のフィールドについて議論する必要がありますか？SCC についてはどうですか？
 

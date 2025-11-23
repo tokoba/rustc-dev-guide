@@ -1,4 +1,5 @@
 # 診断およびサブ診断構造体
+
 rustcには、診断を作成するために使用できる3つの診断トレイトがあります：
 `Diagnostic`、`LintDiagnostic`、および`Subdiagnostic`。
 
@@ -138,6 +139,7 @@ tcx.dcx().emit_err(FieldAlreadyDeclared {
 ```
 
 ### `#[derive(Diagnostic)]`および`#[derive(LintDiagnostic)]`のリファレンス
+
 `#[derive(Diagnostic)]`および`#[derive(LintDiagnostic)]`は
 次の属性をサポートします：
 
@@ -208,6 +210,7 @@ tcx.dcx().emit_err(FieldAlreadyDeclared {
   - フィールドが診断引数として提供されるのを防ぎます。
 
 ## `#[derive(Subdiagnostic)]`
+
 コンパイラでは、適用可能な場合に特定のサブ診断をエラーに条件付きで追加する
 関数を書くことが一般的です。多くの場合、これらのサブ診断は、
 全体的な診断ができなくても、診断構造体を使用して表すことができます。
@@ -334,6 +337,7 @@ impl<'tcx> Subdiagnostic for ExpectedReturnTypeLabel<'tcx> {
 サブ診断がメイン診断に既に存在する引数と同じ名前の引数を設定する場合、
 両方がまったく同じ値でない限り、実行時にエラーを報告します。
 これには2つの利点があります：
+
 - メイン診断の引数がサブ診断の属性に表示される柔軟性を保持します。
 例えば、サブ診断に`#[suggestion(code = "{new_vis}")]`属性がありますが、`new_vis`はメイン診断構造体のフィールドです。
 - メイン診断または他のサブ診断に必要な引数の誤った上書きまたは削除を防ぎます。
@@ -343,6 +347,7 @@ impl<'tcx> Subdiagnostic for ExpectedReturnTypeLabel<'tcx> {
 さらに、サブ診断は、必要に応じて同じ名前のメイン診断からの引数にアクセスできます。
 
 ### `#[derive(Subdiagnostic)]`のリファレンス
+
 `#[derive(Subdiagnostic)]`は次の属性をサポートします：
 
 - `#[label(slug)]`、`#[help(slug)]`、`#[warning(slug)]`、または`#[note(slug)]`

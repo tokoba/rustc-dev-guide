@@ -13,9 +13,11 @@ cargo run --manifest-path src/ci/citool/Cargo.toml run-local dist-x86_64-linux-a
 上記のスクリプトがうまくいかない場合、Dockerイメージの実行をより詳細に制御したい場合、またはDockerジョブの実行中に正確に何が起こるかを理解したい場合は、以下を読み続けてください。
 
 ## `run.sh`スクリプト
+
 [`src/ci/docker/run.sh`]スクリプトは、特定のDockerイメージをビルドし、実行し、イメージ内でRustをビルドし、テストを実行するか、配布用に設計された一連のアーカイブを準備するために使用されます。スクリプトは、ローカルのRustソースツリーを読み取り専用モードでマウントし、`obj`ディレクトリを読み書きモードでマウントします。すべてのコンパイラアーティファクトは`obj`ディレクトリに保存されます。シェルは`obj`ディレクトリから開始されます。そこから、Dockerイメージによって定義されたビルドを開始する`../src/ci/run.sh`を実行します。
 
 `src/ci/docker/run.sh <image-name>`を直接実行できます。`run.sh`スクリプトに関するいくつかの重要な注意事項：
+
 - CIで実行されるとき、スクリプトはすべてのサブモジュールがチェックアウトされていることを期待します。ジョブによってアクセスされる一部のサブモジュールが利用できない場合、ビルドはエラーになります。したがって、必要なすべてのサブモジュールがローカルにチェックアウトされていることを確認する必要があります。git経由で手動で行うか、`bootstrap.toml`に`submodules = true`を設定し、`x build`のようなコマンドを実行してbootstrapに最も重要なサブモジュールをダウンロードさせることができます（ただし、実行しようとしている特定のCIジョブには十分でない可能性があります）。
 - `<image-name>`は、`src/ci/docker/host-*`ディレクトリのいずれかに配置された単一のディレクトリに対応します。イメージ名は必ずしもジョブ名に対応しないことに注意してください。一部のジョブは同じイメージを実行しますが、異なる環境変数またはDockerビルド引数を使用します（これは、CIジョブをローカルで実行することを困難にする複雑さの一部です）。
 - 「dist」ジョブ（`dist-`で始まるジョブ）を実行している場合は、`DEPLOY=1`環境変数を設定する必要があります。
@@ -37,5 +39,4 @@ Dockerコンテナ内では、個々のコマンドを実行して特定のタ�
 [Docker]: https://www.docker.com/
 [`src/ci/docker`]: https://github.com/rust-lang/rust/tree/HEAD/src/ci/docker
 [`src/ci/docker/run.sh`]: https://github.com/rust-lang/rust/blob/HEAD/src/ci/docker/run.sh
-[`src/ci/run.sh`]: https://github.com/rust-lang/rust/blob/HEAD/src/ci/run.sh
 [`enable-docker-ipv6.sh`]: https://github.com/rust-lang/rust/blob/HEAD/src/ci/scripts/enable-docker-ipv6.sh

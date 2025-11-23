@@ -107,10 +107,10 @@ PR例：
 
    <!-- date-check: mar 2025 -->
    > 以前のLLVM更新の例：
-   > - [LLVM 17](https://github.com/rust-lang/rust/pull/115959)
-   > - [LLVM 18](https://github.com/rust-lang/rust/pull/120055)
-   > - [LLVM 19](https://github.com/rust-lang/rust/pull/127513)
-   > - [LLVM 20](https://github.com/rust-lang/rust/pull/135763)
+   > * [LLVM 17](https://github.com/rust-lang/rust/pull/115959)
+   > * [LLVM 18](https://github.com/rust-lang/rust/pull/120055)
+   > * [LLVM 19](https://github.com/rust-lang/rust/pull/127513)
+   > * [LLVM 20](https://github.com/rust-lang/rust/pull/135763)
 
    [`llvm-wrapper`] の互換性を、実際に `src/llvm-project` を更新する前のPRとしてランディングするのが最も簡単な場合があります。この方法では、LLVMの問題に取り組んでいる間、新しいLLVMを試すことに興味のある他の人が、C++バインディングの更新作業から恩恵を受けることができます。
 
@@ -130,10 +130,8 @@ PR例：
 * 一般的な質問がある場合は、[wg-llvm]が役立ちます。
 * GitHubでのブランチの作成は特権的な操作なので、おそらく書き込みアクセス権を持つ誰かにブランチを作成してもらう必要があります。
 
-
 [rust-lang/llvm-project repository]: https://github.com/rust-lang/llvm-project
 [llvm/llvm-project repository]: https://github.com/llvm/llvm-project
 [`llvm-wrapper`]: https://github.com/rust-lang/rust/tree/HEAD/compiler/rustc_llvm/llvm-wrapper
 [wg-llvm]: https://rust-lang.zulipchat.com/#narrow/stream/187780-t-compiler.2Fwg-llvm
 [Dev Desktops]: https://forge.rust-lang.org/infra/docs/dev-desktop.html
-[backport process]: https://llvm.org/docs/GitHub.html#backporting-fixes-to-the-release-branches

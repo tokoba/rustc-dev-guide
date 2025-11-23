@@ -40,8 +40,6 @@ impl<'a> Foo<&'a isize> for AnyInt { }
 3. _プレースホルダーリーク_をチェックする。
 
 [hrsubtype]: ./hrtb.md
-[placeholder]: ../appendix/glossary.html#placeholder
-[paper by SPJ]: https://www.microsoft.com/en-us/research/publication/practical-type-inference-for-arbitrary-rank-types
 
 では、例を通して作業しましょう。
 

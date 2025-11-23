@@ -13,6 +13,7 @@ fn uses_vec_clone<T: Clone>(x: Vec<T>) -> (Vec<T>, Vec<T>) {
     (x.clone(), x)
 }
 ```
+
 ここで、`x.clone()`への呼び出しは、`T: Clone`が真であるという仮定の下で、`Vec<T>`が`Clone`を実装することを証明する必要があります。`T: Clone`を仮定できるのは、
 この関数の呼び出し側によって証明されるためです。
 

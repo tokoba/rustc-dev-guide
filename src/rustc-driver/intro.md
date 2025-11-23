@@ -29,7 +29,6 @@
 > **警告：** その性質上、内部コンパイラAPIは常に
 > 不安定です。とはいえ、不必要に壊さないように努めています。
 
-
 [`Compiler`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_interface/interface/struct.Compiler.html
 [`rustc_driver`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_driver/
 [`rustc_interface`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_interface/index.html

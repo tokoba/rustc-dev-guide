@@ -5,7 +5,6 @@
 関数や関数本体をまたいで機能するため、特に複雑です。
 
 [隠蔽型]: ./borrow_check/region_inference/member_constraints.html?highlight=%22hidden%20type%22#member-constraints
-[opaque type]: ./opaque-types-type-alias-impl-trait.md
 
 ## 実行例
 
@@ -234,6 +233,7 @@ MIR借用チェッカーは`nll_relate`を介して物事を関連付け、領�
 
 1. すべての戻りサイトが同じ推論変数を共有するため、
    一部の戻りサイトは、別の戻りサイトが具体的な型を使用する場合にのみコンパイルされる可能性があります。
+
     ```rust
     fn foo() -> impl Debug {
         if false {
@@ -242,6 +242,7 @@ MIR借用チェッカーは`nll_relate`を介して物事を関連付け、領�
         vec![42]
     }
     ```
+
 2. `impl Trait`の関連型等価性制約は、
    隠蔽型が関連型のトレイト境界を満たす限り使用できます。
    不透明な`impl Trait`シグネチャはそれらを満たす必要はありません。
@@ -273,6 +274,7 @@ MIR借用チェッカーは`nll_relate`を介して物事を関連付け、領�
         || 42
     }
     ```
+
 3. クロージャは親関数の`impl Trait`の隠蔽型を作成できません。
    この点はほとんど問題になりません。
    なぜなら、ポイント1が推論変数を導入するため、

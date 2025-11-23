@@ -20,7 +20,7 @@ trait Trait<T> {
 
 `GenericParamDef` には、パラメータの位置を表す `u32` インデックスも含まれています（最も外側の親から開始）。これは、ジェネリックパラメータの使用を表すために使用される値です（詳細については、[型の表現に関する章][ch_representing_types]を参照してください）。
 
-興味深いことに、`ty::Generics` は現在、アイテムで定義された_すべての_ジェネリックパラメータを含んでいるわけではありません。関数の場合、_early bound_ パラメータのみが含まれます。
+興味深いことに、`ty::Generics` は現在、アイテムで定義された_すべての_ジェネリックパラメータを含んでいるわけではありません。関数の場合、*early bound* パラメータのみが含まれます。
 
 [ch_representing_types]: ./ty.md
 [`ty::Generics`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.Generics.html

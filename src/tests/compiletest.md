@@ -19,6 +19,7 @@
 新しいテストの作成に関するチュートリアルと良いテストを書くためのアドバイスについては、[Adding new tests](adding.md)と[Best practices](best-practices.md)の章を、テストスイートの実行方法については[Running tests](running.md)の章を参照してください。
 
 引数は`--test-args`を使用するか、`--`の後に配置することでcompiletestに渡すことができます。例：
+
 - `x test --test-args --force-rerun`
 - `x test -- --force-rerun`
 
@@ -110,9 +111,9 @@ Compiletestは、`-C incremental`フラグを使用して空のディレクト�
 
 リビジョンは次のように始める必要があります：
 
-* `rpass` — テストはコンパイルして正常に実行される必要があります
-* `rfail` — テストは正常にコンパイルされる必要がありますが、実行可能ファイルは実行に失敗する必要があります
-* `cfail` — テストはコンパイルに失敗する必要があります
+- `rpass` — テストはコンパイルして正常に実行される必要があります
+- `rfail` — テストは正常にコンパイルされる必要がありますが、実行可能ファイルは実行に失敗する必要があります
+- `cfail` — テストはコンパイルに失敗する必要があります
 
 リビジョンを一意にするには、`rpass1`と`rpass2`のようにサフィックスを追加する必要があります。
 
@@ -141,7 +142,6 @@ fn main() { foo(); }
 `cfail`テストは、テストが内部コンパイラエラー（ICE）を引き起こすべきことを指定する`should-ice`ディレクティブをサポートします。これは、ICE後もインクリメンタルキャッシュが引き続き機能することをチェックするための非常に特殊なディレクティブです。
 
 [`tests/incremental`]: https://github.com/rust-lang/rust/tree/HEAD/tests/incremental
-
 
 ### デバッグ情報テスト
 
@@ -226,7 +226,6 @@ fn b() {}
 [`tests/codegen-llvm`]: https://github.com/rust-lang/rust/tree/HEAD/tests/codegen-llvm
 [FileCheck]: https://llvm.org/docs/CommandGuide/FileCheck.html
 
-
 ### アセンブリテスト
 
 [`tests/assembly-llvm`]のテストは、LLVMアセンブリ出力をテストします。これらは`--emit=asm`フラグを使用してテストをコンパイルし、アセンブリ出力を含む`.s`ファイルを出力します。次に、LLVM [FileCheck]ツールを実行します。
@@ -241,7 +240,6 @@ fn b() {}
 
 [`tests/assembly-llvm`]: https://github.com/rust-lang/rust/tree/HEAD/tests/assembly-llvm
 
-
 ### コード生成ユニットテスト
 
 [`tests/codegen-units`]のテストは、[単相化](../backend/monomorph.md)コレクタとCGUパーティショニングをテストします。
@@ -255,18 +253,17 @@ statics[Internal]`
 
 [`tests/codegen-units`]: https://github.com/rust-lang/rust/tree/HEAD/tests/codegen-units
 
-
 ### MIR最適化テスト
 
 [`tests/mir-opt`]のテストは、生成されたMIRの一部をチェックして、正しく生成され、期待される最適化を実行していることを確認します。詳細については、[MIR Optimizations](../mir/optimizations.md)の章を参照してください。
 
 Compiletestは、いくつかのフラグを使用してテストをビルドし、MIR出力をダンプし、最適化のベースラインを設定します：
 
-* `-Copt-level=1`
-* `-Zdump-mir=all`
-* `-Zmir-opt-level=4`
-* `-Zvalidate-mir`
-* `-Zdump-mir-exclude-pass-number`
+- `-Copt-level=1`
+- `-Zdump-mir=all`
+- `-Zmir-opt-level=4`
+- `-Zvalidate-mir`
+- `-Zdump-mir-exclude-pass-number`
 
 テストには、期待されるMIR出力を含むファイルを指定する`// EMIT_MIR`コメントで注釈を付ける必要があります。`x test --bless`を使用して、初期の期待ファイルを作成できます。
 
@@ -286,7 +283,6 @@ Compiletestは、いくつかのフラグを使用してテストをビルドし
 デフォルトでは、32ビットと64ビットのターゲットは同じダンプファイルを使用しますが、定数内のポインタや他のビット幅依存のものが存在する場合に問題が生じる可能性があります。その場合、テストに`// EMIT_MIR_FOR_EACH_BIT_WIDTH`を追加すると、32ビットシステムと64ビットシステム用に別々のファイルが生成されます。
 
 [`tests/mir-opt`]: https://github.com/rust-lang/rust/tree/HEAD/tests/mir-opt
-
 
 ### `run-make`テスト
 
@@ -312,7 +308,7 @@ Compiletestは、いくつかのフラグを使用してテストをビルドし
 ステージ1のrustcをビルドせずに`rmake.rs`テストがコンパイル可能かどうかを素早くチェックできます。ステージ0のコンパイラで`rmake.rs`を強制的にコンパイルします：
 
 ```bash
-$ COMPILETEST_FORCE_STAGE0=1 x test --stage 0 tests/run-make/<test-name>
+COMPILETEST_FORCE_STAGE0=1 x test --stage 0 tests/run-make/<test-name>
 ```
 
 もちろん、一部のテストはこの方法では正常に*実行*されません。
@@ -420,7 +416,7 @@ profiler = true
 詳細なstdout/stderrを表示したい場合は、`COMPILETEST_VERBOSE_CRASHES=1`を設定する必要があります。例：
 
 ```bash
-$ COMPILETEST_VERBOSE_CRASHES=1 ./x test tests/crashes/999999.rs --stage 1
+COMPILETEST_VERBOSE_CRASHES=1 ./x test tests/crashes/999999.rs --stage 1
 ```
 
 誰でもissue trackerから["untracked" crashes]を追加できます。複数のissueからのテストケースを1つのPRに含めることを強くお勧めします。

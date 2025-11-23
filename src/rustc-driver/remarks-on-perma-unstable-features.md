@@ -44,9 +44,11 @@ error: linking with `cc` failed: exit status: 1
 
 1. **LLVMのインストールを確認**: LLVMがインストールされており、アクセス可能であることを確認します
 2. **ライブラリパスの設定**: 環境変数を設定する必要がある場合があります：
+
    ```text
    export LD_LIBRARY_PATH=/path/to/llvm/lib:$LD_LIBRARY_PATH
    ```
+
 3. **バージョンの互換性を確認**: LLVMバージョンがRustツールチェーンと互換性があることを確認します
 
 ### 追加リソース

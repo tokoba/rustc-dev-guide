@@ -59,7 +59,6 @@ struct MyStruct<T> {
 
 [nominal]: https://en.wikipedia.org/wiki/Nominal_type_system
 
-
 ## `GenericArgs` 型
 
 ジェネリック型 `MyType<A, B, …>` が与えられたとき、`MyType` のジェネリック引数のリストを保存する必要があります。
@@ -86,10 +85,8 @@ fn deal_with_generic_arg<'tcx>(generic_arg: GenericArg<'tcx>) -> GenericArg<'tcx
 }
 ```
 
-[list]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.List.html
 [`GenericArg`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.GenericArg.html
 [`GenericArgKind`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/type.GenericArgKind.html
-[`GenericArgs`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/type.GenericArgs.html
 
 すべてをまとめると：
 

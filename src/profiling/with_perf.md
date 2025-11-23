@@ -46,7 +46,7 @@ perf record -F99 --call-graph dwarf cargo +<toolchain> rustc
 - 依存関係のビルドに費やされる時間をプロファイリングしたくないでしょう。
   そのため、`cargo build; cargo clean -p $C`のようなものが役立つかもしれません
   (`$C`はクレート名です)
-    - ただし、通常は`touch src/lib.rs`を実行して代わりに再ビルドします。=)
+  - ただし、通常は`touch src/lib.rs`を実行して代わりに再ビルドします。=)
 - インクリメンタルがプロファイルに干渉しないようにしたいでしょう。
   そのため、`CARGO_INCREMENTAL=0`のようなものが役立ちます。
 
@@ -67,7 +67,7 @@ cargo install addr2line --features="bin"
 [rustc-perf][rustc-perf]リポジトリをクローンする必要があります:
 
 ```bash
-$ git clone https://github.com/rust-lang/rustc-perf
+git clone https://github.com/rust-lang/rustc-perf
 ```
 
 次に、プロファイリングしたいテストのソースコードを見つけます。テストのソースは

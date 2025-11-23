@@ -15,13 +15,11 @@
 
 </div>
 
-
 コンパイラは `x.py` というツールを使用してビルドされます。これを実行するには Python がインストールされている必要があります。
 
 ## クイックスタート
 
 コンパイラを実行するための簡易的なクイックスタートについては、[クイックスタート](./quickstart.md) をご覧ください。
-
 
 ## ソースコードの取得
 
@@ -116,6 +114,7 @@ python x.py <subcommand> [flags]
 ```
 
 Windows では、PowerShell コマンドで次のようなエラーが発生する場合があります：
+
 ```
 PS C:\Users\vboxuser\rust> ./x
 ./x : File C:\Users\vboxuser\rust\x.ps1 cannot be loaded because running scripts is disabled on this system. For more
@@ -128,6 +127,7 @@ At line:1 char:1
 ```
 
 PowerShell がローカルスクリプトを実行できるようにすることで、このエラーを回避できます：
+
 ```
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
@@ -178,6 +178,7 @@ Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
 このコマンドは次のことを行います：
+
 - stage0 コンパイラと stage0 `std` を使用して `rustc` をビルドします。
 - ちょうどビルドされた stage1 コンパイラで `library`（標準ライブラリ）をビルドします。
 - stage1 コンパイラと stage1 標準ライブラリを含む、動作する stage1 sysroot を組み立てます。

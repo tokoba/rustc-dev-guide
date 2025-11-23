@@ -19,7 +19,6 @@
 `EvalCtxt::assemble_and_evaluate_candidates`を介してこのゴールを証明できるすべての可能な方法を収集する必要があります。各候補は、他の候補に推論制約をリークしないように、別の「プローブ」で処理されます。
 次に、`EvalCtxt::merge_candidates`を介して組み立てられた候補をマージしようとします。
 
-
 ## 重要な概念と設計パターン
 
 ### `EvalCtxt::add_goal`

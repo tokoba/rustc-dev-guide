@@ -90,4 +90,3 @@
 詳細については[#122687]を参照してください。
 
 [#122687]: https://github.com/rust-lang/rust/pull/122687
-[正規化]: ../normalization.md

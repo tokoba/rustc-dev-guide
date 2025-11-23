@@ -10,7 +10,6 @@ HIR（「High-Level Intermediate Representation」：高レベル中間表現）
 cargo rustc -- -Z unpretty=hir-tree
 ```
 
-
 また、`-Z unpretty=hir` オプションを使用して、元のソースコード式に近い HIR を生成することもできます：
 
 ```bash
@@ -71,7 +70,6 @@ HIR は、共存してさまざまな目的を果たすさまざまな識別子�
 
 ほとんどの場合、HIR を扱うときは、`TyCtxt` を介して行います。これには、`hir::map` モジュールで定義され、ほとんどが `hir_` プレフィックスを持つ多数のメソッドが含まれており、さまざまな種類の ID を変換したり、HIR ノードに関連付けられたデータを検索したりします。
 
-[`TyCtxt`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html
 
 例えば、[`LocalDefId`] があり、それを [`HirId`] に変換したい場合は、[`tcx.local_def_id_to_hir_id(def_id)`][local_def_id_to_hir_id] を使用できます。ローカルアイテムのみが HIR ノードを持つため、`DefId` ではなく `LocalDefId` が必要です。
 
@@ -87,7 +85,6 @@ HIR は、共存してさまざまな目的を果たすさまざまな識別子�
 最後に、[`tcx.parent_hir_node(n)`][parent_hir_node] のような呼び出しを介してノードの親を見つけることができます。
 
 [parent_hir_node]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html#method.parent_hir_node
-
 
 ## HIR ボディ
 

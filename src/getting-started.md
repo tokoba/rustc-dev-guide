@@ -13,7 +13,6 @@ Rust への貢献に興味を持っていただき、ありがとうございま
 [rust-zulip]: https://rust-lang.zulipchat.com
 [coc]: https://www.rust-lang.org/policies/code-of-conduct
 [walkthrough]: ./walkthrough.md
-[Getting Started]: ./getting-started.md
 
 ## 質問する
 
@@ -135,7 +134,6 @@ PR がその間に別の方法で実装されている場合、`S-inactive` ラ�
 [community-library]: https://github.com/rust-lang/rfcs/labels/A-community-library
 [wd]: ./contributing.md#writing-documentation
 [wg]: https://rust-lang.github.io/compiler-team/working-groups/
-[triage]: ./contributing.md#issue-triage
 
 ## クローンとビルド
 

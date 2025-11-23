@@ -70,7 +70,6 @@ println!("x: {}", x);
 
 例えば、次のコードは[`ResultsVisitor`]を使用しています...
 
-
 ```rust,ignore
 // `MyVisitor`が`ResultsVisitor<FlowState = MyAnalysis::Domain>`を実装していると仮定...
 let mut my_visitor = MyVisitor::new();
@@ -106,17 +105,14 @@ for (bb, block) in body.basic_blocks().iter_enumerated() {
 
 ![A graphviz diagram for a dataflow analysis](../img/dataflow-graphviz-example.png)
 
-["gen-kill" problems]: https://en.wikipedia.org/wiki/Data-flow_analysis#Bit_vector_problems
 [*Static Program Analysis*]: https://cs.au.dk/~amoeller/spa/
 [MIRのデバッグ]: ./debugging.md
 [`Analysis`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_dataflow/trait.Analysis.html
-[`GenKillAnalysis`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_dataflow/trait.GenKillAnalysis.html
 [`JoinSemiLattice`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_dataflow/lattice/trait.JoinSemiLattice.html
 [`NAME`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_dataflow/trait.Analysis.html#associatedconstant.NAME
 [`ResultsCursor`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_dataflow/struct.ResultsCursor.html
 [`ResultsVisitor`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_dataflow/trait.ResultsVisitor.html
 [`apply_call_return_effect`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_dataflow/trait.Analysis.html#tymethod.apply_call_return_effect
-[`into_engine`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_dataflow/trait.Analysis.html#method.into_engine
 [`lattice`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_dataflow/lattice/index.html
 [pr-1295]: https://github.com/rust-lang/rustc-dev-guide/pull/1295
 [pr-1295-comment]: https://github.com/rust-lang/rustc-dev-guide/pull/1295#issuecomment-1118131294

@@ -109,4 +109,3 @@ SVHは[インクリメンタルコンパイル][incremental compilation]セッ�
 
 [#64191]: https://github.com/rust-lang/rust/issues/64191
 
-[metadata]: #metadata

@@ -92,16 +92,16 @@ WPAがrustcのシンボルをロードしたら、rustc.exeノードを展開し
 
 プロファイルには、役立つ可能性のあるいくつかの他のタブも含まれています:
 
-- System Configuration
-    - キャプチャが記録されたシステムに関する一般情報。
-- rustc Build Processes
-    - rustc.exe、cargo.exe、link.exeなどの関連プロセスのフラットリスト。
-    - 各プロセスはコマンドライン引数をリストします。
-    - 特定のrustcプロセスが何に取り組んでいたかを把握するのに役立ちます。
-- rustc Build Process Tree
-    - プロセスがいつ開始および終了したかを示すタイムライン。
-- rustc CPU Analysis
-    - rustcのホットスポットを表示するように事前設定されたグラフが含まれています。
-    - これらのグラフは、rustcが時間を費やしている場所の分析をサポートするように設計されています。
-- rustc Memory Analysis
-    - rustcがメモリを割り当てている場所を表示するように事前設定されたグラフが含まれています。
+* System Configuration
+  * キャプチャが記録されたシステムに関する一般情報。
+* rustc Build Processes
+  * rustc.exe、cargo.exe、link.exeなどの関連プロセスのフラットリスト。
+  * 各プロセスはコマンドライン引数をリストします。
+  * 特定のrustcプロセスが何に取り組んでいたかを把握するのに役立ちます。
+* rustc Build Process Tree
+  * プロセスがいつ開始および終了したかを示すタイムライン。
+* rustc CPU Analysis
+  * rustcのホットスポットを表示するように事前設定されたグラフが含まれています。
+  * これらのグラフは、rustcが時間を費やしている場所の分析をサポートするように設計されています。
+* rustc Memory Analysis
+  * rustcがメモリを割り当てている場所を表示するように事前設定されたグラフが含まれています。

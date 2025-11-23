@@ -28,6 +28,7 @@ rigid ではありません。`u32`に正規化できるためです。
 
 エイリアスは、さらに正規化できない場合に rigid です。*rigid*エイリアスの具体的な例は、
 `T: Iterator<Item = ...>`境界がなく、`T: Iterator`境界のみがある環境の`<T as Iterator>::Item`です。
+
 ```rust
 fn foo<T: Iterator>() {
     // This alias is *rigid*
@@ -43,6 +44,7 @@ fn bar<T: Iterator<Item = u32>>() {
 エイリアスがまだ正規化できないが、[現在の環境](./typing_parameter_envs.md)で正規化可能になる可能性がある場合、
 「ambiguous」エイリアスと見なします。これは、エイリアスにトレイトの実装方法を判断できない
 推論変数が含まれている場合に発生する可能性があります。
+
 ```rust
 fn foo<T: Iterator, U: Iterator>() {
     // This alias is considered to be "ambiguous"
@@ -69,6 +71,7 @@ FreeおよびInherentエイリアスは、名前を付けることもエイリ�
 
 エイリアスは、その定義が正規化する基礎となる非エイリアス型を指定しない場合、「発散」すると見なされます。
 発散エイリアスの具体的な例：
+
 ```rust
 type Diverges = Diverges;
 
@@ -79,6 +82,7 @@ impl Trait for () {
     type DivergingAssoc = <() as Trait>::DivergingAssoc;
 }
 ```
+
 この例では、`Diverges`と`DivergingAssoc`はどちらも、自分自身と等しいと定義されている
 発散型エイリアスの「自明な」ケースです。`Diverges`が正規化できる基礎となる型はありません。
 
@@ -86,6 +90,7 @@ impl Trait for () {
 前の例では、定義は「十分に単純」で検出されるため、エラーが出力されます。
 ただし、より複雑なケース、またはジェネリックパラメータの一部のインスタンス化のみが
 発散エイリアスになるケースでは、エラーを出力しません。
+
 ```rust
 trait Trait {
     type DivergingAssoc<U: Trait>;
@@ -101,6 +106,7 @@ impl<T: ?Sized> Trait for T {
 エイリアスは、特定のジェネリック引数に対してのみ発散する可能性があるため、
 エイリアスが発散するかどうかは、完全に具体的な場合にのみわかります。
 これは、codegenまたは const-evaluation も発散エイリアスを処理する必要があることを意味します。
+
 ```rust
 trait Trait {
     type Diverges<U: Trait>;
@@ -117,6 +123,7 @@ fn main() {
     foo::<()>();
 }
 ```
+
 この例では、`foo::<()>`の codegen 中にのみ発散エイリアスからエラーが発生します。
 `foo`への呼び出しが削除されると、コンパイルエラーは出力されません。
 
@@ -180,6 +187,7 @@ fn bar() {
 
 まず、ambiguous エイリアスを正規化するとき、そのままにするのではなく推論変数に正規化します。
 これには2つの主な効果があります。
+
 - 推論変数は rigid 型ではありませんが、常に rigid 型に推論されるため、
   正規化の結果が再び正規化される必要がないことを保証します
 - 推論変数は、型が非 rigid であるすべてのケースで使用され、
@@ -200,6 +208,7 @@ fn foo() {
 ```
 
 この例では：
+
 - `Foo<?x>`を正規化すると`Bar<?x>`になりますが、`Foo`が等しいと定義されている型のエイリアスを正規化したいです
 - `Bar<?x>`を正規化すると`<?x as Iterator>::Item`になりますが、繰り返しますが、
   `Bar`が等しいと定義されている型のエイリアスを正規化したいです
@@ -221,6 +230,7 @@ fn foo() {
 移行は、Github の [WG-trait-system-refactor](https://github.com/rust-lang/rust/labels/WG-trait-system-refactor) ラベルで追跡できます。
 
 コンパイラのさまざまな正規化エントリポイントの概要は次のとおりです。
+
 - `infcx.at.structurally_normalize`
 - `infcx.at.(deeply_)?normalize`
 - `infcx.query_normalize`
@@ -379,8 +389,6 @@ unnormalized エイリアスのジェネリック引数を等価にすること�
 最終的に、これは値内のすべてのエイリアスが rigid であることを保証することが
 常に可能であるとは限らないことを意味します。
 
-[universe]: borrow_check/region_inference/placeholders_and_universes.md#what-is-a-universe
-[deeply_normalize]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_trait_selection/traits/normalize/trait.NormalizeExt.html#tymethod.deeply_normalize
 
 ## 発散エイリアスの使用の処理
 
@@ -401,6 +409,7 @@ unnormalized エイリアスのジェネリック引数を等価にすること�
 古いソルバーと新しいソルバーでは、今は正規化する場所が少ないため異なります。
 
 発散エイリアスが恣意的にエラーを引き起こすことの「問題」の例：
+
 ```rust
 trait Trait {
     type Diverges<D: Trait>;

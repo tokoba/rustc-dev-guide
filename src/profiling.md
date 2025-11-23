@@ -38,6 +38,7 @@ LLVMに渡されるコードの量を減らすことで、rustcのコンパイ�
 これは、LLVMビットコード形式で`*.no-opt.bc`拡張子を持つファイルに保存されます。
 
 使用例:
+
 ```
 cargo install cargo-llvm-lines
 # 通常のクレートでは`cargo llvm-lines`を実行できますが、`x`は通常ではありません :P
@@ -61,6 +62,7 @@ cargo llvm-lines --files ./build/x86_64-unknown-linux-gnu/stage0-rustc/x86_64-un
 ```
 
 コンパイラの出力例:
+
 ```
   Lines            Copies          Function name
   -----            ------          -------------
@@ -87,6 +89,7 @@ cargo llvm-lines --files ./build/x86_64-unknown-linux-gnu/stage0-rustc/x86_64-un
 これはインクリメンタルコンパイルや`./x check`では機能しないようなので、
 rustcを何度もコンパイルすることになります。
 耐えられるように、`bootstrap.toml`でいくつかの設定を変更することをお勧めします:
+
 ```
 [rust]
 # デバッグビルドは私のマシンでは3分の1の時間で済みますが、

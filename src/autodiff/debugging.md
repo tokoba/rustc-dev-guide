@@ -19,7 +19,7 @@ llvm-irを生成する前に、デバッグのために関連するrustコード
 RUSTFLAGS="-Z autodiff=Enable,PrintModbefore" cargo +enzyme build --release &> out.ll
 ```
 
-これにより、モジュールの前後にいくつかの警告と情報メッセージも取り込まれます。out.llを開き、`; moduleid = <somehash>`より上の行をすべて削除してください。次に、ファイルの末尾を確認し、llvm-irの一部ではないものをすべて削除します。つまり、エラーと警告を削除します。llvm-irの最後の行は、`!<somenumber> = `で始まるはずです。例えば、`!40831 = !{i32 0, i32 1037508, i32 1037538, i32 1037559}`や`!43760 = !dilocation(line: 297, column: 5, scope: !43746)`などです。
+これにより、モジュールの前後にいくつかの警告と情報メッセージも取り込まれます。out.llを開き、`; moduleid = <somehash>`より上の行をすべて削除してください。次に、ファイルの末尾を確認し、llvm-irの一部ではないものをすべて削除します。つまり、エラーと警告を削除します。llvm-irの最後の行は、`!<somenumber> =`で始まるはずです。例えば、`!40831 = !{i32 0, i32 1037508, i32 1037538, i32 1037559}`や`!43760 = !dilocation(line: 297, column: 5, scope: !43746)`などです。
 
 実際の数値はコードによって異なります。
 
@@ -30,6 +30,7 @@ RUSTFLAGS="-Z autodiff=Enable,PrintModbefore" cargo +enzyme build --release &> o
 ```sh
 <path/to/opt> out.ll -load-pass-plugin=/path/to/build/<target-triple>/stage1/lib/libEnzyme-21.so -passes="enzyme" -enzyme-strict-aliasing=0  -s
 ```
+
 このコマンドは将来のバージョンやシステムで失敗する可能性があります。その場合は、libEnzyme-21.soをLLVMEnzyme-21.soに置き換えてください。ビルド方法についてはEnzymeのドキュメントを参照してください。LLVMバージョンのビルド方法も調整する必要があるかもしれません。
 
 前のステップが成功した場合、cargoでrustコードをコンパイルした時と同じエラーが表示されます。

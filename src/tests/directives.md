@@ -118,73 +118,71 @@ comparison](ui.md#output-comparison)、[Rustfix tests](ui.md#rustfix-tests)を�
 
 `ignore-X`または`only-X`の`X`の例：
 
-- 完全なターゲットトリプル：`aarch64-apple-ios`
-- アーキテクチャ：`aarch64`, `arm`, `mips`, `wasm32`, `x86_64`, `x86`,
+* 完全なターゲットトリプル：`aarch64-apple-ios`
+* アーキテクチャ：`aarch64`, `arm`, `mips`, `wasm32`, `x86_64`, `x86`,
   ...
-- OS：`android`, `emscripten`, `freebsd`, `ios`, `linux`, `macos`, `windows`,
+* OS：`android`, `emscripten`, `freebsd`, `ios`, `linux`, `macos`, `windows`,
   ...
-- 環境（ターゲットトリプルの4番目の単語）：`gnu`, `msvc`, `musl`
-- ポインタ幅：`32bit`, `64bit`
-- エンディアン：`endian-big`
-- ステージ：`stage1`, `stage2`
-- バイナリフォーマット：`elf`
-- チャンネル：`stable`, `beta`
-- クロスコンパイル時：`cross-compile`
-- [リモートテスト]が使用される場合：`remote`
-- 特定のデバッガがテストされる場合：`cdb`, `gdb`, `lldb`
-- 特定のデバッガバージョンが一致する場合：`ignore-gdb-version`
-- 特定の[比較モード]：`compare-mode-polonius`, `compare-mode-chalk`,
+* 環境（ターゲットトリプルの4番目の単語）：`gnu`, `msvc`, `musl`
+* ポインタ幅：`32bit`, `64bit`
+* エンディアン：`endian-big`
+* ステージ：`stage1`, `stage2`
+* バイナリフォーマット：`elf`
+* チャンネル：`stable`, `beta`
+* クロスコンパイル時：`cross-compile`
+* [リモートテスト]が使用される場合：`remote`
+* 特定のデバッガがテストされる場合：`cdb`, `gdb`, `lldb`
+* 特定のデバッガバージョンが一致する場合：`ignore-gdb-version`
+* 特定の[比較モード]：`compare-mode-polonius`, `compare-mode-chalk`,
   `compare-mode-split-dwarf`, `compare-mode-split-dwarf-single`
-- カバレッジテストで使用される2つの異なるテストモード：
+* カバレッジテストで使用される2つの異なるテストモード：
   `ignore-coverage-map`, `ignore-coverage-run`
-- distツールチェーンをテストする場合：`dist`
-  - これは`COMPILETEST_ENABLE_DIST_TESTS=1`で有効にする必要があります
-- ターゲットの`rustc_abi`：例：`rustc_abi-x86_64-sse2`
+* distツールチェーンをテストする場合：`dist`
+  * これは`COMPILETEST_ENABLE_DIST_TESTS=1`で有効にする必要があります
+* ターゲットの`rustc_abi`：例：`rustc_abi-x86_64-sse2`
 
 次のディレクティブは、rustcビルド設定とターゲット設定をチェックします：
 
-- `needs-asm-support` — **ホスト**アーキテクチャが`asm!`の安定サポートを持たない場合に無視します。`--target`経由で明示的なターゲットにクロスコンパイルするテストの場合は、代わりに`needs-llvm-components`を使用して、適切なバックエンドが利用可能であることを確認してください。
-- `needs-profiler-runtime` — プロファイラランタイムがターゲットで有効になっていない場合、テストを無視します
+* `needs-asm-support` — **ホスト**アーキテクチャが`asm!`の安定サポートを持たない場合に無視します。`--target`経由で明示的なターゲットにクロスコンパイルするテストの場合は、代わりに`needs-llvm-components`を使用して、適切なバックエンドが利用可能であることを確認してください。
+* `needs-profiler-runtime` — プロファイラランタイムがターゲットで有効になっていない場合、テストを無視します
   （rustcの`bootstrap.toml`の`build.profiler = true`）
-- `needs-sanitizer-support` — サニタイザサポートがターゲットで有効になっていない場合に無視します（rustcの`bootstrap.toml`の`sanitizers = true`）
-- `needs-sanitizer-{address,hwaddress,leak,memory,thread}` — 対応するサニタイザがターゲットで有効になっていない場合に無視します（AddressSanitizer、ハードウェア支援AddressSanitizer、LeakSanitizer、MemorySanitizer、ThreadSanitizerのいずれか）
-- `needs-run-enabled` — 実行されるテストで、実行が無効になっている場合に無視します。テストの実行は、`x test --run=never`フラグで無効にするか、fuchsiaで実行することで無効にできます。
-- `needs-unwind` — ターゲットがアンワインドサポートを持たない場合に無視します
-- `needs-rust-lld` — rust lldサポートが有効になっていない場合に無視します（`bootstrap.toml`の`rust.lld = true`）
-- `needs-threads` — ターゲットがスレッドサポートを持たない場合に無視します
-- `needs-subprocess`  — ターゲットがサブプロセスサポートを持たない場合に無視します
-- `needs-symlink` — ターゲットがシンボリックリンクをサポートしていない場合に無視します。これは、開発者が特権シンボリックリンク権限を有効にしていない場合、Windowsで当てはまる可能性があります。
-- `ignore-std-debug-assertions` — stdがデバッグアサーション付きでビルドされている場合に無視します。
-- `needs-std-debug-assertions` — stdがデバッグアサーションなしでビルドされている場合に無視します。
-- `ignore-rustc-debug-assertions` — rustcがデバッグアサーション付きでビルドされている場合に無視します。
-- `needs-rustc-debug-assertions` — rustcがデバッグアサーションなしでビルドされている場合に無視します。
-- `needs-target-has-atomic` — ターゲットが指定されたすべてのアトミック幅のサポートを持たない場合に無視します。例えば、`//@ needs-target-has-atomic: 8,
+* `needs-sanitizer-support` — サニタイザサポートがターゲットで有効になっていない場合に無視します（rustcの`bootstrap.toml`の`sanitizers = true`）
+* `needs-sanitizer-{address,hwaddress,leak,memory,thread}` — 対応するサニタイザがターゲットで有効になっていない場合に無視します（AddressSanitizer、ハードウェア支援AddressSanitizer、LeakSanitizer、MemorySanitizer、ThreadSanitizerのいずれか）
+* `needs-run-enabled` — 実行されるテストで、実行が無効になっている場合に無視します。テストの実行は、`x test --run=never`フラグで無効にするか、fuchsiaで実行することで無効にできます。
+* `needs-unwind` — ターゲットがアンワインドサポートを持たない場合に無視します
+* `needs-rust-lld` — rust lldサポートが有効になっていない場合に無視します（`bootstrap.toml`の`rust.lld = true`）
+* `needs-threads` — ターゲットがスレッドサポートを持たない場合に無視します
+* `needs-subprocess`  — ターゲットがサブプロセスサポートを持たない場合に無視します
+* `needs-symlink` — ターゲットがシンボリックリンクをサポートしていない場合に無視します。これは、開発者が特権シンボリックリンク権限を有効にしていない場合、Windowsで当てはまる可能性があります。
+* `ignore-std-debug-assertions` — stdがデバッグアサーション付きでビルドされている場合に無視します。
+* `needs-std-debug-assertions` — stdがデバッグアサーションなしでビルドされている場合に無視します。
+* `ignore-rustc-debug-assertions` — rustcがデバッグアサーション付きでビルドされている場合に無視します。
+* `needs-rustc-debug-assertions` — rustcがデバッグアサーションなしでビルドされている場合に無視します。
+* `needs-target-has-atomic` — ターゲットが指定されたすべてのアトミック幅のサポートを持たない場合に無視します。例えば、`//@ needs-target-has-atomic: 8,
   16, ptr`を含むテストは、カンマ区切りのアトミック幅リストをサポートしている場合にのみ実行されます。
-- `needs-dynamic-linking` — ターゲットが動的リンクをサポートしていない場合に無視します
+* `needs-dynamic-linking` — ターゲットが動的リンクをサポートしていない場合に無視します
   （`dylib`および`cdylib`クレートタイプを作成できないこととは直交しています）
-- `needs-crate-type` — ターゲットプラットフォームが、カンマ区切りで指定された1つ以上のクレートタイプをサポートしていない場合に無視します。例えば、
+* `needs-crate-type` — ターゲットプラットフォームが、カンマ区切りで指定された1つ以上のクレートタイプをサポートしていない場合に無視します。例えば、
   `//@ needs-crate-type: cdylib, proc-macro`は、ターゲットが`proc-macro`クレートタイプをサポートしていないため、`wasm32-unknown-unknown`ターゲットでテストを無視します。
-- `needs-target-std` — ターゲットプラットフォームがstdサポートを持たない場合に無視します。
-- `ignore-backends` — 空白文字で区切られた、リストされたバックエンドを無視します。このディレクティブは`--bypass-ignore-backends=[BACKEND]`コマンドラインフラグで上書きできることに注意してください。
-- `needs-backends` — 現在のcodegenバックエンドがリストされている場合にのみテストを実行します。
+* `needs-target-std` — ターゲットプラットフォームがstdサポートを持たない場合に無視します。
+* `ignore-backends` — 空白文字で区切られた、リストされたバックエンドを無視します。このディレクティブは`--bypass-ignore-backends=[BACKEND]`コマンドラインフラグで上書きできることに注意してください。
+* `needs-backends` — 現在のcodegenバックエンドがリストされている場合にのみテストを実行します。
 
 次のディレクティブはLLVMサポートをチェックします：
 
-- `exact-llvm-major-version: 19` — llvmメジャーバージョンが指定されたllvmメジャーバージョンと一致しない場合に無視します。
-- `min-llvm-version: 13.0` — LLVMバージョンが指定された値より低い場合に無視します
-- `min-system-llvm-version: 12.0` — システムLLVMを使用していて、そのバージョンが指定された値より低い場合に無視します
-- `max-llvm-major-version: 19` — LLVMメジャーバージョンが指定されたメジャーバージョンより高い場合に無視します
-- `ignore-llvm-version: 9.0` — 特定のLLVMバージョンを無視します
-- `ignore-llvm-version: 7.0 - 9.9.9` — 範囲内（両端を含む）のLLVMバージョンを無視します
-- `needs-llvm-components: powerpc` — 特定のLLVMコンポーネントがビルドされていない場合に無視します。注：コンポーネントが存在しない場合、CI（`COMPILETEST_REQUIRE_ALL_LLVM_COMPONENTS`が設定されている場合）でテストは失敗します。
-- `needs-forced-clang-based-tests` — 環境変数`RUSTBUILD_FORCE_CLANG_BASED_TESTS`が設定されていない限り、テストは無視されます。これにより、LLVMと一緒にclangをビルドできます
-  - これは2つのCIジョブ（[`x86_64-gnu-debug`]と
+* `exact-llvm-major-version: 19` — llvmメジャーバージョンが指定されたllvmメジャーバージョンと一致しない場合に無視します。
+* `min-llvm-version: 13.0` — LLVMバージョンが指定された値より低い場合に無視します
+* `min-system-llvm-version: 12.0` — システムLLVMを使用していて、そのバージョンが指定された値より低い場合に無視します
+* `max-llvm-major-version: 19` — LLVMメジャーバージョンが指定されたメジャーバージョンより高い場合に無視します
+* `ignore-llvm-version: 9.0` — 特定のLLVMバージョンを無視します
+* `ignore-llvm-version: 7.0 - 9.9.9` — 範囲内（両端を含む）のLLVMバージョンを無視します
+* `needs-llvm-components: powerpc` — 特定のLLVMコンポーネントがビルドされていない場合に無視します。注：コンポーネントが存在しない場合、CI（`COMPILETEST_REQUIRE_ALL_LLVM_COMPONENTS`が設定されている場合）でテストは失敗します。
+* `needs-forced-clang-based-tests` — 環境変数`RUSTBUILD_FORCE_CLANG_BASED_TESTS`が設定されていない限り、テストは無視されます。これにより、LLVMと一緒にclangをビルドできます
+  * これは2つのCIジョブ（[`x86_64-gnu-debug`]と
     [`aarch64-gnu-debug`]）でのみ設定され、`run-make`テストのサブセットのみを実行します。このディレクティブを持つ他のテストはまったく実行されません。これは通常、望ましいことではありません。
 
 デバッガを無視するためのディレクティブについては、[Debuginfo tests](compiletest.md#debuginfo-tests)も参照してください。
 
-[remote testing]: running.md#running-tests-on-a-remote-machine
-[compare modes]: ui.md#compare-modes
 [`x86_64-gnu-debug`]: https://github.com/rust-lang/rust/blob/ab3dba92db355b8d97db915a2dca161a117e959c/src/ci/docker/host-x86_64/x86_64-gnu-debug/Dockerfile#L32
 [`aarch64-gnu-debug`]: https://github.com/rust-lang/rust/blob/20c909ff9cdd88d33768a4ddb8952927a675b0ad/src/ci/docker/host-aarch64/aarch64-gnu-debug/Dockerfile#L32
 
@@ -214,19 +212,19 @@ comparison](ui.md#output-comparison)、[Rustfix tests](ui.md#rustfix-tests)を�
 
 例：
 
-- `//@ edition: 2018`ディレクティブを持つテストは、2018エディションの下でのみ実行されます。
-- `//@ edition: 2015..2021`ディレクティブを持つテストは、2015、2018、および2021エディションの下で実行できます。
+* `//@ edition: 2018`ディレクティブを持つテストは、2018エディションの下でのみ実行されます。
+* `//@ edition: 2015..2021`ディレクティブを持つテストは、2015、2018、および2021エディションの下で実行できます。
   ただし、CIは範囲内の最低エディション（この例では2015）でのみテストを実行します。
-- `//@ edition: 2018..`ディレクティブを持つテストは、2018エディション以上で実行されます。
+* `//@ edition: 2018..`ディレクティブを持つテストは、2018エディション以上で実行されます。
   ただし、CIは範囲内の最低エディション（この例では2018）でのみテストを実行します。
 
 `-- --edition=`引数を渡すことで、`./x test`に特定のエディションを使用させることもできます。
 ただし、`//@ edition`ディレクティブを持つテストは、引数に渡された値をクランプします。
 例えば、`./x test -- --edition=2015`を実行する場合：
 
-- `//@ edition: 2018`を持つテストは、2018エディションで実行されます。
-- `//@ edition: 2015..2021`を持つテストは、2015エディションで実行されます。
-- `//@ edition: 2018..`を持つテストは、2018エディションで実行されます。
+* `//@ edition: 2018`を持つテストは、2018エディションで実行されます。
+* `//@ edition: 2015..2021`を持つテストは、2015エディションで実行されます。
+* `//@ edition: 2018..`を持つテストは、2018エディションで実行されます。
 
 ### Rustdoc
 
@@ -253,12 +251,12 @@ comparison](ui.md#output-comparison)、[Rustfix tests](ui.md#rustfix-tests)を�
 
 #### その他のディレクティブ
 
-- `no-auto-check-cfg` — 自動check-cfgを無効にする（`--check-cfg`テストのみ）
-- [`revisions`](compiletest.md#revisions) — 複数回コンパイル
+* `no-auto-check-cfg` — 自動check-cfgを無効にする（`--check-cfg`テストのみ）
+* [`revisions`](compiletest.md#revisions) — 複数回コンパイル
 -[`forbid-output`](compiletest.md#incremental-tests) — インクリメンタルcfailは出力パターンを拒否
-- [`should-ice`](compiletest.md#incremental-tests) — インクリメンタルcfailはICEする必要がある
-- [`reference`] — リファレンスのルールへのリンク注釈
-- `disable-gdb-pretty-printers` — debuginfoテスト用のgdbプリティプリンタを無効にする
+* [`should-ice`](compiletest.md#incremental-tests) — インクリメンタルcfailはICEする必要がある
+* [`reference`] — リファレンスのルールへのリンク注釈
+* `disable-gdb-pretty-printers` — debuginfoテスト用のgdbプリティプリンタを無効にする
 
 [`reference`]: https://github.com/rust-lang/reference/blob/master/docs/authoring.md#test-rule-annotations
 
@@ -266,19 +264,19 @@ comparison](ui.md#output-comparison)、[Rustfix tests](ui.md#rustfix-tests)を�
 
 次のディレクティブは、これらのツールを使用するテストスイートで、特定のコマンドラインツールの呼び出し方法に影響します：
 
-- `filecheck-flags`は、LLVMの`FileCheck`ツールを実行するときに追加のフラグを追加します。
-  - [codegenテスト](compiletest.md#codegen-tests)、
+* `filecheck-flags`は、LLVMの`FileCheck`ツールを実行するときに追加のフラグを追加します。
+  * [codegenテスト](compiletest.md#codegen-tests)、
   [assemblyテスト](compiletest.md#assembly-tests)、
   [MIR-optテスト](compiletest.md#mir-opt-tests)で使用されます。
-- `llvm-cov-flags`は、LLVMの`llvm-cov`ツールを実行するときに追加のフラグを追加します。
-  - `coverage-run`モードの[coverageテスト](compiletest.md#coverage-tests)で使用されます。
+* `llvm-cov-flags`は、LLVMの`llvm-cov`ツールを実行するときに追加のフラグを追加します。
+  * `coverage-run`モードの[coverageテスト](compiletest.md#coverage-tests)で使用されます。
 
 ### Tidy固有のディレクティブ
 
 次のディレクティブは、[tidyスクリプト](../conventions.md#formatting)がテストを検証する方法を制御します。
 
-- `ignore-tidy-target-specific-tests`は、テストが特定のターゲット用にコンパイルされる場合（`compile-flag`ディレクティブの`--target`フラグ経由）に、適切なLLVMコンポーネントが必要であること（`needs-llvm-components`ディレクティブ経由）のチェックを無効にします。
-- [`unused-revision-names`](compiletest.md#ignoring-unused-revision-names) -
+* `ignore-tidy-target-specific-tests`は、テストが特定のターゲット用にコンパイルされる場合（`compile-flag`ディレクティブの`--target`フラグ経由）に、適切なLLVMコンポーネントが必要であること（`needs-llvm-components`ディレクティブ経由）のチェックを無効にします。
+* [`unused-revision-names`](compiletest.md#ignoring-unused-revision-names) -
       未知のリビジョン名の言及に対するtidyチェックを抑制します。
 
 ## 置換
@@ -291,24 +289,22 @@ comparison](ui.md#output-comparison)、[Rustfix tests](ui.md#rustfix-tests)を�
 
 ここで、センチネル`{{src-base}}`は、以下に説明する適切なパスに置き換えられます：
 
-- `{{cwd}}`：compiletestが実行されるディレクトリ。これはチェックアウトのルートではない可能性があるため、可能な限り使用を避ける必要があります。
-  - 例：`/path/to/rust`, `/path/to/build/root`
-- `{{src-base}}`：テストが定義されているディレクトリ。これは[出力正規化]の`$DIR`と同等です。
-  - 例：`/path/to/rust/tests/ui/error-codes`
-- `{{build-base}}`：テストの出力が格納されるベースディレクトリ。これは[出力正規化]の`$TEST_BUILD_DIR`と同等です。
-  - 例：`/path/to/rust/build/x86_64-unknown-linux-gnu/test/ui`
-- `{{rust-src-base}}`：libstd/libcore/...が配置されているsysrootディレクトリ
-- `{{sysroot-base}}`：テストのビルドに使用されるsysrootディレクトリのパス。
-  - 主に、API経由でコンパイラを実行する`ui-fulldeps`テストを対象としています。
-- `{{target-linker}}`：このテストのために`-Clinker`に渡されるリンカ。リンカのオーバーライドがアクティブでない場合は空白です。
-  - 主に、API経由でコンパイラを実行する`ui-fulldeps`テストを対象としています。
-- `{{target}}`：テストがコンパイルされるターゲット
-  - 例：`x86_64-unknown-linux-gnu`
+* `{{cwd}}`：compiletestが実行されるディレクトリ。これはチェックアウトのルートではない可能性があるため、可能な限り使用を避ける必要があります。
+  * 例：`/path/to/rust`, `/path/to/build/root`
+* `{{src-base}}`：テストが定義されているディレクトリ。これは[出力正規化]の`$DIR`と同等です。
+  * 例：`/path/to/rust/tests/ui/error-codes`
+* `{{build-base}}`：テストの出力が格納されるベースディレクトリ。これは[出力正規化]の`$TEST_BUILD_DIR`と同等です。
+  * 例：`/path/to/rust/build/x86_64-unknown-linux-gnu/test/ui`
+* `{{rust-src-base}}`：libstd/libcore/...が配置されているsysrootディレクトリ
+* `{{sysroot-base}}`：テストのビルドに使用されるsysrootディレクトリのパス。
+  * 主に、API経由でコンパイラを実行する`ui-fulldeps`テストを対象としています。
+* `{{target-linker}}`：このテストのために`-Clinker`に渡されるリンカ。リンカのオーバーライドがアクティブでない場合は空白です。
+  * 主に、API経由でコンパイラを実行する`ui-fulldeps`テストを対象としています。
+* `{{target}}`：テストがコンパイルされるターゲット
+  * 例：`x86_64-unknown-linux-gnu`
 
 この置換を使用するテストの例については、
 [`tests/ui/argfile/commandline-argfile.rs`](https://github.com/rust-lang/rust/blob/HEAD/tests/ui/argfile/commandline-argfile.rs)を参照してください。
-
-[output normalization]: ui.md#normalization
 
 
 ## ディレクティブの追加

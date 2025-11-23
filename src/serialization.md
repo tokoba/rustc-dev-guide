@@ -58,6 +58,7 @@ impl<D: Decoder> Decodable<D> for MyStruct {
     }
 }
 ```
+
 [`rustc_serialize`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_serialize/index.html
 
 ## アリーナに割り当てられた型のエンコードとデコード
@@ -108,7 +109,6 @@ impl<'tcx, D: TyDecoder<'tcx>> Decodable<D> for MyStruct<'tcx> {
 [`rustc_metadata::rmeta::`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_metadata/rmeta/index.html
 [`rustc_metadata::rmeta::decoder::DecodeContext`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_metadata/rmeta/decoder/struct.DecodeContext.html
 [`rustc_metadata::rmeta::encoder::EncodeContext`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_metadata/rmeta/encoder/struct.EncodeContext.html
-[`rustc_middle`]: https://github.com/rust-lang/rust/tree/HEAD/compiler/rustc_middle
 
 ## 短縮形
 

@@ -1,6 +1,5 @@
 [![CI](https://github.com/rust-lang/rustc-dev-guide/actions/workflows/ci.yml/badge.svg)](https://github.com/rust-lang/rustc-dev-guide/actions/workflows/ci.yml)
 
-
 これはrustcの動作を説明するガイドを構築するための共同作業です。このガイドの目的は、新しい貢献者がrustcに慣れるのを助けること、また経験豊富な人々が以前に取り組んだことのないコンパイラの新しい部分を理解するのを助けることです。
 
 [You can read the latest version of the guide here.](https://rustc-dev-guide.rust-lang.org/)

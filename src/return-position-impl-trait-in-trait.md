@@ -58,9 +58,9 @@ It may be better if we were able to lower without duplicates and for
 that I think we would need to stop distinguishing between early and late
 bound lifetimes. So we would need a solution like [Account for
 late-bound lifetimes in generics
-#103448](https://github.com/rust-lang/rust/pull/103448) and then also a
+# 103448](https://github.com/rust-lang/rust/pull/103448) and then also a
 PR similar to [Inherit function lifetimes for impl-trait
-#103449](https://github.com/rust-lang/rust/pull/103449).
+# 103449](https://github.com/rust-lang/rust/pull/103449).
 
 ### HIR ty lowering
 
@@ -145,6 +145,7 @@ trait Foo {
 ```
 
 Would desugar to...
+
 ```rust
 trait Foo {
     //       vvvvvvvvv method's generics
@@ -154,6 +155,7 @@ trait Foo {
     fn method<'early: 'early, 'late, T>() -> Self::Gat<'early, T, 'early, 'late>;
 }
 ```
+
 </details>
 
 ##### `generics_of` for the impl
@@ -384,7 +386,7 @@ implemented `assumed_wf_types` which inherits the WF types of the method
 from which the RPITIT originates ([#113704]), we have no issues
 WF-checking the GAT as if it were a regular GAT.
 
-### What's broken, what's weird, etc.
+### What's broken, what's weird, etc
 
 ##### Specialization is super busted
 
@@ -398,6 +400,7 @@ tracked in:
 ##### Projections don't have variances
 
 This code fails because projections don't have variances:
+
 ```rust
 #![feature(return_position_impl_trait_in_trait)]
 
@@ -417,6 +420,7 @@ This is because we can't relate `<T as Foo>::Rpitit<'a>` and `<T as
 Foo>::Rpitit<'b>`, even if they don't capture their lifetime. If we were
 using regular opaque types, this would work, because they would be
 bivariant in that lifetime parameter:
+
 ```rust
 #![feature(return_position_impl_trait_in_trait)]
 

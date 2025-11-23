@@ -1,9 +1,6 @@
 # `#[test]` 属性
 
-
-
 多くのRustプログラマーは、`#[test]`という組み込みの属性に頼っています。関数にマークを付けて、次のようにいくつかのアサートを含めるだけです：
-
 
 ```rust,ignore
 #[test]
@@ -102,7 +99,7 @@ self::test::TestDescAndFn{
 `nightly`の`rustc`には、[`macro`]展開後のモジュールソースを出力するために使用できる`unpretty`という不安定なフラグがあります：
 
 ```bash
-$ rustc my_mod.rs -Z unpretty=hir
+rustc my_mod.rs -Z unpretty=hir
 ```
 
 [`macro`]: ./macro-expansion.md

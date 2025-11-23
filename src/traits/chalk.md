@@ -29,6 +29,7 @@ chalk 自体について詳しくは、
 [Chalk book](https://rust-lang.github.io/chalk/book/) セクションをご覧ください。
 
 ## 進行中の作業
+
 新しいスタイルのトレイト解決の設計は、2つの場所で行われています：
 
 **chalk**。[chalk] リポジトリは、トレイトシステムの新しいアイデアと
@@ -39,4 +40,3 @@ rustc の降下モジュールで、構造体、トレイト、impl 宣言を論
 マッピングします。
 
 [chalk]: https://github.com/rust-lang/chalk
-[rustc_traits]: https://github.com/rust-lang/rust/tree/HEAD/compiler/rustc_traits

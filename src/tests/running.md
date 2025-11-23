@@ -370,5 +370,4 @@ wasi-root = "<wasi-sdk location>/build/sysroot/install/share/wasi-sysroot"
 [wasi sdk リポジトリ]: https://github.com/WebAssembly/wasi-sdk
 [wasm32-wasip1 ターゲットサポートページ]: https://github.com/rust-lang/rust/blob/HEAD/src/doc/rustc/src/platform-support/wasm32-wasip1.md#building-the-target.
 
-
 [`tests/ui`]: https://github.com/rust-lang/rust/tree/HEAD/tests/ui

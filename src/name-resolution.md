@@ -103,7 +103,6 @@ let y: x = 2; // See? x is still a type here.
 内側の関数は、通常のスコープルールでは表示されるべきであっても、
 外側の関数のパラメータとローカルバインディングにアクセスできません。例：
 
-[`ribs`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/late/struct.LateResolutionVisitor.html#structfield.ribs
 
 ```rust
 fn do_something<T: Default>(val: T) { // <- New rib in both types and values (1)
@@ -154,7 +153,6 @@ _投機的なクレートロード_と呼ばれます。エラーに遭遇した
 これを行う関数は[`lookup_import_candidates`]であり、
 [`rustc_resolve::diagnostics`]に存在します。
 
-[`rustc_resolve`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/index.html
 [`lookup_import_candidates`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/struct.Resolver.html#method.lookup_import_candidates
 [`rustc_resolve::diagnostics`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/diagnostics/index.html
 

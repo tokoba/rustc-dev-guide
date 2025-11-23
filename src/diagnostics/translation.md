@@ -203,6 +203,4 @@ rustc内のすべてのエミッターは、フォールバックFluentバンド
 バンドルのロードは失敗する可能性があります。
 
 [Fluent]: https://projectfluent.org
-[`compiler/rustc_borrowck/messages.ftl`]: https://github.com/rust-lang/rust/blob/HEAD/compiler/rustc_borrowck/messages.ftl
-[`compiler/rustc_parse/messages.ftl`]: https://github.com/rust-lang/rust/blob/HEAD/compiler/rustc_parse/messages.ftl
 [`rustc_error_messages::DiagMessage`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_error_messages/enum.DiagMessage.html

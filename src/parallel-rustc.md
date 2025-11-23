@@ -20,7 +20,6 @@
 
 ---
 
-[codegen]: backend/codegen.md
 
 ## コード生成
 
@@ -125,7 +124,5 @@
 [imlist]: https://github.com/nikomatsakis/rustc-parallelization/blob/master/interior-mutability-list.md
 [irlo0]: https://internals.rust-lang.org/t/parallelizing-rustc-using-rayon/6606
 [irlo1]: https://internals.rust-lang.org/t/help-test-parallel-rustc/11503
-[monomorphization]: backend/monomorph.md
-[parallel-rustdoc]: https://github.com/rust-lang/rust/issues/82741
 [rustc-rayon]: https://github.com/rust-lang/rustc-rayon
 [tracking]: https://github.com/rust-lang/rust/issues/48685

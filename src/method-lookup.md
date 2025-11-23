@@ -29,7 +29,6 @@
 これは、メソッド呼び出しサイト全体でキャッシュ可能になるように設計されています。
 したがって、推論変数やその他の情報は含まれません。
 
-[fully-qualified syntax]: https://doc.rust-lang.org/nightly/book/ch19-03-advanced-traits.html#fully-qualified-syntax-for-disambiguation-calling-methods-with-the-same-name
 [UFCS]: https://github.com/rust-lang/rfcs/blob/master/text/0132-ufcs.md
 [probe]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir_typeck/method/probe/
 [confirm]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir_typeck/method/confirm/

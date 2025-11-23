@@ -9,9 +9,9 @@
 `Vec<Vec<Vec<u32>>>: Debug`の例を考えると、次の木が得られます。
 
 - `Vec<Vec<Vec<u32>>>: Debug`
-    - `Vec<Vec<u32>>: Debug`
-        - `Vec<u32>: Debug`
-            - `u32: Debug`
+  - `Vec<Vec<u32>>: Debug`
+    - `Vec<u32>: Debug`
+      - `u32: Debug`
 
 この木は有限です。しかし、すべてのゴールが有限の証明木を持つわけではありません。
 次の例を考えてみましょう：
@@ -27,14 +27,14 @@ struct List<T> {
 これにより、次の証明木が得られます：
 
 - `List<T>: Send`
-    - `T: Send`
-    - `Option<Box<List<T>>>: Send`
-        - `Box<List<T>>: Send`
-            - `List<T>: Send`
-                - `T: Send`
-                - `Option<Box<List<T>>>: Send`
-                    - `Box<List<T>>: Send`
-                        - ...
+  - `T: Send`
+  - `Option<Box<List<T>>>: Send`
+    - `Box<List<T>>: Send`
+      - `List<T>: Send`
+        - `T: Send`
+        - `Option<Box<List<T>>>: Send`
+          - `Box<List<T>>: Send`
+            - ...
 
 この木は無限に大きくなり、これがまさに余帰納が扱うものです。
 
@@ -54,6 +54,7 @@ struct List<T> {
 サイクルでは、キャッシングに注意する必要があります。領域と
 推論変数の正規化のため、サイクルに遭遇しても無限の証明木が得られるとは限りません。
 次の例を見てください：
+
 ```rust
 trait Foo {}
 struct Wrapper<T>(T);
@@ -63,6 +64,7 @@ where
     Wrapper<T>: Foo
 {}
 ```
+
 `Wrapper<?0>: Foo`を証明することは、impl `impl<T> Foo for Wrapper<Wrapper<T>>`を使用し、これは
 `?0`を`Wrapper<?1>`に制約し、次に`Wrapper<?1>: Foo`を必要とします。正規化により、これは
 サイクルとして検出されます。
@@ -77,14 +79,13 @@ TODO: ここで詳しく説明する。余帰納サイクルに対してchalkと
 
 [chalk]: https://rust-lang.github.io/chalk/book/recursive/inductive_cycles.html
 
-
 ## 将来の作業
 
 現在、自動トレイト、`Sized`、および`WF`ゴールのみを余帰納的と見なしています。
 将来的には、ほとんどすべてのゴールを余帰納的にするつもりです。
 まず、より多くの余帰納的証明を許可することがなぜ望ましいのかを説明しましょう。
 
-### 再帰的データ型はすでに余帰納に依存しています...
+### 再帰的データ型はすでに余帰納に依存しています
 
 ...トレイトソルバーでそれらを避ける傾向があるだけです。
 
@@ -112,10 +113,12 @@ impl<T: Clone> Clone for List<T> {
 
 プロジェクションを含む再帰的型について推論するには、余帰納も必要です。
 たとえば、次は現在コンパイルに失敗しますが、有効であるべきです。
+
 ```rust
 use std::borrow::Cow;
 pub struct Foo<'a>(Cow<'a, [Foo<'a>]>);
 ```
+
 この問題は少なくとも2015年から知られています。詳細については
 [#23714](https://github.com/rust-lang/rust/issues/23714)を参照してください。
 
@@ -143,10 +146,11 @@ impl<T> FromResidual<<Ready<T> as Try>::Residual> for Ready<T> {}
 `FromResidual`のimplがwell-formedであることをチェックする際、次のサイクルが発生します：
 
 implは、`<Ready<T> as Try>::Residual`と`Ready<T>`がwell-formedである場合にwell-formedです。
+
 - `wf(<Ready<T> as Try>::Residual)`には
--  `Ready<T>: Try`が必要で、これはスーパートレイトのために
--  `Ready<T>: FromResidual<Ready<T> as Try>::Residual>`を必要とし、**implの暗黙の境界のために**
--  `wf(<Ready<T> as Try>::Residual)` :tada: **サイクル**
+- `Ready<T>: Try`が必要で、これはスーパートレイトのために
+- `Ready<T>: FromResidual<Ready<T> as Try>::Residual>`を必要とし、**implの暗黙の境界のために**
+- `wf(<Ready<T> as Try>::Residual)` :tada: **サイクル**
 
 ### より多くのゴールに余帰納を拡張する際の問題
 
@@ -156,6 +160,7 @@ implは、`<Ready<T> as Try>::Residual`と`Ready<T>`がwell-formedである場�
 #### 暗黙のスーパートレイト境界
 
 トレイトシステムは現在、スーパートレイト（たとえば`trait Trait: SuperTrait`）を
+
 1) `Trait`を実装するすべての型に対して`SuperTrait`が成り立つ必要がある、
 および2) `Trait`が成り立つ場合は`SuperTrait`を仮定する、という方法で扱います。
 
@@ -172,6 +177,7 @@ fn sup<T: SuperTrait>() {}
 fn requires_trait<T: Trait>() { sup::<T>() }
 fn generic<T>() { requires_trait::<T>() }
 ```
+
 これは本質的に余帰納に固有のものではなく、それによって健全でなくなる既存の特性です。
 
 ##### 可能な解決策
@@ -225,6 +231,7 @@ impl Trait for () {
 実験と例：<https://hackmd.io/-8p0AHnzSq2VAE6HE_wX-w?view>
 
 別の要約の試み。
+
 - プロジェクション等式では、rhsを制約することで進捗する必要があります
 - サイクルは、等化中に少なくとも1回は正規化後にlhsに剛体型がある場合にのみ問題ありません
 - `normalizes_to`の再帰的な`eq`呼び出しの外側のサイクルは常に問題ありません

@@ -55,6 +55,7 @@ Rustdocは完全にクレート[`librustdoc`][rd]内に実装されています�
 * `./x test tests/rustdoc*`を使用して、stage1のrustdocを使用してテストを実行します。
   * テストの詳細については、[Rustdoc internals]を参照してください。
 * `./x.py test tidy --extra-checks=js`を使用して、rustdocのJavaScriptチェック（`eslint`、`es-check`、`tsc`）を実行します。
+
 > **注意：** `./x.py test tidy`は、JS/TSソースが変更されたときに既にこれらのチェックを自動的に実行します；`--extra-checks=js`は明示的に強制します。
 
 ### JavaScript CIチェック
@@ -140,9 +141,9 @@ Rustdocは、さまざまな入力に対して複数回実行できます。出�
 HTMLは各クレートごとに独立して生成されますが、出力ディレクトリにクレートを追加する際に更新される
 クレート間の情報がいくつかあります：
 
- - `crates<SUFFIX>.js`は、出力ディレクトリ内のすべてのクレートのリストを保持します。
- - `search-index<SUFFIX>.js`は、すべての検索可能なアイテムのリストを保持します。
- - 各トレイトについて、`implementors/.../trait.TraitName.js`の下にファイルがあり、
+* `crates<SUFFIX>.js`は、出力ディレクトリ内のすべてのクレートのリストを保持します。
+* `search-index<SUFFIX>.js`は、すべての検索可能なアイテムのリストを保持します。
+* 各トレイトについて、`implementors/.../trait.TraitName.js`の下にファイルがあり、
    そのトレイトの実装者のリストが含まれています。
    実装者は、トレイトとは異なるクレートにある場合があり、新しいものが見つかるたびにJSファイルが更新されます。
 

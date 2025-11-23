@@ -46,7 +46,7 @@ PGO最適化されたプログラムを生成するには、次の4つのステ�
 上述のように、プロファイリング計装はLLVMによって追加されます。`rustc` は、LLVM `PassManager` を作成するときに[適切なフラグを設定する][pgo-gen-passmanager]ことでLLVMに指示します：
 
 ```C
-	// `PMBR` is an `LLVMPassManagerBuilderRef`
+ // `PMBR` is an `LLVMPassManagerBuilderRef`
     unwrap(PMBR)->EnablePGOInstrGen = true;
     // Instrumented binaries have a default output path for the `.profraw` file
     // hard-coded into them:
@@ -58,19 +58,17 @@ PGO最適化されたプログラムを生成するには、次の4つのステ�
 [pgo-gen-passmanager]: https://github.com/rust-lang/rust/blob/1.34.1/src/rustllvm/PassWrapper.cpp#L412-L416
 [pgo-gen-symbols]:https://github.com/rust-lang/rust/blob/1.34.1/src/librustc_codegen_ssa/back/symbol_export.rs#L212-L225
 
-
 #### 最適化がプロファイリングデータを利用するバイナリのコンパイル
 
 上で説明したワークフローの最後のステップでは、プログラムが再度コンパイルされます。今回はコンパイラが収集されたプロファイリングデータを使用して最適化の決定を推進します。`rustc` はここでも作業のほとんどをLLVMに任せます。基本的に、LLVM `PassManagerBuilder` にプロファイリングデータがどこにあるかを[伝えるだけ][pgo-use-passmanager]です：
 
 ```C
-	unwrap(PMBR)->PGOInstrUse = PGOUsePath;
+ unwrap(PMBR)->PGOInstrUse = PGOUsePath;
 ```
 
 [pgo-use-passmanager]: https://github.com/rust-lang/rust/blob/1.34.1/src/rustllvm/PassWrapper.cpp#L417-L420
 
 LLVMが残りを行います（例：ブランチウェイトの設定、関数への `cold` または `inlinehint` のマークなど）。
-
 
 ### 実行時の側面
 

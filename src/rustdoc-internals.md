@@ -45,11 +45,11 @@ fn clean_lifetime<'tcx>(lifetime: &hir::Lifetime, cx: &mut DocContext<'tcx>) -> 
 [`visit_ast::RustdocVisitor`]を呼び出して、モジュールツリーを中間の[`visit_ast::Module`]に処理することです。
 これは実際に[`rustc_hir::Crate`]をクロールして、名前解決のさまざまな側面を正規化するステップです。たとえば：
 
-  * `#[doc(inline)]`と`#[doc(no_inline)]`の処理
-  * importのglobとサイクルを処理して、重複や無限のディレクトリツリーがないようにする
-  * プライベートアイテムのpublic `use`エクスポートをインライン化するか、モジュールページに「Reexport」行を表示する
-  * ベースアイテムが非表示の場合は、`#[doc(hidden)]`を持つアイテムをインライン化する
-  * 再エクスポートとして定義されているかどうかに関係なく、クレートルートに`#[macro_export]`されたマクロを表示する
+* `#[doc(inline)]`と`#[doc(no_inline)]`の処理
+* importのglobとサイクルを処理して、重複や無限のディレクトリツリーがないようにする
+* プライベートアイテムのpublic `use`エクスポートをインライン化するか、モジュールページに「Reexport」行を表示する
+* ベースアイテムが非表示の場合は、`#[doc(hidden)]`を持つアイテムをインライン化する
+* 再エクスポートとして定義されているかどうかに関係なく、クレートルートに`#[macro_export]`されたマクロを表示する
 
 このステップの後、`clean::krate`は[`clean_doc_module`]を呼び出し、
 実際に`HIR`アイテムをクリーン化された[`AST`][ast]に変換します。
@@ -96,38 +96,38 @@ fn clean_lifetime<'tcx>(lifetime: &hir::Lifetime, cx: &mut DocContext<'tcx>) -> 
 
 <!-- date-check --> 2023年3月時点のパスのリストは次のとおりです：
 
-- `calculate-doc-coverage`は、`--show-coverage`フラグに使用される情報を計算します。
+* `calculate-doc-coverage`は、`--show-coverage`フラグに使用される情報を計算します。
 
-- `check-doc-test-visibility`は、`doctest`の可視性関連の`lint`を実行します。このパスは
+* `check-doc-test-visibility`は、`doctest`の可視性関連の`lint`を実行します。このパスは
   `strip-private`の前に実行されるため、`run-lints`とは別にする必要があります。
 
-- `collect-intra-doc-links`は[intra-docリンク](https://doc.rust-lang.org/nightly/rustdoc/write-documentation/linking-to-items-by-name.html)を解決します。
+* `collect-intra-doc-links`は[intra-docリンク](https://doc.rust-lang.org/nightly/rustdoc/write-documentation/linking-to-items-by-name.html)を解決します。
 
-- `collect-trait-impls`は、クレート内の各アイテムの`trait` `impl`を収集します。
+* `collect-trait-impls`は、クレート内の各アイテムの`trait` `impl`を収集します。
   たとえば、`trait`を実装する`struct`を定義すると、このパスは
   その`struct`がその`trait`を実装していることを記録します。
 
-- `propagate-doc-cfg`は、`#[doc(cfg(...))]`を子アイテムに伝播します。
+* `propagate-doc-cfg`は、`#[doc(cfg(...))]`を子アイテムに伝播します。
 
-- `run-lints`は、`passes/lint`で定義された`rustdoc`の`lint`の一部を実行します。
+* `run-lints`は、`passes/lint`で定義された`rustdoc`の`lint`の一部を実行します。
   これは実行される最後のパスです。
 
-  - `bare_urls`は、リンク化されていないリンクを検出します。たとえば、Markdownで
+  * `bare_urls`は、リンク化されていないリンクを検出します。たとえば、Markdownで
     `Go to https://example.com/.`のようなものです。リンクを角括弧で囲むことを提案します：
     `Go to <https://example.com/>.`でリンク化します。
     これは、<!-- date-check: may 2022 --> `rustdoc::bare_urls` `lint`の背後にあるコードです。
 
-  - `check_code_block_syntax`は、Rustコードブロック内の構文を検証します
+  * `check_code_block_syntax`は、Rustコードブロック内の構文を検証します
     (<code>```rust</code>)
 
-  - `html_tags`は、ドキュメントコメント内の無効な`HTML`（閉じられていない`<span>`など）を検出します。
+  * `html_tags`は、ドキュメントコメント内の無効な`HTML`（閉じられていない`<span>`など）を検出します。
 
-- `strip-hidden`と`strip-private`は、すべての`doc(hidden)`とプライベートアイテムを出力から削除します。
+* `strip-hidden`と`strip-private`は、すべての`doc(hidden)`とプライベートアイテムを出力から削除します。
   `strip-private`は`strip-priv-imports`を含みます。
   基本的に、目標は公開ドキュメントに関連しないアイテムを削除することです。
   このパスは、`--document-hidden-items`が渡されたときにスキップされます。
 
-- `strip-priv-imports`は、クレートからすべてのプライベートインポートステートメント（`use`、`extern
+* `strip-priv-imports`は、クレートからすべてのプライベートインポートステートメント（`use`、`extern
   crate`）を削除します。
   これは、`rustdoc`が*公開*インポートを処理するために必要です。
   アイテムのドキュメントをモジュールにインライン化するか、
@@ -136,7 +136,7 @@ fn clean_lifetime<'tcx>(lifetime: &hir::Lifetime, cx: &mut DocContext<'tcx>) -> 
   技術的には`--document-private-items`が渡されたときにのみ実行されますが、
   `strip-private`も同じことを達成します。
 
-- `strip-private`は、外部から見えないすべてのプライベートアイテムをクレートから削除します。
+* `strip-private`は、外部から見えないすべてのプライベートアイテムをクレートから削除します。
   このパスは、`--document-private-items`が渡されたときにスキップされます。
 
 `librustdoc/passes`には[`stripper`]モジュールもありますが、
@@ -275,9 +275,9 @@ $ python3 -m http.server -d build/[YOUR ARCH]/doc
 
 ## 参照
 
-- [`rustdoc` APIドキュメント]
-- [`rustdoc`の概要](./rustdoc.md)
-- [rustdocユーザーガイド]
+* [`rustdoc` APIドキュメント]
+* [`rustdoc`の概要](./rustdoc.md)
+* [rustdocユーザーガイド]
 
 [`rustdoc` APIドキュメント]: https://doc.rust-lang.org/nightly/nightly-rustc/rustdoc/
 [rustdocユーザーガイド]: https://doc.rust-lang.org/nightly/rustdoc/

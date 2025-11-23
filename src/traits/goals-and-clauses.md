@@ -53,9 +53,11 @@ K = <type>     // 「種類」
 
 さらに、前に示した節の定義を少し平坦化すると、節は常に次の形式である
 ことがわかります：
+
 ```text
 forall<K1, ..., Kn> { DomainGoal :- Goal }
 ```
+
 したがって、ドメインゴールは実際には節の LHS です。つまり、最も細かい
 レベルでは、ドメインゴールはトレイトソルバーが最終的に証明しようとする
 ものです。
@@ -107,12 +109,14 @@ WhereClause = Implemented(TraitRef)
 これらを1つずつ分解してみましょう。
 
 #### Implemented(TraitRef)
+
 例：`Implemented(i32: Copy)`
 
 与えられたトレイトが与えられた入力型とライフタイムに対して実装されている
 場合に真です。
 
 #### ProjectionEq(Projection = Type)
+
 例：`ProjectionEq<T as Iterator>::Item = u8`
 
 与えられた関連型 `Projection` が `Type` と等しい場合。これは
@@ -120,6 +124,7 @@ WhereClause = Implemented(TraitRef)
 [Chalk Book の関連型に関するセクション][at]を参照してください。
 
 #### Normalize(Projection -> Type)
+
 例：`ProjectionEq<T as Iterator>::Item -> u8`
 
 与えられた関連型 `Projection` が `Type` に[正規化][n]できる場合。
@@ -133,6 +138,7 @@ WhereClause = Implemented(TraitRef)
 [at]: https://rust-lang.github.io/chalk/book/clauses/type_equality.html
 
 #### FromEnv(TraitRef)
+
 例：`FromEnv(Self: Add<i32>)`
 
 内部の `TraitRef` が真であると*仮定*されている場合、つまり、
@@ -157,6 +163,7 @@ where 句はネストするため、impl 本体内の関数本体も impl 本体
 重要です。
 
 #### FromEnv(Type)
+
 例：`FromEnv(HashSet<K>)`
 
 内部の `Type` が整形式であると*仮定*されている場合、つまり、それが
@@ -182,6 +189,7 @@ fn loud_insert<K>(set: &mut HashSet<K>, item: K) {
 それが真であると自動的に仮定します。
 
 #### WellFormed(Item)
+
 これらのゴールは、与えられたアイテムが*整形式*であることを意味します。
 
 異なる種類のアイテムが整形式であることについて話すことができます：
@@ -199,6 +207,7 @@ fn loud_insert<K>(set: &mut HashSet<K>, item: K) {
 `WellFormed(HashSet<K>)` を検証するからです。
 
 #### Outlives(Type: Region), Outlives(Region: Region)
+
 例：`Outlives(&'a str: 'b)`、`Outlives('a: 'static)`
 
 左側の与えられた型または領域が右側の領域よりも長生きする場合に真です。
@@ -258,11 +267,10 @@ Rust のトレイト解決で使用されます。自動トレイトの場合、
 これらは、[暗黙の境界]のセクションで説明されているように、同様の
 「すべてのケースを列挙する」パターンを実現するために使用されます。
 
-[implied bounds]: https://rust-lang.github.io/chalk/book/clauses/implied_bounds.html#implied-bounds
 
 ## 不完全な章
 
 まだ書かれていないトピック：
 
-- 証明手続きの詳細
-- SLG 解決 - 否定的推論の導入
+* 証明手続きの詳細
+* SLG 解決 - 否定的推論の導入

@@ -59,10 +59,12 @@ include = ["cross.toml"]
 ### rust-analyzer 用の別のビルドディレクトリの使用
 
 デフォルトでは、rust-analyzer がチェックまたはフォーマットコマンドを実行すると、手動のコマンドラインビルドと同じビルドディレクトリを共有します。これは2つの理由で不便です：
+
 - 各ビルドがビルドディレクトリをロックし、他方を待たせるため、rust-analyzer がバックグラウンドでコマンドを実行している間にコマンドラインビルドを実行することが不可能になります。
 - コンパイラフラグやその他の設定の競合により、ビルドの一方が以前にビルドされたアーティファクトを削除するリスクが高まり、場合によっては追加の再ビルドが強制されます。
 
 これらの問題を回避するには：
+
 - エディタの rust-analyzer 設定のすべてのカスタム `x` コマンドに `--build-dir=build/rust-analyzer` を追加します。（必要に応じて別のディレクトリ名を選択してください。）
 - `rust-analyzer.rustfmt.overrideCommand` 設定を変更して、その他のビルドディレクトリ内の `rustfmt` のコピーを指すようにします。
 - `rust-analyzer.procMacro.server` 設定を変更して、その他のビルドディレクトリ内の `rust-analyzer-proc-macro-srv` のコピーを指すようにします。
@@ -93,7 +95,6 @@ include = ["cross.toml"]
 ```
 
 [Build Task]: https://code.visualstudio.com/docs/editor/tasks
-
 
 ### Neovim
 
@@ -280,7 +281,9 @@ direnv を使用している場合は、`src/tools/nix-dev-shell/envrc-flake` �
 ```bash
 ln -s ./src/tools/nix-dev-shell/envrc-flake ./.envrc # Use flake
 ```
+
 または
+
 ```bash
 ln -s ./src/tools/nix-dev-shell/envrc-shell ./.envrc # Use nix-shell
 ```

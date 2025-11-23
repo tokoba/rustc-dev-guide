@@ -5,6 +5,7 @@
 ## ビルド手順
 
 まず、Rustリポジトリをクローンして設定する必要があります：
+
 ```bash
 git clone git@github.com:rust-lang/rust
 cd rust
@@ -12,19 +13,20 @@ cd rust
 ```
 
 その後、次のコマンドを使用してrustcをビルドできます：
+
 ```bash
 ./x build --stage 1 library
 ```
 
 その後、rustc toolchain linkを使用してcargoで使用できるようになります：
+
 ```
 rustup toolchain link offload build/host/stage1
 rustup toolchain install nightly # -Z unstable-optionsを有効にする
 ```
 
-
-
 ## LLVM自体のビルド手順
+
 ```bash
 git clone git@github.com:llvm/llvm-project
 cd llvm-project
@@ -34,11 +36,13 @@ cmake -G Ninja ../llvm -DLLVM_TARGETS_TO_BUILD="host,AMDGPU,NVPTX" -DLLVM_ENABLE
 ninja
 ninja install
 ```
+
 これで動作するLLVMビルドが得られます。
 
-
 ## テスト
+
 実行：
+
 ```
 ./x test --stage 1 tests/codegen-llvm/gpu_offload
 ```

@@ -108,6 +108,7 @@ fn enable_precise_capture(tcx: TyCtxt<'_>, span: Span) -> bool {
 [RFC 3101]: https://rust-lang.github.io/rfcs/3101-reserved_prefixes.html
 
 ### エディションハイジーン
+
 [エディションハイジーン]: #edition-hygiene
 
 スパンは、スパンが来たクレートのエディションでマークされています。
@@ -126,7 +127,7 @@ fn enable_precise_capture(tcx: TyCtxt<'_>, span: Span) -> bool {
 あるいは、リントは[エディション固有](#edition-specific-lints)にすることができ、特定のエディションからデフォルトレベルが変更されます。
 
 ### マイグレーションリント
-[マイグレーションリント]: #migration-lints
+
 [マイグレーションリント]: #migration-lints
 
 *マイグレーションリント*は、プロジェクトをあるエディションから次のエディションに移行するために使用されます。
@@ -178,7 +179,6 @@ declare_lint! {
 エディションが安定してから数年後に、`Allow`を`Warn`に切り替えることを検討するかもしれません。
 これは、新しいエディションに更新していない比較的少数の遅延者にのみ表示されます。
 
-[`keyword_idents`]: https://doc.rust-lang.org/nightly/rustc/lints/listing/allowed-by-default.html#keyword-idents
 [`FutureIncompatibilityReason::EditionError`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_lint_defs/enum.FutureIncompatibilityReason.html#variant.EditionError
 [`FutureIncompatibilityReason::EditionSemanticsChange`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_lint_defs/enum.FutureIncompatibilityReason.html#variant.EditionSemanticsChange
 
@@ -219,7 +219,6 @@ declare_lint! {
   エディションの一部にすることで、ほとんどのユーザーは最終的に新しいエディションに更新し、移行によって処理されました。
   `Warn`に切り替えることは、更新しなかった少数の遅延者にのみ影響を与えました。
 
-[`ellipsis_inclusive_range_patterns`]: https://doc.rust-lang.org/nightly/rustc/lints/listing/warn-by-default.html#ellipsis-inclusive-range-patterns
 [`anonymous_parameters`]: https://doc.rust-lang.org/nightly/rustc/lints/listing/warn-by-default.html#anonymous-parameters
 
 ### リントと安定性
@@ -280,7 +279,6 @@ declare_lint! {
 
 [into-iter]: https://doc.rust-lang.org/nightly/edition-guide/rust-2021/IntoIterator-for-arrays.html
 [panic-macro]: https://doc.rust-lang.org/nightly/edition-guide/rust-2021/panic-macro-consistency.html
-[`non_fmt_panics`]: https://doc.rust-lang.org/nightly/rustc/lints/listing/warn-by-default.html#non-fmt-panics
 
 ### 標準ライブラリエディションの移行
 
@@ -288,10 +286,10 @@ declare_lint! {
 
 - 新しく安定したエディションがbetaに到達し、ブートストラップコンパイラが更新されるまで待ちます。
 - マイグレーションリントを適用します。これは、一部のコードが外部サブモジュール[^std-submodules]にあり、標準ライブラリが条件付きコンパイルを多用しているため、複雑なプロセスになる可能性があります。また、標準ライブラリ自体で`cargo fix --edition`を実行することは実用的ではない場合があります。1つのアプローチは、各クレートの先頭に各リントごとに`#![warn(...)]`を個別に追加し、`./x check library`を実行し、マイグレーションを適用し、`#![warn(...)]`を削除して、各マイグレーションを個別にコミットすることです。完全なカバレッジを得るには、多くの異なるターゲットで`./x check`を`--target`とともに実行する必要があります（そうしないと、CIが通過するまでに数日または数週間かかる可能性があります）[^ed-docker]。その他のヒントについては、[上級マイグレーションガイド]も参照してください。
-    - [`backtrace-rs`]にマイグレーションを適用します。[2024の例](https://github.com/rust-lang/backtrace-rs/pull/700)。これは、crates.ioで独立して公開されているため、クレート自体のエディションは更新せず、そうしないと最小Rustバージョンが制限されることに注意してください。エディションが更新されるまで、リグレッションを回避するために、いくつかの`#![deny()]`属性を追加することを検討してください。
-    - [`stdarch`]にマイグレーションを適用し、エディションとフォーマットを更新します。[2024の例](https://github.com/rust-lang/stdarch/pull/1710)。
-    - backtraceとstdarchサブモジュールを更新するPRを投稿し、それらがマージされるまで待ちます。
-    - 標準ライブラリクレートにマイグレーションリントを適用し、エディションを更新します。`core`から始めて、一度に1つのクレートで作業することをお勧めします。[2024の例](https://github.com/rust-lang/rust/pull/138162)。
+  - [`backtrace-rs`]にマイグレーションを適用します。[2024の例](https://github.com/rust-lang/backtrace-rs/pull/700)。これは、crates.ioで独立して公開されているため、クレート自体のエディションは更新せず、そうしないと最小Rustバージョンが制限されることに注意してください。エディションが更新されるまで、リグレッションを回避するために、いくつかの`#![deny()]`属性を追加することを検討してください。
+  - [`stdarch`]にマイグレーションを適用し、エディションとフォーマットを更新します。[2024の例](https://github.com/rust-lang/stdarch/pull/1710)。
+  - backtraceとstdarchサブモジュールを更新するPRを投稿し、それらがマージされるまで待ちます。
+  - 標準ライブラリクレートにマイグレーションリントを適用し、エディションを更新します。`core`から始めて、一度に1つのクレートで作業することをお勧めします。[2024の例](https://github.com/rust-lang/rust/pull/138162)。
 
 [^std-submodules]: これは将来的に変更され、これらのサブモジュールを`rust-lang/rust`に取り込むことが期待されます。
 [^ed-docker]: また、さまざまなターゲットに対して多くのテストを行う必要があり、ここで[dockerテスト](../tests/docker.md)が役立ちます。
@@ -307,8 +305,8 @@ declare_lint! {
 - [`LATEST_STABLE_EDITION`]を更新します。
 - [`Edition::is_stable`]を更新します。
 - エディションを番号で参照するドキュメントを探して更新します：
-    - [`--edition`フラグ](https://github.com/rust-lang/rust/blob/HEAD/src/doc/rustc/src/command-line-arguments.md#--edition-specify-the-edition-to-use)
-    - [Rustdoc属性](https://github.com/rust-lang/rust/blob/HEAD/src/doc/rustdoc/src/write-documentation/documentation-tests.md#attributes)
+  - [`--edition`フラグ](https://github.com/rust-lang/rust/blob/HEAD/src/doc/rustc/src/command-line-arguments.md#--edition-specify-the-edition-to-use)
+  - [Rustdoc属性](https://github.com/rust-lang/rust/blob/HEAD/src/doc/rustdoc/src/write-documentation/documentation-tests.md#attributes)
 - `//@ edition`ヘッダーを使用するテストをクリーンアップして、`-Zunstable-options`フラグを削除し、実際に安定していることを確認します。注：これは理想的には自動化すべきです。[#133582]を参照してください。
 - 変更されるテストをblessします。
 - `lint-docs`を新しいエディションにデフォルト設定するように更新します。

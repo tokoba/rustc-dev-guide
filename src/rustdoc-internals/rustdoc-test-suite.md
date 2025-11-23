@@ -191,4 +191,3 @@ HtmlDocCkは、Python標準ライブラリのXPath実装を使用します。
 
 [リビジョン]: ../tests/compiletest.md#revisions
 [compiletestディレクティブ]: ../tests/directives.md
-[Compiletestディレクティブ]: ../tests/directives.md

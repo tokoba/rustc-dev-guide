@@ -10,7 +10,6 @@
 
 言語への変更を提案する際の手順については、[Rust言語設計チームの手順][lang-propose]も参照してください。
 
-[a different process]: ./stability.md
 [lang-propose]: https://lang-team.rust-lang.org/how_to/propose.html
 
 ## @rfcbot FCPプロセス
@@ -95,7 +94,7 @@ nightlyでその機能を使用する実際の経験を得たいと思います�
 機能のすべての部分を変更できますし、機能を完全に書き直したり削除したりすることもできます。
 機能は、長期間不安定で変更されないことで既得権を得ることはありません。
 
-###  追跡Issue
+### 追跡Issue
 
 不安定な機能のステータス、
 nightlyでの使用中に得た経験、
@@ -131,7 +130,7 @@ lang実験に関連する機能フラグは、
 
 [lang experiment]: https://lang-team.rust-lang.org/how_to/experiment.html
 
-##  コード内の安定性
+## コード内の安定性
 
 新しい不安定な機能を実装するには、以下の手順を実行する必要があります。
 
@@ -184,7 +183,6 @@ lang実験に関連する機能フラグは、
    [セマンティックマージコンフリクト]を避けるために、
    `1.70`または別の明示的なバージョン番号の代わりに`CURRENT_RUSTC_VERSION`を使用してください。
 
-   [semantic merge conflicts]: https://bors.tech/essay/2017/02/02/pitch/
 
 1. 機能ゲートが設定されていない限り、新機能の使用を防ぎます。
    コンパイラのほとんどの場所で、
@@ -225,11 +223,6 @@ lang実験に関連する機能フラグは、
 [#81015]: https://github.com/rust-lang/rust/pull/81015
 [`rustc_session::parse::feature_err`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_session/parse/fn.feature_err.html
 [`rustc_ast_passes::feature_gate::check_crate`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast_passes/feature_gate/fn.check_crate.html
-[value the stability of Rust]: https://github.com/rust-lang/rfcs/blob/master/text/1122-language-semver.md
-[stability in code]: #stability-in-code
-[here]: ./stabilization_guide.md
-[tracking issue]: #tracking-issues
-[add-feature-gate]: ./feature-gates.md#adding-a-feature-gate
 
 ## テストの呼びかけ
 
@@ -264,10 +257,10 @@ lang実験に関連する機能フラグは、
 - [`rust-analyzer`]を拡張する（該当する場合）。
   この作業の範囲は、言語機能の性質によって異なる場合があります。
   一部の機能は*完全な*サポートでブロックされる必要がないためです。
-   - 言語機能が、[`rust-analyzer`]でサポートが実装される前に
+  - 言語機能が、[`rust-analyzer`]でサポートが実装される前に
      単に存在するだけでユーザー体験を低下させる場合、
      langチームはブロッキングの懸念を提起する可能性があります。
-   - そのような例には、[`rust-analyzer`]が解析できない新しい構文や、
+  - そのような例には、[`rust-analyzer`]が解析できない新しい構文や、
      理解できない型推論の変更が含まれる可能性があり、
      それらが偽の診断につながる場合です。
 
@@ -279,7 +272,6 @@ lang実験に関連する機能フラグは、
 後方互換性のない変更は一般的に許可されなくなります
 （詳細については、langチームの[定義されたsemverポリシー](https://rust-lang.github.io/rfcs/1122-language-semver.html)を参照してください）。
 安定化の詳細については、[安定化ガイド][stab]を参照してください。
-
 
 [stab]: ./stabilization_guide.md
 [rust-blog]: https://github.com/rust-lang/blog.rust-lang.org/

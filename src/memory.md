@@ -58,13 +58,8 @@
 [`GenericArgs`]: ./ty_module/generic_arguments.md#the-genericargs-type
 [adtdefid]: ./ty_module/generic_arguments.md#adtdef-and-defid
 [`TraitRef`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/type.TraitRef.html
-[`AdtDef` and `DefId`]: ./ty.md#adts-representation
-[`def-id`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/def_id/struct.DefId.html
-[`GenericArgs`]: ./generic_arguments.html#GenericArgs
 [`mk_args`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/context/struct.TyCtxt.html#method.mk_args
-[adtdefid]: ./ty_module/generic_arguments.md#adtdef-and-defid
 [`Predicate`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.Predicate.html
-[`TraitRef`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/type.TraitRef.html
 [`ty::TyKind`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/sty/type.TyKind.html
 [traits]: ./traits/resolution.md
 

@@ -22,7 +22,7 @@ rustcコンパイラには、以下のサニタイザーのサポートが含ま
 
 サニタイザー（CFIを除く）の実装は、ほぼ完全にLLVMに依存しています。rustcは、LLVMコンパイル時のインストルメンテーションパスとランタイムライブラリの統合ポイントです。実装の最も重要な側面のハイライト：
 
-*  サニタイザーランタイムライブラリは[compiler-rt]プロジェクトの一部であり、`bootstrap.toml`で有効にすると[サポートされているターゲット][sanitizer-targets]で[ビルドされます][sanitizer-build]：
+* サニタイザーランタイムライブラリは[compiler-rt]プロジェクトの一部であり、`bootstrap.toml`で有効にすると[サポートされているターゲット][sanitizer-targets]で[ビルドされます][sanitizer-build]：
 
    ```toml
    [build]
@@ -31,13 +31,13 @@ rustcコンパイラには、以下のサニタイザーのサポートが含ま
 
    ランタイムは[ターゲットのlibdirに配置されます][sanitizer-copy]。
 
-*  LLVMコード生成中に、インストルメンテーション対象の関数は適切なLLVM属性で[マークされます][sanitizer-attribute]：`SanitizeAddress`、`SanitizeHWAddress`、`SanitizeMemory`、または`SanitizeThread`。デフォルトでは、すべての関数がインストルメント化されますが、この動作は`#[sanitize(xyz = "on|off|<other>")]`で変更できます。
+* LLVMコード生成中に、インストルメンテーション対象の関数は適切なLLVM属性で[マークされます][sanitizer-attribute]：`SanitizeAddress`、`SanitizeHWAddress`、`SanitizeMemory`、または`SanitizeThread`。デフォルトでは、すべての関数がインストルメント化されますが、この動作は`#[sanitize(xyz = "on|off|<other>")]`で変更できます。
 
-*  インストルメンテーションを実行するかどうかの決定は、関数の粒度でのみ可能です。これらの決定が関数間で異なる場合、インライン化を禁止する必要がある場合があります。[MIRレベル][inline-mir]と[LLVMレベル][inline-llvm]の両方で。
+* インストルメンテーションを実行するかどうかの決定は、関数の粒度でのみ可能です。これらの決定が関数間で異なる場合、インライン化を禁止する必要がある場合があります。[MIRレベル][inline-mir]と[LLVMレベル][inline-llvm]の両方で。
 
-*  rustcによって生成されたLLVM IRは、[専用のLLVMパス][sanitizer-pass]によってインストルメント化され、サニタイザーごとに異なります。インストルメンテーションパスは最適化パスの後に呼び出されます。
+* rustcによって生成されたLLVM IRは、[専用のLLVMパス][sanitizer-pass]によってインストルメント化され、サニタイザーごとに異なります。インストルメンテーションパスは最適化パスの後に呼び出されます。
 
-*  実行可能ファイルを生成する際、サニタイザー固有のランタイムライブラリが[リンクされます][sanitizer-link]。ライブラリはターゲットのlibdirで検索されます。最初に、オーバーライドされたシステムルートに相対的に検索され、次にデフォルトのシステムルートに相対的に検索されます。デフォルトのシステムルートへのフォールバックにより、cargo `-Z build-std`やxargoによって構築されたsysrootオーバーライドを使用する場合でも、サニタイザーランタイムが利用可能であることが保証されます。
+* 実行可能ファイルを生成する際、サニタイザー固有のランタイムライブラリが[リンクされます][sanitizer-link]。ライブラリはターゲットのlibdirで検索されます。最初に、オーバーライドされたシステムルートに相対的に検索され、次にデフォルトのシステムルートに相対的に検索されます。デフォルトのシステムルートへのフォールバックにより、cargo `-Z build-std`やxargoによって構築されたsysrootオーバーライドを使用する場合でも、サニタイザーランタイムが利用可能であることが保証されます。
 
 [compiler-rt]: https://github.com/llvm/llvm-project/tree/main/compiler-rt
 [sanitizer-build]: https://github.com/rust-lang/rust/blob/1ead4761e9e2f056385768614c23ffa7acb6a19e/src/bootstrap/src/core/build_steps/llvm.rs#L958-L1031

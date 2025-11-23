@@ -81,6 +81,7 @@ MIR では、const チェックの一部として、呼び出されるアイテ�
 ## 関連型とトレイトの `explicit_implied_const_bounds`
 
 関連型、opaque 型、スーパートレイトの境界、例えば：
+
 ```rust
 trait Foo: ~const PartialEq {
     type X: ~const PartialEq;

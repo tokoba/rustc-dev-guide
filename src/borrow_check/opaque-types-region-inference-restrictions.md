@@ -8,10 +8,12 @@
 [source-borrowck-opaque]: https://github.com/rust-lang/rust/blob/435b5255148617128f0a9b17bacd3cc10e032b23/compiler/rustc_borrowck/src/region_infer/opaque_types.rs
 
 ## 背景: 型と const ジェネリック引数
+
 型引数の場合、2 つの制限が必要です: 各型引数は (1) 型パラメータでなければならず、(2) ジェネリック引数の中で一意でなければなりません。
 同じことが const 引数にも適用されます。
 
 ケース (1) の例:
+
 ```rust
 type Opaque<X> = impl Sized;
 
@@ -25,6 +27,7 @@ fn bad() -> Opaque<()> {} //~ ERROR
 ```
 
 ケース (2) の例:
+
 ```rust
 type Opaque<X, Y> = impl Sized;
 
@@ -36,6 +39,7 @@ fn good<T, U>(t: T, _u: U) -> Opaque<T, U> { t }
 // Opaque<T, T> := T;
 fn bad<T>(t: T) -> Opaque<T, T> { t } //~ ERROR
 ```
+
 **動機:** 最初のケース `Opaque<()> := ()` では、隠れた型は 2 つの異なる解釈と互換性があるため曖昧です: `Opaque<X> := X` と `Opaque<X> := ()`。
 同様に、2 番目のケース `Opaque<T, T> := T` では、`Opaque<X, Y> := X` と解釈すべきか、`Opaque<X, Y> := Y` と解釈すべきかが曖昧です。
 この曖昧さのため、両方のケースは無効な定義使用として拒否されます。
@@ -82,6 +86,7 @@ fn still_bad_2<'a: 'b, 'b: 'a>() -> Opaque<'a, 'b> {}
 ## 一意性ルールの例外
 
 上記の一意性ルールの例外は、不透明型の定義の境界が、ライフタイムパラメータが別のパラメータまたは `'static` ライフタイムと等しいことを要求する場合です。
+
 ```rust
 // 定義は `'x` が `'static` と等しいことを要求します。
 type Opaque<'x: 'static> = impl Sized + 'x;
@@ -92,6 +97,7 @@ fn good() -> Opaque<'static> {}
 **動機:** RPIT の一意性制限を実装しようとすると、[crater によって見つかった破損](https://github.com/rust-lang/rust/pull/112842#issuecomment-1610057887) が発生しました。
 これは、このルールの例外によって緩和できます。
 それ以外の場合に壊れるコードの例:
+
 ```rust
 struct Type<'a>(&'a ());
 impl<'a> Type<'a> {
@@ -123,6 +129,7 @@ fn test<'a>() -> Opaque<'a> {
 この制限の背後にある本当の理由は純粋に技術的なものです。[member constraints] アルゴリズムには基本的な制限があります:
 不透明型定義 `Opaque<'?1> := &'?2 u8` に遭遇すると、メンバー制約 `'?2 member-of ['static, '?1]` が登録されます。
 アルゴリズムが正しい選択を選ぶためには、選択領域 `['static, '?1]` 間の「outlives」関係の*完全な*セットが、領域推論を行う*前に*既に知られている必要があります。これは、各選択領域が次のいずれかである場合にのみ満たすことができます:
+
 1. 全称領域、つまり `RegionKind::Re{EarlyParam,LateParam,Placeholder,Static}`。
 なぜなら、全称領域間の関係は、明示的および暗黙の境界から、領域推論の前に完全に知られているからです。
 1. または全称領域と「厳密に等しい」存在領域。
@@ -145,7 +152,6 @@ fn test<'a>() -> Opaque<'a> {
 
 [#116935]: https://github.com/rust-lang/rust/pull/116935
 
-
 ## クロージャの制限
 
 不透明型がクロージャ/コルーチン/inline-const 本体で定義されている場合、クロージャの「外部」である全称ライフタイムは不透明型引数で許可されません。
@@ -154,6 +160,7 @@ fn test<'a>() -> Opaque<'a> {
 [source-external-region]: https://github.com/rust-lang/rust/blob/caf730043232affb6b10d1393895998cb4968520/compiler/rustc_borrowck/src/universal_regions.rs#L201.
 
 例:（これは現在の nightly でたまたまコンパイルされますが、より実用的な例は、既に混乱を招くエラーで拒否されています。）
+
 ```rust
 type Opaque<'x> = impl Sized + 'x;
 
@@ -214,6 +221,7 @@ fn test<'a>() -> impl FnOnce() -> Opaque<'a> {
     //~^ ERROR expected generic lifetime parameter, found `'_`
 }
 ```
+
 ```rust
 use std::future::Future;
 type Opaque<'x> = impl Sized + 'x;

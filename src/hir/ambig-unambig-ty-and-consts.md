@@ -25,6 +25,7 @@ fn func<T, const N: usize>(arg: T) {
 曖昧な位置では、推論された引数は`hir::GenericArg::Infer`で表現されます。
 
 これを素朴に実装すると、HIRの構造から見て、HIRで推論された型/定数が見つかる可能性のある場所が5つあることになります：
+
 1. 非曖昧な型位置における`hir::TyKind::Infer`
 2. 非曖昧な定数引数位置における`hir::ConstArgKind::Infer`
 3. 曖昧な位置における[`GenericArg::Type(TyKind::Infer)`][generic_arg_ty]
@@ -34,6 +35,7 @@ fn func<T, const N: usize>(arg: T) {
 場所3と4は実際には遭遇することはありません。なぜなら、ジェネリック引数位置では常に`GenericArg::Infer`に下げるからです。
 
 これにはいくつかの失敗モードがあります：
+
 - `GenericArg::Infer`をチェックするビジターを書くが、`hir::TyKind/ConstArgKind::Infer`をチェックし忘れ、偶然にも曖昧な位置のinferのみを処理してしまう可能性がある。
 - `hir::TyKind/ConstArgKind::Infer`をチェックするビジターを書くが、`GenericArg::Infer`をチェックし忘れ、偶然にも非曖昧な位置のinferのみを処理してしまう可能性がある。
 - `GenericArg::Type/Const(TyKind/ConstArgKind::Infer)`と`GenericArg::Infer`をチェックするビジターを書くが、曖昧な位置で推論された型/定数を`GenericArg::Type/Const`として表現することは決してないことに気づかない可能性がある。
@@ -46,6 +48,7 @@ fn func<T, const N: usize>(arg: T) {
 2. HIRビジターの[`visit_ty`][visit_ty]と[`visit_const_arg`][visit_const_arg]メソッドは、型/定数の曖昧な位置バージョンのみを受け入れます。非曖昧な型/定数は、訪問プロセス中に曖昧な型/定数に暗黙的に変換され、`Infer`バリアントは専用の[`visit_infer`][visit_infer]メソッドによって処理されます。
 
 これには多くの利点があります：
+
 - `GenericArg::Type/Const`が推論された型/定数引数を表現できないことが明確である
 - `visit_ty`と`visit_const_arg`の実装者は、推論された型/定数に遭遇することが決してないため、正しく動作するように見えるが、エッジケースを誤って処理するビジターを書くことが不可能になる
 - `visit_infer`メソッドは、HIRにおける推論された型/定数の*すべて*のケースを処理するため、ビジターが専用の1つの場所で推論された型/定数を処理し、ケースを忘れないようにすることが容易になる

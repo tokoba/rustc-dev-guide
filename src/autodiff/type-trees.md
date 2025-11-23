@@ -1,9 +1,11 @@
 # Autodiff用TypeTree
 
 ## TypeTreeとは？
+
 Enzymeのためのメモリレイアウト記述子です。Enzymeに型がメモリ内でどのように構造化されているかを正確に伝えることで、効率的に導関数を計算できるようにします。
 
 ## 構造
+
 ```rust
 TypeTree(Vec<Type>)
 
@@ -18,6 +20,7 @@ Type {
 ## 例：`fn compute(x: &f32, data: &[f32]) -> f32`
 
 **入力0: `x: &f32`**
+
 ```rust
 TypeTree(vec![Type {
     offset: -1, size: 8, kind: Pointer,
@@ -29,6 +32,7 @@ TypeTree(vec![Type {
 ```
 
 **入力1: `data: &[f32]`**
+
 ```rust
 TypeTree(vec![Type {
     offset: -1, size: 8, kind: Pointer,
@@ -40,6 +44,7 @@ TypeTree(vec![Type {
 ```
 
 **出力: `f32`**
+
 ```rust
 TypeTree(vec![Type {
     offset: 0, size: 4, kind: Float,  // 単一のスカラー：オフセット0を使用
@@ -48,14 +53,16 @@ TypeTree(vec![Type {
 ```
 
 ## なぜ必要なのか？
+
 - EnzymeはLLVM IRから複雑な型レイアウトを推測できない
 - 遅いメモリパターン解析を防ぐ
 - ネストされた構造に対する正しい導関数計算を可能にする
 - メタデータと微分可能なバイトをEnzymeに伝える
 
-## Enzymeがこの情報で何をするか：
+## Enzymeがこの情報で何をするか
 
 TypeTreeなし：
+
 ```llvm
 ; Enzymeは汎用的なLLVM IRを見る：
 define float @distance(ptr %p1, ptr %p2) {
@@ -66,6 +73,7 @@ define float @distance(ptr %p1, ptr %p2) {
 ```
 
 TypeTreeあり：
+
 ```llvm
 define "enzyme_type"="{[-1]:Float@float}" float @distance(
     ptr "enzyme_type"="{[-1]:Pointer, [-1,0]:Float@float}" %p1,
@@ -92,6 +100,7 @@ Type {
 ## オフセット値
 
 ### 通常のオフセット (0, 4, 8, など)
+
 **構造体内の特定のバイト位置**
 
 ```rust
@@ -103,6 +112,7 @@ struct Point {
 ```
 
 `&Point`のTypeTree（内部表現）：
+
 ```rust
 TypeTree(vec![
     Type { offset: 0, size: 4, kind: Float },   // バイト0にx
@@ -112,14 +122,17 @@ TypeTree(vec![
 ```
 
 生成されるLLVM：
+
 ```llvm
 "enzyme_type"="{[-1]:Pointer, [-1,0]:Float@float, [-1,4]:Float@float, [-1,8]:Integer, [-1,9]:Integer, [-1,10]:Integer, [-1,11]:Integer}"
 ```
 
 ### オフセット -1 (特別：「すべての場所」)
+
 **「このパターンがすべての要素で繰り返される」ことを意味する**
 
 #### 例1：直接配列 `[f32; 100]` (ポインタ間接参照なし)
+
 ```rust
 TypeTree(vec![Type {
     offset: -1, // すべての位置
@@ -131,6 +144,7 @@ TypeTree(vec![Type {
 生成されるLLVM：`"enzyme_type"="{[-1]:Float@float}"`
 
 #### 例1b：配列参照 `&[f32; 100]` (ポインタ間接参照あり)
+
 ```rust
 TypeTree(vec![Type {
     offset: -1, size: 8, kind: Pointer,
@@ -147,6 +161,7 @@ TypeTree(vec![Type {
 オフセット`0,4,8,12...396`を持つ100個の個別のTypeをリストする代わりに
 
 #### 例2：スライス `&[i32]`
+
 ```rust
 // スライスデータへのポインタ
 TypeTree(vec![Type {
@@ -162,6 +177,7 @@ TypeTree(vec![Type {
 生成されるLLVM：`"enzyme_type"="{[-1]:Pointer, [-1,-1]:Integer}"`
 
 #### 例3：混合構造
+
 ```rust
 struct Container {
     header: i64,        // オフセット 0
@@ -183,11 +199,13 @@ TypeTree(vec![
 ## 重要な区別：単一値 vs 配列
 
 **単一値**は精度のためにオフセット`0`を使用：
+
 - `&f32`はオフセット0に正確に1つのf32値を持つ
 - -1（「すべての場所」）を使用するよりも正確
 - 生成：`{[-1]:Pointer, [-1,0]:Float@float}`
 
 **配列**は効率性のためにオフセット`-1`を使用：
+
 - `&[f32; 100]`は同じパターンが100回繰り返される
 - -1を使用することで、100個の個別のオフセットをリストすることを回避
 - 生成：`{[-1]:Pointer, [-1,-1]:Float@float}`

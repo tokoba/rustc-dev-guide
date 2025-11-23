@@ -66,15 +66,18 @@ pub extern "gpu-kernel" fn kernel_1(x: *mut [f64; 256]) {
 ```
 
 ## コンパイル手順
+
 rustcと同じllvm上でビルドされたclangコンパイラを使用することが重要です。フルパスなしでclangを呼び出すだけでは、おそらくシステムのclangが使用され、互換性がない可能性があります。したがって、以下のclang/lld呼び出しを絶対パスで置き換えるか、`PATH`を適切に設定してください。
 
 まず、ホスト（CPU）コードを生成します。最初のビルドは単にlibcをコンパイルするためのもので、ハッシュ化されたパスに注意してください。次に、libcアーティファクトをrustcに提供しながら、rustcを直接呼び出してホストコードをビルドします。
+
 ```
 cargo +offload build -r -v
 rustc +offload --edition 2024 src/lib.rs -g --crate-type cdylib -C opt-level=3 -C panic=abort -C lto=fat -L dependency=/absolute_path_to/target/release/deps --extern libc=/absolute_path_to/target/release/deps/liblibc-<HASH>.rlib --emit=llvm-bc,llvm-ir  -Zoffload=Enable -Zunstable-options
 ```
 
 次に、デバイスコードを生成します。target-cpuを自分のGPUに適したコードに置き換えてください。
+
 ```
 RUSTFLAGS="-Ctarget-cpu=gfx90a --emit=llvm-bc,llvm-ir -Zoffload=Enable -Zunstable-options" cargo +offload build -Zunstable-options -r -v --target amdgcn-amd-amdhsa -Zbuild-std=core
 ```
@@ -82,6 +85,7 @@ RUSTFLAGS="-Ctarget-cpu=gfx90a --emit=llvm-bc,llvm-ir -Zoffload=Enable -Zunstabl
 次に、target/amdgcn-amd-amdhsaフォルダの下にある`<libname>.ll`を見つけて、device.llファイルにコピーします（または以下のファイル名を調整してください）。
 NVIDIAまたはIntel GPUで作業している場合は、名前を適切に調整し、結果（成功または失敗）を共有するためにissueを開いてください。
 まず、.llファイル（手動検査に適しています）を.bcファイルにコンパイルし、残ったアーティファクトをクリーンアップします。クリーンアップは重要です。そうしないと、キャッシングが次の実行時に干渉する可能性があります。
+
 ```
 opt lib.ll -o lib.bc
 opt device.ll -o device.bc
@@ -100,6 +104,7 @@ rm bare.amdgcn.gfx90a.img*
 ```
 
 特に最後のコマンドについては、パスを修正するのではなく、bareモードのOpenMP例をコピーして、自分のclangでコンパイルすることで再生成することをお勧めします。clang呼び出しに`-###`を追加することで、個々のステップを確認できます。
+
 ```
 myclang++ -fuse-ld=lld -O3 -fopenmp  -fopenmp-offload-mandatory --offload-arch=gfx90a omp_bare.cpp -o main -###
 ```
@@ -114,6 +119,7 @@ The second element is  0.000000
 ```
 
 メモリ転送に関する詳細情報を受け取るには、情報出力を有効にできます
+
 ```
 LIBOMPTARGET_INFO=-1  ./main
 ```

@@ -49,7 +49,6 @@
 let ty = tcx.type_of(some_def_id);
 ```
 
-[`TyCtxt`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html
 
 ## コンパイラがクエリを実行する方法
 
@@ -145,10 +144,13 @@ pub fn provide(providers: &mut Providers) {
 `fubar`という新しいクエリを追加したいとします。次のようにします:
 
 1. プロバイダー関数を実装します:
+
     ```rust,ignore
     fn fubar<'tcx>(tcx: TyCtxt<'tcx>, key: DefId) -> Fubar<'tcx> { ... }
     ```
+
 2. `provide`関数に登録します:
+
     ```rust,ignore
     pub fn provide(providers: &mut Providers) {
         *providers = Providers {

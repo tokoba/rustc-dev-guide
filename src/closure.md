@@ -33,6 +33,7 @@ fn main() {
 上記が `immut.rs` というファイルの内容だとしましょう。次のコマンドを使用して
 `immut.rs` をコンパイルすると、[`-Z dump-mir=all`][dump-mir] フラグにより、
 `rustc` が [MIR][mir] を生成し、`mir_dump` というディレクトリにダンプします。
+
 ```console
 > rustc +stage1 immut.rs -Z dump-mir=all
 ```
@@ -78,6 +79,7 @@ fn main() {
 _4 = &mut _1;
 _3 = [closure@mut.rs:7:13: 10:6] { x: move _4 };
 ```
+
 今回は、行 `_4 = &mut _1;` で、借用が可変借用に変更されたことがわかります。
 十分に公平です！クロージャは `x` を 10 増加させます。
 
@@ -102,6 +104,7 @@ fn main() {
 ```rust,ignore
 _6 = [closure@move.rs:7:13: 9:6] { x: move _1 }; // bb16[3]: scope 1 at move.rs:7:13: 9:6
 ```
+
 ここで、`x` はクロージャに直接移動され、その後のアクセスは許可されません。
 
 ## コンパイラでの推論

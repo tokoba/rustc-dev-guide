@@ -15,5 +15,4 @@
 
 [`rustc_interface`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_interface/index.html
 [`rustc_interface::Config`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_interface/interface/struct.Config.html
-[`TyCtxt.analysis`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_interface/passes/fn.analysis.html
 [`rustc_hir_typeck::typeck`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir_typeck/fn.typeck.html

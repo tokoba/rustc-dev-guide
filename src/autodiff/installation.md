@@ -5,6 +5,7 @@
 ## ビルド手順
 
 まず、Rustリポジトリをクローンして設定する必要があります。好みに応じて、`--enable-clang`または`--enable-lld`も有効にすることができます。
+
 ```bash
 git clone git@github.com:rust-lang/rust
 cd rust
@@ -12,11 +13,13 @@ cd rust
 ```
 
 その後、以下を使用してrustcをビルドできます：
+
 ```bash
 ./x build --stage 1 library
 ```
 
 その後、rustup toolchain linkを使用すると、cargo経由で使用できるようになります：
+
 ```
 rustup toolchain link enzyme build/host/stage1
 rustup toolchain install nightly # -Z unstable-optionsを有効にする
@@ -32,32 +35,37 @@ rustup toolchain install nightly # -Z unstable-optionsを有効にする
 ```
 
 Autodiffはまだ実験的なため、独自のプロジェクトで使用する場合は、Cargo.tomlに`lto="fat"`を追加し、
-`cargo`や`cargo +nightly`の代わりに`RUSTFLAGS="-Zautodiff=Enable" cargo +enzyme`を使用する必要があります。 
+`cargo`や`cargo +nightly`の代わりに`RUSTFLAGS="-Zautodiff=Enable" cargo +enzyme`を使用する必要があります。
 
 ## Compiler Explorerとdistビルド
 
 同様の方法で、compiler explorerインスタンスを新しいrustcに更新できます。まず、dockerインスタンスを準備します。
+
 ```bash
 docker run -it ubuntu:22.04
 export CC=clang CXX=clang++
 apt update
 apt install wget vim python3 git curl libssl-dev pkg-config lld ninja-build cmake clang build-essential
 ```
+
 次に、わずかに変更した方法でrustcをビルドします：
+
 ```bash
 git clone https://github.com/rust-lang/rust
 cd rust
 ./configure --release-channel=nightly --enable-llvm-enzyme --enable-llvm-link-shared --enable-llvm-assertions --enable-ninja --enable-option-checking --disable-docs --set llvm.download-ci-llvm=false
 ./x dist
 ```
+
 次に、tarballをホストにコピーします。dockeridは`docker ps -a`の下の最新のエントリです。
+
 ```bash
 docker cp <dockerid>:/rust/build/dist/rust-nightly-x86_64-unknown-linux-gnu.tar.gz rust-nightly-x86_64-unknown-linux-gnu.tar.gz
 ```
+
 その後、EnzymeAD/rustリポジトリに新しい（プレリリース）タグを作成し、EnzymeAD/enzyme-explorerリポジトリに対してタグを更新するPRを作成できます。
 PRで`tgymnich`にpingして、更新スクリプトを実行してもらうことを忘れないでください。注意：EnzymeAD/rustをアーカイブし、ここの手順を更新する必要があります。explorerは近々
 公式のrustサーバーからrustcツールチェーンを取得できるようになるはずです。
-
 
 ## Enzyme自体のビルド手順
 
@@ -74,8 +82,10 @@ cmake -G Ninja ../llvm -DLLVM_TARGETS_TO_BUILD="host" -DLLVM_ENABLE_ASSERTIONS=O
 ninja
 ninja install
 ```
+
 これにより、動作するLLVMビルドが得られます。次に、Enzymeのビルドを続けることができます。
 `llvm-project`フォルダを離れて、次のコマンドを実行します：
+
 ```bash
 git clone git@github.com:EnzymeAD/Enzyme
 cd Enzyme/enzyme
@@ -84,5 +94,5 @@ cd build
 cmake .. -G Ninja -DLLVM_DIR=<YourLocalPath>/llvm-project/build/lib/cmake/llvm/ -DLLVM_EXTERNAL_LIT=<YourLocalPath>/llvm-project/llvm/utils/lit/lit.py -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=YES -DBUILD_SHARED_LIBS=ON
 ninja
 ```
-これによりEnzymeがビルドされ、`Enzyme/enzyme/build/lib/<LLD/Clang/LLVM/lib>Enzyme.so`で見つけることができます。（拡張子はOSによって異なる場合があります）。
 
+これによりEnzymeがビルドされ、`Enzyme/enzyme/build/lib/<LLD/Clang/LLVM/lib>Enzyme.so`で見つけることができます。（拡張子はOSによって異なる場合があります）。

@@ -107,13 +107,12 @@ Rust文法のスーパーセットを解析しながら、エラー型も発行�
 例えば、LLVMは[`simplify_try`] `MIR`-optが探すパターンを
 最適化できないようです。
 
-Rustコードも、コード生成中に[_monomorphization_]されます。
+Rustコードも、コード生成中に[*monomorphization*]されます。
 これは、すべてのジェネリックコードのコピーを作成し、
 型パラメータを具体的な型に置き換えることを意味します。
 これを行うには、どの具体的な型のコードを生成するかのリストを収集する必要があります。
 これは_monomorphizationコレクション_と呼ばれ、`MIR`レベルで行われます。
 
-[_monomorphized_]: https://en.wikipedia.org/wiki/Monomorphization
 
 ### コード生成
 
@@ -127,9 +126,6 @@ LLVMはそれに対して多くの最適化を行い、基本的にアセンブ�
 （例：ELFオブジェクトまたは`WASM`）。次に、異なるライブラリ/バイナリが
 リンクされて最終的なバイナリが生成されます。
 
-[*trait solving*]: traits/resolution.md
-[*type checking*]: type-checking.md
-[*type inference*]: type-inference.md
 [`bump`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_parse/parser/struct.Parser.html#method.bump
 [`check`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_parse/parser/struct.Parser.html#method.check
 [`Crate`]: https://doc.rust-lang.org/beta/nightly-rustc/rustc_ast/ast/struct.Crate.html
@@ -151,10 +147,8 @@ LLVMはそれに対して多くの最適化を行い、基本的にアセンブ�
 [`simplify_try`]: https://github.com/rust-lang/rust/pull/66282
 [`Lexer`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_parse/lexer/struct.Lexer.html
 [`Ty<'tcx>`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.Ty.html
-[borrow checking]: borrow_check.md
 [codegen]: backend/codegen.md
 [hir]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/index.html
-[lex]: the-parser.md
 [mir-opt]: mir/optimizations.md
 [mir]: mir/index.md
 [parse_crate_mod]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_parse/parser/struct.Parser.html#method.parse_crate_mod
@@ -163,7 +157,6 @@ LLVMはそれに対して多くの最適化を行い、基本的にアセンブ�
 [parse_nonterminal]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_parse/parser/struct.Parser.html#method.parse_nonterminal
 [parser]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_parse/index.html
 [rustc_parse_parser_dir]: https://github.com/rust-lang/rust/tree/HEAD/compiler/rustc_parse/src/parser
-[String interning]: https://en.wikipedia.org/wiki/String_interning
 [thir]: ./thir.md
 
 ## どのように行うか
@@ -229,7 +222,7 @@ LLVMはそれに対して多くの最適化を行い、基本的にアセンブ�
 - 高レベルIR（HIR）：これは、脱糖された`AST`の一種です。まだユーザーが
   構文的に書いたものに近いですが、いくつかの暗黙的なものを含みます。
   例えば、いくつかの省略されたライフタイムなど。このIRは型チェックに適しています。
-- 型付き`HIR`（THIR）_以前は高レベル抽象IR（HAIR）_：これは
+- 型付き`HIR`（THIR）*以前は高レベル抽象IR（HAIR）*：これは
   `HIR`とMIRの間の中間です。`HIR`に似ていますが、完全に型付けされており、
   もう少し脱糖されています（例：メソッド呼び出しと暗黙的な逆参照は
   完全に明示的になります）。その結果、`HIR`からよりも`THIR`から`MIR`に
@@ -360,7 +353,7 @@ Rustコンパイラは、順次実行されるコードに対する一連のパ�
 
 `rustc`自体はRustで書かれています。では、コンパイラをどのようにコンパイルするのでしょうか？
 古いコンパイラを使用して新しいコンパイラをコンパイルします。
-これは[_bootstrapping_]と呼ばれます。
+これは[*bootstrapping*]と呼ばれます。
 
 ブートストラップには多くの興味深い意味があります。例えば、
 Rustの主要なユーザーの1つがRustコンパイラ自体であることを意味するため、

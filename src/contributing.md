@@ -189,7 +189,6 @@ PRを前進させるために、Triage WGは定期的に、レビューを待っ
 また、一部のPRに対して特別な手順をリクエストする場合もあります。
 そのような手順の例については、[Crater]および[Breaking Changes]章を参照してください。
 
-[r?]: https://github.com/rust-lang/rust/pull/78133#issuecomment-712692371
 [#t-release/triage]: https://rust-lang.zulipchat.com/#narrow/stream/242269-t-release.2Ftriage
 [Crater]: tests/crater.md
 
@@ -360,7 +359,7 @@ CSSが乱れる可能性がありますが、HTMLが正しいことを確認で�
   - テキストが時代遅れになる可能性がある理由(「変更」以外)。
     変更はプロジェクト全体で一定です。
 
-  - コメントが追加された日付。例えば、_「現在、...」_や_「今のところ、...」_と書く代わりに、
+  - コメントが追加された日付。例えば、_「現在、...」*や*「今のところ、...」_と書く代わりに、
     日付を追加することを検討してください。次のいずれかの形式で:
     - Jan 2021
     - January 2021
@@ -404,17 +403,6 @@ rustc-dev-guide変更をどこに貢献するか、そしてそうすること�
 
 <https://forge.rust-lang.org/release/issue-triaging.html>を参照してください。
 
-[stable-]: https://github.com/rust-lang/rust/labels?q=stable
-[beta-]: https://github.com/rust-lang/rust/labels?q=beta
-[I-\*-nominated]: https://github.com/rust-lang/rust/labels?q=nominated
-[I-prioritize]: https://github.com/rust-lang/rust/labels/I-prioritize
-[tracking issues]: https://github.com/rust-lang/rust/labels/C-tracking-issue
-[beta-backport]: https://forge.rust-lang.org/release/backporting.html#beta-backporting-in-rust-langrust
-[stable-backport]: https://forge.rust-lang.org/release/backporting.html#stable-backporting-in-rust-langrust
-[metabug]: https://github.com/rust-lang/rust/labels/metabug
-[regression-]: https://github.com/rust-lang/rust/labels?q=regression
-[relnotes]: https://github.com/rust-lang/rust/labels/relnotes
-[S-tracking-]: https://github.com/rust-lang/rust/labels?q=s-tracking
 [the rustc-dev-guide working group documentation]: https://forge.rust-lang.org/wg-rustc-dev-guide/index.html#where-to-contribute-rustc-dev-guide-changes
 
 ### rfcbotラベル

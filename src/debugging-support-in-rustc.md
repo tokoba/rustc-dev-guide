@@ -78,7 +78,7 @@ DWARFリーダーサポートが必要ないくつかの例は次のとおりで
 
 [This comment by Tom](https://github.com/rust-lang/rustc-dev-guide/pull/316#discussion_r284027340)
 > gdbのRust拡張と制限はgdbマニュアルに文書化されています:
-https://sourceware.org/gdb/onlinedocs/gdb/Rust.html -- ただし、これはgdbの便利な変数とレジスタがgdbの$規約に従うことを言及しておらず、RustパーサーがgdbのA拡張を実装していることも言及していません。
+<https://sourceware.org/gdb/onlinedocs/gdb/Rust.html> -- ただし、これはgdbの便利な変数とレジスタがgdbの$規約に従うことを言及しておらず、RustパーサーがgdbのA拡張を実装していることも言及していません。
 
 [This question by Aman](https://github.com/rust-lang/rustc-dev-guide/pull/316#discussion_r285401353)
 > @tromey この部分をGDB-Rustドキュメントに記載すべきと思いますか?重複を避けるためです。
@@ -246,20 +246,24 @@ Rustコンパイラは、`SourceMap`内の対応する`SourceFile`に各ソー�
 コマンドラインオプションでオーバーライドすることもできます。
 
 #### DWARF 5
+
 DWARFバージョン5は、使用中のソースファイルバージョンを検証するためのMD5ハッシュの埋め込みをサポートしています。
 DWARF 5 - Section 6.2.4.1 opcode DW_LNCT_MD5
 
 #### LLVM
+
 LLVM IRは、DIFileノードでMD5とSHA1(およびLLVM 11以降でSHA256)のソースファイルチェックサムをサポートしています。
 
 [LLVM DIFile documentation](https://llvm.org/docs/LangRef.html#difile)
 
 #### Microsoft Visual C++ Compiler /ZH option
+
 MSVCコンパイラは、`/ZH`コンパイラオプションを使用してPDBにMD5、SHA1、またはSHA256ハッシュを埋め込むことをサポートしています。
 
 [MSVC /ZH documentation](https://docs.microsoft.com/en-us/cpp/build/reference/zh)
 
 #### Clang
+
 ClangはMD5チェックサムを常に埋め込みますが、これはドキュメントには表示されません。
 
 ## 将来の作業
@@ -290,21 +294,14 @@ GDBには便利な変数などのいくつかの拡張も追加しています�
 [debugger or debugging tool]: https://en.wikipedia.org/wiki/Debugger
 [Bison]: https://www.gnu.org/software/bison/
 [ptype]: https://ftp.gnu.org/old-gnu/Manuals/gdb/html_node/gdb_109.html
-[rust-lang/lldb wiki page]: https://github.com/rust-lang/lldb/wiki
 [DWARF]: http://dwarfstd.org
 [manual for GDB/Rust]: https://sourceware.org/gdb/onlinedocs/gdb/Rust.html
-[GDB Bugzilla]: https://sourceware.org/bugzilla/
 [Recursive Descent parser]: https://en.wikipedia.org/wiki/Recursive_descent_parser
 [System Integrity Protection]: https://en.wikipedia.org/wiki/System_Integrity_Protection
-[https://github.com/rust-dev-tools/gdb]: https://github.com/rust-dev-tools/gdb
 [DWARF feature request]: http://dwarfstd.org/ShowIssue.php?issue=180517.2
-[https://docs.python.org/3/c-api/stable.html]: https://docs.python.org/3/c-api/stable.html
 [https://github.com/rust-lang/rfcs/pull/2117]: https://github.com/rust-lang/rfcs/pull/2117
 [https://github.com/rust-lang/rust/issues/33014]: https://github.com/rust-lang/rust/issues/33014
-[https://github.com/rust-lang/rust/issues/34457]: https://github.com/rust-lang/rust/issues/34457
 [Apple developer documentation for System Integrity Protection]: https://developer.apple.com/library/archive/releasenotes/MacOSX/WhatsNewInOSX/Articles/MacOSX10_11.html#//apple_ref/doc/uid/TP40016227-SW11
-[https://github.com/rust-lang/lldb]: https://github.com/rust-lang/lldb
-[https://github.com/rust-lang/llvm-project]: https://github.com/rust-lang/llvm-project
 [PDB]: https://llvm.org/docs/PDB/index.html
 [symbol records]: https://llvm.org/docs/PDB/CodeViewSymbols.html
 [type records]: https://llvm.org/docs/PDB/CodeViewTypes.html

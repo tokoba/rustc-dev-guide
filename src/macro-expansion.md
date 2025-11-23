@@ -6,7 +6,6 @@ Rustには非常に強力なマクロシステムがあります。前の章で�
 [*抽象構文木*（AST）][ast]を得るまで、これらのマクロを反復的に展開するプロセスについて説明します。
 
 [ast]: ./ast-validation.md
-[placeholders]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/placeholders/index.html
 
 まず、マクロ出力を展開してASTに統合するアルゴリズムについて説明します。次に、
 ハイジーンデータの収集方法を見ていきます。最後に、
@@ -149,6 +148,7 @@ Eager-expansionは一般的に、遅延（通常）展開が行うことのサ�
 ### その他のデータ構造
 
 展開と統合に関与する他の注目すべきデータ構造は次のとおりです。
+
 - [`ResolverExpand`] - クレートの依存関係を壊すために使用される`trait`。
   これにより、[`rustc_resolve`]とほぼすべてが[`rustc_ast`]に依存しているにもかかわらず、
   [`rustc_ast`]でリゾルバーサービスを使用できます。
@@ -160,7 +160,6 @@ Eager-expansionは一般的に、遅延（通常）展開が行うことのサ�
   [`AstFragmentKind`]（つまり、アイテム、式、パターンなど）に応じて、
   異なる[`AstFragment`]に変換できるもの。
 
-[`AstFragment`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/expand/enum.AstFragment.html
 [`rustc_ast`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast/index.html
 [`rustc_resolve`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/index.html
 [`ResolverExpand`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/base/trait.ResolverExpand.html
@@ -257,8 +256,6 @@ Rustマクロは衛生的であり、上記のようなバグを書くことを�
 任意の[`Ident`]からコンテキストなしでアクセスできる、
 ハイジーンと展開情報を含むグローバルなデータです。
 
-
-[`ExpnId`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/hygiene/struct.ExpnId.html
 [rootid]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/hygiene/struct.ExpnId.html#method.root
 [hd]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/hygiene/struct.HygieneData.html
 [hy]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/hygiene/index.html
@@ -372,7 +369,6 @@ m!(foo);
 システムよりも強力なハイジーンを持っており、2つの間の奇妙な相互作用を引き起こす可能性があります。
 ハックは、今のところ物事を「うまく機能させる」ことを目的としています。
 
-[`ExpnId`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/hygiene/struct.ExpnId.html
 [hack]: https://github.com/rust-lang/rust/pull/51762#issuecomment-401400732
 
 ### 呼び出しサイト階層
@@ -411,6 +407,7 @@ baz`です。
 それはマクロのタイプによって異なります。
 
 Rustには2種類のマクロがあります。
+
   1. `macro_rules!`マクロ（別名「Macros By Example」（MBE））、および、
   2. 手続きマクロ（procマクロ）。カスタム派生を含みます。
 
@@ -419,6 +416,7 @@ Rustには2種類のマクロがあります。
 コードのこれらの部分を使用して展開されます。
 
 ここでのいくつかの重要なデータ構造/インターフェース：
+
 - [`SyntaxExtension`] - 低レベルのマクロ表現。展開関数が含まれており、
   [`TokenStream`]またはASTを別の[`TokenStream`]またはASTに変換します。
   さらに、安定性や、マクロ内で許可される不安定な機能のリストなどの追加データも含まれます。
@@ -485,6 +483,7 @@ _マクロ展開_の一般的な例の1つです。
 ### MBEパーサー
 
 マクロパーサーによって行われるMBE展開には2つの部分があります。
+
   1. 定義の解析、および、
   2. 呼び出しの解析。
 
@@ -572,7 +571,6 @@ procマクロで使用されるトークンストリームタイプは_安定_�
 安定版[`proc_macro::TokenStream`][stablets]に変換されてから戻されます。
 Rust ABIは現在不安定なので、この変換にはC ABIを使用します。
 
-[tsmod]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast/tokenstream/index.html
 [rustcts]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast/tokenstream/struct.TokenStream.html
 [stablets]: https://doc.rust-lang.org/proc_macro/struct.TokenStream.html
 [pm]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/proc_macro/index.html

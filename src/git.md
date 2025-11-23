@@ -36,7 +36,6 @@ SSH を使用している場合です。
 
 **注意**：このページは `rust-lang/rust` のワークフローに特化していますが、Rust プロジェクトの他のリポジトリに貢献する際にも役立つでしょう。
 
-
 ## 標準プロセス
 
 以下は、ほとんどの小さな変更と PR に使用する可能性が高い通常の手順です：
@@ -65,13 +64,13 @@ SSH を使用している場合です。
 
 古くなっている場合、`rust-lang/rust` をゼロからクローンする必要はありません！修復不可能なほど混乱させたと思っても、リポジトリ全体を再度ダウンロードする必要のない Git の状態を修正する方法があります。以下は、遭遇する可能性のある一般的な問題です：
 
-### 誤ってマージコミットを作成してしまいました。
+### 誤ってマージコミットを作成してしまいました
 
 Git には、ブランチを最新の変更で更新する2つの方法があります：マージとリベースです。Rust は[リベースを使用します][no-merge-policy]。マージコミットを作成してしまった場合、修正するのはそれほど難しくありません：`git rebase -i upstream/main`。
 
 リベースの詳細については、[リベース](#rebasing)を参照してください。
 
-### GitHub でフォークを削除してしまいました！
+### GitHub でフォークを削除してしまいました
 
 これは Git の観点からは問題ではありません。`git remote -v` を実行すると、次のように表示されます：
 
@@ -116,10 +115,12 @@ Web UI で競合に気付くこともあります：
 ### リベースしようとすると「error: cannot rebase」と表示されます
 
 リベースするときによく見られる2つのエラー：
+
 ```console
 error: cannot rebase: Your index contains uncommitted changes.
 error: Please commit or stash them.
 ```
+
 ```console
 error: cannot rebase: You have unstaged changes.
 error: Please commit or stash them.
@@ -135,7 +136,7 @@ git config --global rebase.autostash true
 
 スタッシュの詳細については、<https://git-scm.com/book/en/v2/Git-Tools-Stashing-and-Cleaning> を参照してください。
 
-### 'Untracked Files: src/stdarch' と表示されます。
+### 'Untracked Files: src/stdarch' と表示されます
 
 これは `library/` ディレクトリへの移動から残されたものです。残念ながら、`git rebase` はサブモジュールの名前変更に従わないため、ディレクトリを自分で削除する必要があります：
 
@@ -143,7 +144,7 @@ git config --global rebase.autostash true
 rm -r src/stdarch
 ```
 
-### `<<< HEAD` と表示されます。
+### `<<< HEAD` と表示されます
 
 おそらくリベースまたはマージ競合の最中です。競合を修正する方法については、[競合](#rebasing-and-conflicts)を参照してください。変更を気にせず、リポジトリのクリーンなコピーを取得したいだけの場合は、`git reset` を使用できます：
 
@@ -167,7 +168,7 @@ hint: See the 'Note about fast-forwards' in 'git push --help' for details.
 
 これが提供するアドバイスは正しくありません！Rust の [「no-merge」ポリシー](#no-merge-policy)のため、`git pull` によって作成されるマージコミットは最終的な PR では許可されず、リベースの目的を無効にします！代わりに `git push --force-with-lease` を使用してください。
 
-### Git が自分が書いていないコミットをリベースしようとします。
+### Git が自分が書いていないコミットをリベースしようとします
 
 リベースリストに多数のコミット、マージコミット、または自分が書いていない他の人のコミットが表示される場合は、間違ったブランチにリベースしようとしている可能性があります。例えば、`rust-lang/rust` リモート `upstream` があるのに、`git rebase upstream/main` の代わりに `git rebase origin/main` を実行した可能性があります。修正するには、リベースを中止して代わりに正しいブランチを使用します：
 
@@ -193,8 +194,8 @@ Your branch is up to date with 'origin/main'.
 Changes not staged for commit:
   (use "git add <file>..." to update what will be committed)
   (use "git restore <file>..." to discard changes in working directory)
-	modified:   src/llvm-project (new commits)
-	modified:   src/tools/cargo (new commits)
+ modified:   src/llvm-project (new commits)
+ modified:   src/tools/cargo (new commits)
 
 no changes added to commit (use "git add" and/or "git commit -a")
 ```
@@ -220,10 +221,12 @@ git pull --rebase https://github.com/rust-lang/rust.git main
 ```
 
 > 次のエラーが表示された場合：
+>
 > ```console
 > error: cannot pull with rebase: Your index contains uncommitted changes.
 > error: please commit or stash them.
 > ```
+>
 > これは、作業ツリーにコミットされていない作業があることを意味します。その場合、リベースする前に `git stash` を実行し、リベースしてすべての競合を修正した後に `git stash pop` を実行します。
 
 main でブランチをリベースすると、ブランチのすべての変更が `main` の最新バージョンに再適用されます。言い換えれば、Git は古いバージョンの `main` に加えた変更が、代わりに新しいバージョンの `main` に加えられたふりをしようとします。このプロセス中に、少なくとも1つの「リベース競合」に遭遇することが予想されます。これは、Git が変更を再適用しようとする試みが、他の変更と競合したため失敗したときに発生します。次のような行が出力に表示されるため、これが発生したことがわかります：

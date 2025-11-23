@@ -12,6 +12,7 @@
 ## 通知グループの一覧
 
 通知グループの一覧は以下の通りです：
+
 - [Apple](./apple.md)
 - [ARM](./arm.md)
 - [Emscripten](./emscripten.md)
@@ -43,13 +44,13 @@ cargo run add-person $your_user_name
 
 PRの例：
 
-* [Appleグループに自分を追加する例。](https://github.com/rust-lang/team/pull/1434)
-* [ARMグループに自分を追加する例。](https://github.com/rust-lang/team/pull/358)
-* [Emscriptenグループに自分を追加する例。](https://github.com/rust-lang/team/pull/1579)
-* [RISC-Vグループに自分を追加する例。](https://github.com/rust-lang/team/pull/394)
-* [WASIグループに自分を追加する例。](https://github.com/rust-lang/team/pull/1580)
-* [WebAssemblyグループに自分を追加する例。](https://github.com/rust-lang/team/pull/1581)
-* [Windowsグループに自分を追加する例。](https://github.com/rust-lang/team/pull/348)
+- [Appleグループに自分を追加する例。](https://github.com/rust-lang/team/pull/1434)
+- [ARMグループに自分を追加する例。](https://github.com/rust-lang/team/pull/358)
+- [Emscriptenグループに自分を追加する例。](https://github.com/rust-lang/team/pull/1579)
+- [RISC-Vグループに自分を追加する例。](https://github.com/rust-lang/team/pull/394)
+- [WASIグループに自分を追加する例。](https://github.com/rust-lang/team/pull/1580)
+- [WebAssemblyグループに自分を追加する例。](https://github.com/rust-lang/team/pull/1581)
+- [Windowsグループに自分を追加する例。](https://github.com/rust-lang/team/pull/348)
 
 ## 通知グループの問題にタグを付ける
 

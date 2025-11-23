@@ -62,6 +62,7 @@ JSON 仕様を記入し、ある程度成功裏にコンパイルできるよう
 エラーを修正するには、`library/{std,alloc,core}/Cargo.toml` の異なる `Cargo.toml` に予期しない値を手動で追加する必要があります。以下は、`target_arch` として `NEW_TARGET_ARCH` を追加する例です：
 
 *`library/std/Cargo.toml`*:
+
 ```diff
   [lints.rust.unexpected_cfgs]
   level = "warn"
@@ -101,6 +102,7 @@ index 1e83f05e0ca..4d0172071c1 100644
 この後、`cargo update -p libc` を実行してロックファイルを更新します。
 
 ローカルの `path` 依存関係にパッチを適用すると、その依存関係の警告が有効になることに注意してください。一部の依存関係は警告がなく、`bootstrap.toml` の `deny-warnings` 設定により、ビルドが突然失敗し始める可能性があります。警告を回避するには、次のようにします：
+
 - 依存関係を変更して警告を削除する
 - またはローカル開発のために、bootstrap.toml で deny-warnings = false を設定して警告を抑制します。
 
@@ -129,6 +131,7 @@ compiler/rustc library/std
 ## tier 2（ターゲット）から tier 2（ホスト）へのターゲットの昇格
 
 tier 2 ターゲットには 2 つのレベルがあります：
+
 - クロスコンパイルのみのターゲット（`rustup target add`）
 - [ネイティブツールチェーンを持つ][tier2-native] ターゲット（`rustup toolchain install`）
 

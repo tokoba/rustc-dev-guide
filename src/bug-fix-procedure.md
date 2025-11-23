@@ -5,7 +5,6 @@
 
 # 動機
 
-[motivation]: #motivation
 
 時々、既存のコードがコンパイルされなくなるような、バグ修正、健全性の修正、
 またはコンパイラでのその他の変更を行う必要に遭遇します。これが起こった場合、
@@ -38,7 +37,6 @@ Rust のユーザーにスムーズな移行を提供する方法で変更を処
 
 # 詳細設計
 
-[design]: #detailed-design
 
 破壊的変更を行うための手順は次のとおりです（これらの各ステップについては以下で詳しく説明します）：
 
@@ -191,7 +189,7 @@ lint 名が言及されている各場所を変換します（コンパイラで
 
 > 注：これらの正確なファイルはもう存在しませんが、手順は同じです。
 
-#### lint を削除します。
+#### lint を削除します
 
 最初に見つかるであろう参照は、[次のような
 `rustc_session/src/lint/builtin.rs` の lint 定義][defsource]です：
@@ -223,7 +221,7 @@ FutureIncompatibleInfo {
 
 これも削除してください。
 
-#### 削除された lint のリストに lint を追加します。
+#### 削除された lint のリストに lint を追加します
 
 `compiler/rustc_lint/src/lib.rs` には「名前変更および削除された lint」のリストがあります。
 この lint をリストに追加できます：
@@ -272,7 +270,7 @@ struct_span_code_err!(self.dcx(), self.tcx.span_of_impl(item1).unwrap(), E0592, 
 ./x test
 ```
 
-#### 完了！
+#### 完了
 
 PR を開いてください。=)
 

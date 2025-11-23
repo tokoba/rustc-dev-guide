@@ -40,7 +40,7 @@ rustc.main.000-000.CleanEndRegions.after.mir
 ```bash
 > rustc -Z dump-mir='main & CleanEndRegions' foo.rs
 > ls mir_dump
-rustc.main.000-000.CleanEndRegions.after.mir	rustc.main.000-000.CleanEndRegions.before.mir
+rustc.main.000-000.CleanEndRegions.after.mir rustc.main.000-000.CleanEndRegions.before.mir
 ```
 <!--- TODO: Change NoLandingPads. [#1232](https://github.com/rust-lang/rustc-dev-guide/issues/1232) -->
 フィルタには、`&`フィルタの複数のセットを組み合わせる`|`パーツを含めることもできます。例えば、`main & CleanEndRegions | main & NoLandingPads`は、`main`*と*`CleanEndRegions`*または*`main`*と*`NoLandingPads`の*いずれか*を選択します：

@@ -33,10 +33,8 @@
     Some("$why_it_was_removed"))
    ```
 
-
 ## フィーチャーゲートの名前変更
 
-[renaming]: #renaming-a-feature-gate
 
 フィーチャーゲートの名前を変更するには、次の手順に従います（最初の2つは[フィーチャーゲートを削除する][removing]ときと同じ手順です）：
 
@@ -63,11 +61,8 @@
    (unstable, $new_feature_name, "$version", Some($tracking_issue_number))
    ```
 
-
 ## フィーチャーの安定化
 
 手順については、「フィーチャーの安定化」章の["フィーチャーゲートリストの更新"]を参照してください。宣言を更新するだけでなく、他にも必要な手順があります！
 
-
-["Stability in code"]: ./implementing_new_features.md#stability-in-code
 ["フィーチャーゲートリストの更新"]: ./stabilization_guide.md#updating-the-feature-gate-listing

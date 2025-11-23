@@ -57,7 +57,6 @@ Tidyは、ソースコードのスタイルとフォーマット規則を検証�
 
 [Tidy Readme]: https://github.com/rust-lang/rust/blob/HEAD/src/tools/tidy/Readme.md
 
-
 ### フォーマット
 
 Rustfmtは、コンパイラ全体で統一されたスタイルを強制するためにビルドシステムと統合されています。フォーマットチェックは、上記のTidyツールによって自動的に実行されます。
@@ -134,6 +133,6 @@ Rustは、回帰を検出し、言語の進化について情報に基づいた�
 
 以下のブログ投稿も興味深いかもしれません：
 
-- brsonの古典的な["How Rust is tested"][howtest]
+* brsonの古典的な["How Rust is tested"][howtest]
 
 [howtest]: https://brson.github.io/2017/07/10/how-rust-is-tested

@@ -77,6 +77,7 @@ impl<E> From<E> for MyCustomErrorType where E: Error {}
 負のトレイト実装に依存せず、安定しています。
 
 次のようなものがあるとしましょう
+
 ```rust
 impl From<MyLocalType> for Box<dyn Error> {}  // あなた自身のクレート内
 impl<E> From<E> for Box<dyn Error> where E: Error {} // std 内

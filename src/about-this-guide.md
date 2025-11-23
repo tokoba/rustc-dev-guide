@@ -89,18 +89,12 @@ rustc の開発に関わる新しい貢献者を支援することを目的と�
   _ヒント：_ 任意の Rustdoc ページで `?` を入力すると、
   より多くのヒントとキーボードショートカットを見つけることができます！
 
-
-[rustc dev guide]: about-this-guide.md
 [gsearchdocs]: https://www.google.com/search?q=site:doc.rust-lang.org+your+query+here
-[stddocs]: https://doc.rust-lang.org/std
 [rif]: http://internals.rust-lang.org
 [rr]: https://doc.rust-lang.org/book/
-[rustforge]: https://forge.rust-lang.org/
 [tlgba]: https://tomlee.co/2014/04/a-more-detailed-tour-of-the-rust-compiler/
-[ro]: https://www.rustaceans.org/
 [rctd]: tests/intro.md
 [cheatsheet]: https://bors.rust-lang.org/
-[Miri]: https://github.com/rust-lang/miri
 [@bors]: https://github.com/bors
 [a GitHub repository]: https://github.com/rust-lang/rustc-dev-guide/
 [rustc API docs]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle

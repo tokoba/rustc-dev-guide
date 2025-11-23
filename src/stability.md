@@ -23,11 +23,13 @@
 [accidentally stabilized paths]: https://github.com/rust-lang/rust/issues/113387
 
 ## stable
+
 `#[stable(feature = "foo", since = "1.420.69")]`属性は、アイテムを明示的に安定化としてマークします。安定した関数は本体で不安定なものを使用できることに注意してください。
 
 ## rustc_const_unstable
 
 `#[rustc_const_unstable(feature = "foo", issue = "1234", reason = "lorem ipsum")]`は`unstable`属性と同じインターフェースを持っています。これは、`const fn`の定数性が不安定であることをマークするために使用されます。これは稀なケースでのみ必要です：
+
 - `const fn`が不安定な言語機能やintrinsicを使用する場合。（コンパイラはこれに遭遇した場合、属性を追加するように指示します。）
 - `const fn`が`#[stable]`であるが、まだconst-stableにする意図がない場合。
 - const-unstableなintrinsicを呼び出すために必要な機能ゲートを変更する場合。
@@ -105,9 +107,11 @@ intrinsicでは、この属性はintrinsicを「公開された安定した関�
 ユーザーコードとのもう1つの違いは、`since`フィールドが実際に現在のバージョンの`rustc`に対してチェックされることです。`since`が将来のバージョンにある場合、`deprecated_in_future` lintがトリガーされます。これはデフォルトで`allow`ですが、標準ライブラリのほとんどは`#![warn(deprecated_in_future)]`で警告に引き上げます。
 
 ## unstable_feature_bound
+
 `#[unstable_feature_bound(foo)]`属性は、`#[unstable]`属性と一緒に使用して、安定した型と安定したトレイトの`impl`を不安定としてマークできます。std/coreでは、`#[unstable_feature_bound(foo)]`で注釈されたアイテムは、同じく`#[unstable_feature_bound(foo)]`で注釈された別のアイテムによってのみ使用できます。std/core外では、`#[unstable_feature_bound(foo)]`を持つアイテムを使用するには、クレートに`#![feature(foo)]`属性で機能を有効にする必要があります。
 
 現在、`#[unstable_feature_bound]`で注釈できるアイテムは次のとおりです：
+
 - `impl`
 - 自由関数
 - トレイト

@@ -22,6 +22,7 @@
 ---
 
 次のような関数がある場合：
+
 ```rust
 // `foo`は次の`ParamEnv`を持ちます：
 // `[T: Sized, T: Trait, <T as Trait>::Assoc: Clone]`
@@ -30,9 +31,11 @@ where
     <T as Trait>::Assoc: Clone,
 {}
 ```
+
 概念的に`foo`の内部にいる場合（たとえば、型チェックやリントの際）、型システムと相互作用するすべての場所でこの`ParamEnv`を使用します。これにより、[正規化]、ジェネリック定数の評価、where句/ゴールの証明などが、`T`がサイズ指定され、`Trait`を実装していることなどに依存できるようになります。
 
 より具体的な例：
+
 ```rust
 // `foo`は次の`ParamEnv`を持ちます：
 // `[T: Sized, T: Clone]`
@@ -50,6 +53,7 @@ fn foo<T: Clone>(a: T) {
 ```
 
 または、コンパイルされない例：
+
 ```rust
 // `foo2`は次の`ParamEnv`を持ちます：
 // `[T: Sized]`
@@ -75,6 +79,7 @@ fn foo2<T>(a: T) {
 型システムと相互作用する際に間違った[`ParamEnv`][penv]を使用すると、ICE、不正な形式のプログラムのコンパイル、またはすべきでないときのエラーにつながる可能性があります。[#82159](https://github.com/rust-lang/rust/pull/82159)および[#82067](https://github.com/rust-lang/rust/pull/82067)を、コンパイラが正しいparam envを使用するように変更し、その過程でICEを修正したPRの例として参照してください。
 
 大多数の場合、`ParamEnv`が必要なとき、それはすでにスコープ内のどこかに存在するか、呼び出しスタックの上位にあり、渡されるべきです。既存の`ParamEnv`を見つけられる場所の網羅的ではないリスト：
+
 - 型チェック中、`FnCtxt`には[`param_env`フィールド][fnctxt_param_env]があります
 - late lintsを書くとき、`LateContext`には[`param_env`フィールド][latectxt_param_env]があります
 - well formednessチェック中、`WfCheckingCtxt`には[`param_env`フィールド][wfckctxt_param_env]があります
@@ -85,6 +90,7 @@ fn foo2<T>(a: T) {
 スコープ内のどこかに使用できる`ParamEnv`があるかどうかわからない場合は、[`#t-compiler/help`][compiler_help] Zulipチャネルでスレッドを開くことをお勧めします。誰かが`ParamEnv`を取得できる場所を指摘できる可能性があります。
 
 `ParamEnv`を手動で構築することは、通常、何らかのトップレベル分析の開始時にのみ必要です（例：hir typeckまたは借用チェック）。そのような場合、3つの方法があります：
+
 - 特定の定義に関連付けられた環境を返す[`tcx.param_env(def_id)`クエリ][param_env_query]を呼び出す。
 - [`ParamEnv::empty`][env_empty]で空の環境を作成する。
 - [`ParamEnv::new`][param_env_new]を使用して任意のwhere句のセットで環境を構築する。次に、[`traits::normalize_param_env_or_error`][normalize_env_or_error]を呼び出して、環境内のすべてのwhere句を正規化およびelaborateする処理を行います。
@@ -106,7 +112,6 @@ fn foo2<T>(a: T) {
 [mirtypeck_param_env]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/type_check/struct.TypeChecker.html#structfield.param_env
 [env_empty]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.ParamEnv.html#method.empty
 [param_env_query]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir_typeck/fn_ctxt/struct.FnCtxt.html#structfield.param_env
-[method_pred_entailment]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir_analysis/check/compare_impl_item/fn.compare_method_predicate_entailment.html
 [predicate_emitting_relation]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/relate/combine/trait.PredicateEmittingRelation.html
 [tenv_mono]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TypingEnv.html#method.fully_monomorphized
 [compiler_help]: https://rust-lang.zulipchat.com/#narrow/channel/182449-t-compiler.2Fhelp
@@ -120,6 +125,7 @@ fn foo2<T>(a: T) {
 `fn foo<T: Copy>()`のような関数がある場合、`Copy`トレイトには`Clone`スーパートレイトがあるため、関数内で`T: Clone`を証明できるようにしたいです。`ParamEnv`の構築は、env内のすべてのトレイト境界を調べ、トレイトで見つかったスーパートレイトの新しいwhere句を明示的に`ParamEnv`に追加します。
 
 具体的な例：
+
 ```rust
 trait Trait: SuperTrait {}
 trait SuperTrait: SuperSuperTrait {}
@@ -140,6 +146,7 @@ envをelaborateしなかった場合、`requires_impl`呼び出しは型チェ�
 `Clone`トレイトには`Sized`スーパートレイトがありますが、envには2つの`T: Sized`境界（スーパートレイト用と暗黙的に追加された`T: Sized`境界用）はありません。elaborateプロセス（[`util::elaborate`][elaborate]経由で実装）がwhere句を重複排除するためです。
 
 この副作用として、実際にスーパートレイトのelaborationが行われなくても、env内の既存のwhere句も重複排除されます。次の例を参照してください：
+
 ```rust
 trait Trait {}
 // elaborateされていない`ParamEnv`は次のようになります：
@@ -157,6 +164,7 @@ fn foo<T: Trait + Trait>() {}
 #### すべての境界の正規化
 
 古いトレイトソルバーでは、`ParamEnv`に保存されたwhere句は完全に正規化される必要があります。そうでないと、トレイトソルバーが正しく機能しません。`ParamEnv`を正規化する必要がある具体的な例：
+
 ```rust
 trait Trait<T> {
     type Assoc;
@@ -192,7 +200,6 @@ fn requires_impl<U: Trait<u32>>(_: U) {}
 
 [example]: https://play.rust-lang.org/?version=stable&mode=debug&edition=2021&gist=e6933265ea3e84eaa47019465739992c
 [pe]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.ParamEnv.html
-[normalize_env_or_error]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_trait_selection/traits/fn.normalize_param_env_or_error.html
 
 ## 型付けモード
 

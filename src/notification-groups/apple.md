@@ -34,5 +34,5 @@ Appleは文書化されていないAPIの使用について非常に保護的で
 例えば、Darwin / XNUカーネルには実際にfutexシステムコールがありますが、公開APIではないため、`std`では使用できません。
 
 一般的に、APIがAppleによって公開と見なされるためには、以下の条件を満たす必要があります：
-- 公開ヘッダーに現れる（つまり、Xcodeと一緒に配布され、`xcrun --show-sdk-path --sdk $SDK`で特定のプラットフォーム用に見つかるもの）。
-- 可用性属性がある（`__API_AVAILABLE`、`API_AVAILABLE`など）。
+* 公開ヘッダーに現れる（つまり、Xcodeと一緒に配布され、`xcrun --show-sdk-path --sdk $SDK`で特定のプラットフォーム用に見つかるもの）。
+* 可用性属性がある（`__API_AVAILABLE`、`API_AVAILABLE`など）。

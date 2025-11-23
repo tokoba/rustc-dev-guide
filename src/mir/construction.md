@@ -6,9 +6,9 @@
 * `static`と`const`アイテムの初期化子
 * 列挙型の判別値の初期化子
 * あらゆる種類の糊コードとshim
-    * タプル構造体の初期化関数
-    * ドロップコード（`Drop::drop`関数は直接呼び出されません）
-    * 明示的な`Drop`実装を持たない型のドロップ実装
+  * タプル構造体の初期化関数
+  * ドロップコード（`Drop::drop`関数は直接呼び出されません）
+  * 明示的な`Drop`実装を持たない型のドロップ実装
 
 変換は[`mir_built`]クエリを呼び出すことでトリガーされます。MIRビルダーは実際にはHIRを使用せず、代わりに[THIR]を操作し、THIR式を再帰的に処理します。
 
@@ -93,5 +93,4 @@ let v = match self.generate_more_mir(..) {
 [HIR]: ../hir.html
 [THIR]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_build/thir/index.html
 
-[`rustc_mir_build::thir::cx::expr`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_build/thir/cx/expr/index.html
 [`mir_built`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_transform/fn.mir_built.html

@@ -45,11 +45,8 @@ AST内のすべてのノードには、独自の[`NodeId`]があります。こ�
 [`rustc_lexer`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_lexer/index.html
 [`SourceMap`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/source_map/struct.SourceMap.html
 [`Lexer`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_parse/lexer/struct.Lexer.html
-[ast module]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast/ast/index.html
 [ast]: ./ast-validation.md
 [parser]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_parse/parser/index.html
 [rustc_ast]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast/index.html
-[rustc_errors]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_errors/index.html
 [rustc_parse]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_parse/index.html
 [sourcefile]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/struct.SourceFile.html
-[visit module]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast/visit/index.html

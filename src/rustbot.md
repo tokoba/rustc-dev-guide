@@ -35,6 +35,5 @@ issueやPRのラベルを変更することも、通常は組織のメンバー�
 
 `@rustbot`はリリースチームによって保守されています。既存のコマンドに関するフィードバックや新しいコマンドの提案がある場合は、[Zulip][zulip]で気軽に連絡するか、[triagebot リポジトリ][repo]にissueを提出してください。
 
-[documentation]: https://forge.rust-lang.org/triagebot/index.html
 [zulip]: https://rust-lang.zulipchat.com/#narrow/stream/224082-t-release.2Ftriagebot
 [repo]: https://github.com/rust-lang/triagebot/

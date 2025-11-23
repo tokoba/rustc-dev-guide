@@ -7,12 +7,12 @@
 PR が Rust for Linux CI ジョブを壊した場合は：
 
 - 破損が意図的でなく、一時的なものであるように見える場合は、[RfL][rfl-ping] に知らせて再試行してください。
-    - PR が緊急で、再試行で修正されない場合は、CI ジョブを一時的に無効にしてください
+  - PR が緊急で、再試行で修正されない場合は、CI ジョブを一時的に無効にしてください
       （`src/ci/github-actions/jobs.yml` の `image: x86_64-rust-for-linux` ジョブをコメントアウト）。
 - 破損が意図的でない場合は、PR を変更して破損を解決してください。
 - 破損が意図的である場合は、[RfL][rfl-ping] に知らせて、カーネルで何を変更する必要があるかを議論してください。
-    - PR が緊急の場合は、CI ジョブを一時的に無効にしてください（`src/ci/github-actions/jobs.yml` の `image: x86_64-rust-for-linux` ジョブをコメントアウト）。
-    - PR が数日待てる場合は、RfL メンテナが必要な変更を行った新しい Linux カーネルコミットハッシュを提供するのを待ち、それを PR に適用します。これにより、変更が機能することを確認できます（`src/ci/docker/scripts/rfl-build.sh` の `LINUX_VERSION` 環境変数を更新）。
+  - PR が緊急の場合は、CI ジョブを一時的に無効にしてください（`src/ci/github-actions/jobs.yml` の `image: x86_64-rust-for-linux` ジョブをコメントアウト）。
+  - PR が数日待てる場合は、RfL メンテナが必要な変更を行った新しい Linux カーネルコミットハッシュを提供するのを待ち、それを PR に適用します。これにより、変更が機能することを確認できます（`src/ci/docker/scripts/rfl-build.sh` の `LINUX_VERSION` 環境変数を更新）。
 
 RfL 開発者に連絡する必要がある場合は、[Rust for Linux][rfl-ping] ピンググループにピングして助けを求めることができます：
 

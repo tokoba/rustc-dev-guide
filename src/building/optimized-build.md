@@ -81,15 +81,20 @@ cflags = "-march=x86-64-v3"
 以下は、`opt-dist` をローカル（CI 外）で使用する方法の例です：
 
 1. `bootstrap.toml` ファイルでメトリクスを有効にします。`opt-dist` はそれが有効になっていることを期待しているためです：
+
     ```toml
    [build]
    metrics = true
    ```
+
 2. 次のコマンドでツールをビルドします：
+
     ```bash
     ./x build tools/opt-dist
     ```
+
 3. `local` モードでツールを実行し、必要なパラメータを提供します：
+
     ```bash
     ./build/host/stage1-tools-bin/opt-dist local \
       --target-triple <target> \ # ターゲットを選択、例：「x86_64-unknown-linux-gnu」
@@ -97,6 +102,7 @@ cflags = "-march=x86-64-v3"
       --llvm-dir <path>        \ # ビルドされた LLVM ツールチェーンへのパス、例：「/foo/bar/llvm/install」
       -- python3 x.py dist       # 実際のビルドコマンドを渡す
     ```
+
     変更できるさらなるパラメータを確認するには、`--help` を実行できます。
 
 [`Environment`]: https://github.com/rust-lang/rust/blob/ee451f8faccf3050c76cdcd82543c917b40c7962/src/tools/opt-dist/src/environment.rs#L5

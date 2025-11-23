@@ -136,7 +136,7 @@ fn foo() {
 
 一般的に、データフロー解析では、ブロックに複数の親がある場合（例の(C)のように）、そのデータフロー値はすべての親の何らかの関数になります（そしてもちろん、(C)で何が起こるか）。どの関数を使用するかは、実行している解析に依存します。
 
-この場合、`x`が使用される前に初期化されている必要があることを確実に証明したいと考えています。これにより、保守的に`some_cond`が時々偽である可能性があると仮定することを強いられます。したがって、「マージ関数」は「and」です。つまり、(C)で`init = true`となるのは、(A)_および_(B)で`init = true`である場合（または(C)で`x`が初期化されている場合）です。しかし、これは当てはまりません。特に、(A)では`init = false`であり、(C)で`x`は初期化されていません。したがって、(C)では`init = false`です。「`x`は使用前に初期化されていない可能性がある」というエラーを報告できます。
+この場合、`x`が使用される前に初期化されている必要があることを確実に証明したいと考えています。これにより、保守的に`some_cond`が時々偽である可能性があると仮定することを強いられます。したがって、「マージ関数」は「and」です。つまり、(C)で`init = true`となるのは、(A)*および*(B)で`init = true`である場合（または(C)で`x`が初期化されている場合）です。しかし、これは当てはまりません。特に、(A)では`init = false`であり、(C)で`x`は初期化されていません。したがって、(C)では`init = false`です。「`x`は使用前に初期化されていない可能性がある」というエラーを報告できます。
 
 データフロー解析については、確かにもっと多くのことが言えます。このトピックには、多くの理論を含む広範な研究文献が存在します。ここでは順方向解析のみを議論しましたが、逆方向データフロー解析も有用です。例えば、ブロック(A)から始めて順方向に移動するのではなく、`x`の使用から始めて逆方向に移動してその初期化を見つけることもできます。
 
@@ -158,6 +158,7 @@ Rustでは、これらは型チェックとトレイト解決で登場します�
 ```rust,ignore
 fn foo<T>()
 ```
+
 この関数は、すべての型`T`に対して関数が適格型であると主張します：`∀ T: well_typed(foo)`。
 
 別の例：
@@ -165,6 +166,7 @@ fn foo<T>()
 ```rust,ignore
 fn foo<'a>(_: &'a usize)
 ```
+
 この関数は、任意のライフタイム`'a`（呼び出し元によって決定される）に対して、適格型であると主張します：`∀ 'a: well_typed(foo)`。
 
 別の例：
@@ -173,6 +175,7 @@ fn foo<'a>(_: &'a usize)
 fn foo<F>()
 where for<'a> F: Fn(&'a u8)
 ```
+
 この関数は、すべてのライフタイム`'a`に対して`F: Fn(&'a u8)`であるようなすべての型`F`に対して、適格型であると主張します：`∀ F: ∀ 'a: (F: Fn(&'a u8)) => well_typed(foo)`。
 
 もう1つの例：
@@ -180,6 +183,7 @@ where for<'a> F: Fn(&'a u8)
 ```rust,ignore
 fn foo(_: dyn Debug)
 ```
+
 この関数は、`Debug`を実装する何らかの型`T`が存在し、関数が適格型であると主張します：`∃ T:  (T: Debug) and well_typed(foo)`。
 
 <a id="variance"></a>
@@ -190,7 +194,6 @@ fn foo(_: dyn Debug)
 
 [wikideb]: https://en.wikipedia.org/wiki/De_Bruijn_index
 [sub]: ../ty_module/generic_arguments.md
-
 
 クロージャにde Bruijnインデックスがどのように使用されるかの基本的な例を示します（ただし、`rustc`では実際にはこれを行いません！）：
 
@@ -229,11 +232,12 @@ fn foo(_: dyn Debug)
 
 > 公式Discordの`mem`、`scottmcm`、`Levi`に推薦を、そして`tinaun`にさらなる推薦があった[Graydon Hoareのツイッタースレッド](https://web.archive.org/web/20181230012554/https://twitter.com/graydon_pub/status/1039615569132118016)へのリンクを投稿してくれたことに感謝します！
 >
-> その他の情報源：https://gcc.gnu.org/wiki/ListOfCompilerBooks
+> その他の情報源：<https://gcc.gnu.org/wiki/ListOfCompilerBooks>
 >
 > 他に提案がある場合は、お気軽にissueまたはPRを開いてください。
 
 ## 書籍
+
 - [Types and Programming Languages](https://www.cis.upenn.edu/~bcpierce/tapl/)
 - [Programming Language Pragmatics](https://www.cs.rochester.edu/~scott/pragmatics/)
 - [Practical Foundations for Programming Languages](https://www.cs.cmu.edu/~rwh/pfpl/)
@@ -245,14 +249,17 @@ fn foo(_: dyn Debug)
 - [Crafting Interpreters](http://www.craftinginterpreters.com/)
 
 ## コース
+
 - [University of Oregon Programming Languages Summer School archive](https://www.cs.uoregon.edu/research/summerschool/archives.html)
 
 ## Wiki
+
 - [Wikipedia](https://en.wikipedia.org/wiki/List_of_programming_languages_by_type)
 - [Esoteric Programming Languages](https://esolangs.org/wiki/Main_Page)
 - [Stanford Encyclopedia of Philosophy](https://plato.stanford.edu/index.html)
 - [nLab](https://ncatlab.org/nlab/show/HomePage)
 
 ## その他の論文とブログ投稿
+
 - [Programming in Martin-Löf's Type Theory](https://www.cse.chalmers.se/research/group/logic/book/)
 - [Polymorphism, Subtyping, and Type Inference in MLsub](https://dl.acm.org/doi/10.1145/3093333.3009882)

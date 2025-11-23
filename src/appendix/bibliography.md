@@ -48,7 +48,7 @@
   Eric HolkによるGPU初期研究。
 * [Parallel closures: a new twist on an old
   idea](https://www.usenix.org/conference/hotpar12/parallel-closures-new-twist-old-idea)
-  - Rustについての論文ではありませんが、nmatsakisによるもの
+  * Rustについての論文ではありませんが、nmatsakisによるもの
 * [Patina: A Formalization of the Rust Programming
   Language](https://dada.cs.washington.edu/research/tr/2015/03/UW-CSE-15-03-02.pdf).
   Eric Reedによる型システムの部分集合の初期形式化。

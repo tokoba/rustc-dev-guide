@@ -10,7 +10,6 @@ MIR最適化は、借用チェックの後に実行されます。MIRを改善�
 [`optimized_mir`][optmir]クエリが呼び出されて、指定された[`DefId`][defid]に対する最適化されたMIRを生成します。このクエリは、借用チェッカーが実行され、何らかの検証が行われたことを確認します。次に、MIRを[盗み][steal]、最適化し、改善されたMIRを返します。
 
 [optmir]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_transform/fn.optimized_mir.html
-[query]: ../query.md
 [defid]: ../appendix/glossary.md#def-id
 [steal]: ../mir/passes.md#stealing
 
@@ -54,6 +53,7 @@ MIR最適化は、借用チェックの後に実行されます。MIRを改善�
 [trans]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_transform/index.html
 
 パスの例は次のとおりです：
+
 - `CleanupPostBorrowck`：コード生成ではなく、解析にのみ必要な一部の情報を削除します。
 - `ConstProp`：[定数伝播][constprop]を行います。
 

@@ -31,6 +31,7 @@ where
 ```
 
 この優先順位は、ビルトインimplがパラメータ以外のwhere句に依存するネストされたゴールを持つ場合に不正確です
+
 ```rust
 struct MyType<'a, T: ?Sized>(&'a (), T);
 fn is_sized<T>() {}
@@ -68,6 +69,7 @@ fn foo<'a, T: Trait<'a>>() {
 ```
 
 また、シャドウされたimplが現在曖昧なソルバーサイクルを引き起こす可能性があるため、これも必要です: [trait-system-refactor-initiative#76]。優先順位がない場合、where境界が領域制約を引き起こす場合に不完全性を避けるために、曖昧性エラーで失敗する必要があります。
+
 ```rust
 trait Super {
     type SuperAssoc;
@@ -94,6 +96,7 @@ fn overflow<T: Trait>() {
 
 この優先順位は多くの問題を引き起こします。[#24066]を参照してください。問題のほとんどは、
 where境界が型推論をガイドする場合でも、where境界をimplよりも優先することによって引き起こされます：
+
 ```rust
 trait Trait<T> {
     fn call_me(&self, x: T) {}
@@ -105,7 +108,9 @@ fn bug<T: Trait<U>, U>(x: T) {
     //~^ ERROR mismatched types
 }
 ```
+
 ただし、where境界が推論をガイドしない場合にのみこの優先順位を適用しても、不正確なライフタイム制約が発生する可能性があります：
+
 ```rust
 trait Trait<'a> {}
 impl<'a> Trait<'a> for &'a str {}
@@ -123,6 +128,7 @@ where
 #### `AliasBound`候補よりも優先
 
 これは、次の例で領域エラーを回避するために必要です
+
 ```rust
 trait Bound<'a> {}
 trait Trait<'a> {
@@ -139,7 +145,9 @@ where
     impls_bound::<'c, T::Assoc>();
 }
 ```
+
 不要な制約を引き起こす可能性もあります
+
 ```rust
 trait Bound<'a> {}
 trait Trait<'a> {
@@ -178,6 +186,7 @@ where
     x.test();
 }
 ```
+
 より重要なことは、ここでimplを使用することで、関連型を正規化する際にグローバルwhere境界がimplをシャドウすることを防ぎます。グローバルwhere境界をimplよりも優先することによる既知の問題はありません。
 
 #### グローバルwhere境界を引き続き考慮する理由
@@ -185,6 +194,7 @@ where
 グローバルwhere境界が存在する場合でもimplを使用するだけなので、これらのグローバルwhere境界を完全に無視しない理由を疑問に思うかもしれません：非グローバルwhere境界からの推論ガイダンスを弱めるためにそれらを使用します。
 
 非グローバルwhere境界がなければ、現在、適用可能なimplもあるにもかかわらず非グローバルwhere境界を優先します。非グローバルwhere境界を追加することで、この不必要な推論ガイダンスが無効になり、次のコンパイルが可能になります：
+
 ```rust
 fn check<Color>(color: Color)
 where
@@ -207,6 +217,7 @@ impl From<Vec> for f32 {
 ### `CandidateSource::AliasBound`
 
 エイリアス境界候補をimplよりも優先します。現在、この優先順位を使用して型推論をガイドし、次のコンパイルを可能にしています。個人的には、この優先順位が望ましいとは思いません 🤷
+
 ```rust
 pub trait Dyn {
     type Word: Into<u64>;
@@ -218,6 +229,7 @@ pub trait Dyn {
     }
 }
 ```
+
 ```rust
 fn impl_trait() -> impl Into<u32> {
     0u16
@@ -234,7 +246,9 @@ fn main() {
     println!("{}", std::mem::size_of_val(&x));
 }
 ```
+
 この優先順位は、領域制約による曖昧性も回避します。これが実際に依存されているかどうかはわかりません。
+
 ```rust
 trait Bound<'a> {}
 impl<T> Bound<'static> for T {}
@@ -263,6 +277,7 @@ fn foo<'a, T: Trait<'a>>() {
 これは、関連型を制約しないwhere境界の場合、関連型が*剛体*のままであることを意味します。
 
 これは、implの適用による不要な領域制約を回避するために必要です。
+
 ```rust
 trait Trait<'a> {
     type Assoc;
@@ -303,7 +318,9 @@ fn heck<T: Bound<Assoc: Trait>>(x: <T::Assoc as Super>::Assoc) -> u32 {
     x
 }
 ```
+
 このようなエイリアスを使用すると、追加の領域制約が発生する可能性があります。[#133044]を参照してください。
+
 ```rust
 trait Bound<'a> {
     type Assoc;
@@ -323,6 +340,7 @@ fn heck<'a, T: Trait<Assoc: Bound<'a>>>(x: <T::Assoc as Bound<'a>>::Assoc) {
 
 where境界が関連型を指定しない場合は`AliasBound`候補を使用しますが、指定する場合はwhere境界を優先します。
 これは次の例で必要です：
+
 ```rust
 // `I::IntoIterator: Iterator<Item = ()>`
 // where境界を`I::Intoiterator: Iterator<Item = I::Item>`
@@ -359,6 +377,7 @@ where
 
 `fn check_type_bounds`でGATおよびRPITITのアイテム境界を正規化する際に、「孤立した」`Projection`句を`ParamEnv`に追加します。
 これらの`ParamEnv`候補をimplおよび他のwhere境界よりも優先する必要があります。
+
 ```rust
 #![feature(associated_type_defaults)]
 trait Foo {
@@ -378,6 +397,7 @@ impl<T> Eq<T> for T {}
 #### グローバルwhere境界をimplよりも優先
 
 これは次のコンパイルに必要です。実際にこれに依存しているかどうかはわかりません 🤷
+
 ```rust
 trait Id {
     type This;
@@ -393,7 +413,9 @@ where
     x
 }
 ```
+
 これは、正規化が追加の領域制約を引き起こす可能性があることを意味します。[#133044]を参照してください。
+
 ```rust
 trait Trait {
     type Assoc;

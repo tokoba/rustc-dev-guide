@@ -69,5 +69,4 @@ Rustは2つのパニックランタイムを提供します：`panic_abort` と 
 
 すべてのパニックは、プロセスを中止するか、`catch_unwind` の呼び出しによってキャッチされることに注意してください。特に、stdの[ランタイムサービス][runtime service]では、ユーザー提供の `main` 関数への呼び出しは `catch_unwind` でラップされています。
 
-
 [runtime service]: https://github.com/rust-lang/rust/blob/HEAD/library/std/src/rt.rs
