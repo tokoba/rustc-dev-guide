@@ -1,23 +1,21 @@
-# crates.io dependencies
+# crates.io依存関係
 
-The Rust compiler supports building with some dependencies from `crates.io`.
-Examples are `log` and `env_logger`.
+Rustコンパイラは、`crates.io`からのいくつかの依存関係を使用したビルドをサポートしています。
+例として、`log`や`env_logger`があります。
 
-In general,
-you should avoid adding dependencies to the compiler for several reasons:
+一般的に、
+いくつかの理由により、コンパイラに依存関係を追加することは避けるべきです:
 
-- The dependency may not be of high quality or well-maintained.
-- The dependency may not be using a compatible license.
-- The dependency may have transitive dependencies that have one of the above
-  problems.
+- 依存関係が高品質でなかったり、よくメンテナンスされていない可能性があります。
+- 依存関係が互換性のあるライセンスを使用していない可能性があります。
+- 依存関係に上記の問題のいずれかを持つ推移的な依存関係がある可能性があります。
 
 <!-- date-check: Aug 2025 -->
-Note that there is no official policy for vetting new dependencies to the compiler.
-Decisions are made on a case-by-case basis, during code review.
+コンパイラへの新しい依存関係を審査するための公式なポリシーはないことに注意してください。
+決定は、コードレビュー中にケースバイケースで行われます。
 
-## Permitted dependencies
+## 許可された依存関係
 
-The `tidy` tool has [a list of crates that are allowed]. To add a
-dependency that is not already in the compiler, you will need to add it to the list.
+`tidy`ツールには[a list of crates that are allowed]があります。コンパイラにまだない依存関係を追加するには、リストにそれを追加する必要があります。
 
 [a list of crates that are allowed]: https://github.com/rust-lang/rust/blob/9d1b2106e23b1abd32fce1f17267604a5102f57a/src/tools/tidy/src/deps.rs#L73

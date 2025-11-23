@@ -1,46 +1,26 @@
-# AST lowering
+# ASTのlowering
 
-The AST lowering step converts AST to [HIR](../hir.md).
-This means many structures are removed if they are irrelevant
-for type analysis or similar syntax agnostic analyses. Examples
-of such structures include but are not limited to
+ASTのloweringステップは、ASTを[HIR](../hir.md)に変換します。
+これは、型分析や同様の構文に依存しない分析に関係のない多くの構造が削除されることを意味します。そのような構造の例には以下が含まれますが、これらに限定されません：
 
-* Parenthesis
-    * Removed without replacement, the tree structure makes order explicit
-* `for` loops
-    * Converted to `match` + `loop` + `match`
-* Universal `impl Trait`
-    * Converted to generic arguments
-      (but with some flags, to know that the user didn't write them)
-* Existential `impl Trait`
-    * Converted to a virtual `existential type` declaration
+* 括弧
+    * 置換なしで削除され、ツリー構造が順序を明示的にする
+* `for`ループ
+    * `match` + `loop` + `match`に変換される
+* 全称`impl Trait`
+    * ジェネリック引数に変換される
+      (ただし、ユーザーが書いていないことを示すいくつかのフラグ付き)
+* 存在`impl Trait`
+    * 仮想的な`existential type`宣言に変換される
 
-Lowering needs to uphold several invariants in order to not trigger the
-sanity checks in `compiler/rustc_passes/src/hir_id_validator.rs`:
+Loweringは、`compiler/rustc_passes/src/hir_id_validator.rs`のサニティチェックをトリガーしないために、いくつかの不変条件を維持する必要があります：
 
-1. A `HirId` must be used if created. So if you use the `lower_node_id`,
-  you *must* use the resulting `NodeId` or `HirId` (either is fine, since
-  any `NodeId`s in the `HIR` are checked for existing `HirId`s)
-2. Lowering a `HirId` must be done in the scope of the *owning* item.
-  This means you need to use `with_hir_id_owner` if you are creating parts
-  of an item other than the one being currently lowered. This happens for
-  example during the lowering of existential `impl Trait`
-3. A `NodeId` that will be placed into a HIR structure must be lowered,
-  even if its `HirId` is unused. Calling
-  `let _ = self.lower_node_id(node_id);` is perfectly legitimate.
-4. If you are creating new nodes that didn't exist in the `AST`, you *must*
-  create new ids for them. This is done by calling the `next_id` method,
-  which produces both a new `NodeId` as well as automatically lowering it
-  for you so you also get the `HirId`.
+1. `HirId`は作成されたら使用しなければなりません。したがって、`lower_node_id`を使用する場合、結果の`NodeId`または`HirId`を使用*しなければなりません*(どちらでも構いません。`HIR`内のすべての`NodeId`は既存の`HirId`がチェックされるため)
+2. `HirId`のloweringは、*所有している*アイテムのスコープ内で行わなければなりません。
+  これは、現在loweringされているもの以外のアイテムの一部を作成する場合、`with_hir_id_owner`を使用する必要があることを意味します。これは、例えば存在`impl Trait`のlowering中に発生します
+3. HIR構造に配置される`NodeId`は、その`HirId`が未使用であってもloweringされなければなりません。`let _ = self.lower_node_id(node_id);`を呼び出すことは完全に正当です。
+4. `AST`に存在しなかった新しいノードを作成する場合、それらの新しいIDを作成*しなければなりません*。これは`next_id`メソッドを呼び出すことによって行われ、新しい`NodeId`を生成すると同時に、自動的にloweringも行うため、`HirId`も取得できます。
 
-If you are creating new `DefId`s, since each `DefId` needs to have a
-corresponding `NodeId`, it is advisable to add these `NodeId`s to the
-`AST` so you don't have to generate new ones during lowering. This has
-the advantage of creating a way to find the `DefId` of something via its
-`NodeId`. If lowering needs this `DefId` in multiple places, you can't
-generate a new `NodeId` in all those places because you'd also get a new
-`DefId` then. With a `NodeId` from the `AST` this is not an issue.
+新しい`DefId`を作成する場合、各`DefId`には対応する`NodeId`が必要であるため、これらの`NodeId`を`AST`に追加して、lowering中に新しいものを生成する必要がないようにすることをお勧めします。これには、`NodeId`を介して何かの`DefId`を見つける方法を作成するという利点があります。loweringが複数の場所でこの`DefId`を必要とする場合、すべての場所で新しい`NodeId`を生成することはできません。なぜなら、新しい`DefId`も取得してしまうからです。`AST`からの`NodeId`があれば、これは問題になりません。
 
-Having the `NodeId` also allows the `DefCollector` to generate the `DefId`s
-instead of lowering having to do it on the fly. Centralizing the `DefId`
-generation in one place makes it easier to refactor and reason about.
+`NodeId`を持つことで、loweringが即座に行う代わりに、`DefCollector`が`DefId`を生成することもできます。`DefId`の生成を1か所に集中させることで、リファクタリングと推論が容易になります。

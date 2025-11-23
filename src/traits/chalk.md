@@ -1,41 +1,42 @@
-# Chalk-based trait solving
+# Chalk ベースのトレイト解決
 
-[Chalk][chalk] is an experimental trait solver for Rust that is
-(as of <!-- date-check --> May 2022) under development by the [Types team].
-Its goal is to enable a lot of trait system features and bug fixes
-that are hard to implement (e.g. GATs or specialization). If you would like to
-help in hacking on the new solver, drop by on the rust-lang Zulip in the [`#t-types`]
-channel and say hello!
+[Chalk][chalk] は Rust の実験的なトレイトソルバーであり、
+（<!-- date-check --> 2022年5月現在）[Types team] によって開発中です。
+その目標は、実装が困難な多くのトレイトシステム機能とバグ修正を
+可能にすることです（例：GAT や特殊化）。新しいソルバーのハッキングを
+手伝いたい場合は、rust-lang Zulip の [`#t-types`] チャンネルに立ち寄って
+挨拶してください！
 
 [Types team]: https://github.com/rust-lang/types-team
 [`#t-types`]: https://rust-lang.zulipchat.com/#narrow/stream/144729-t-types
 
-The new-style trait solver is based on the work done in [chalk]. Chalk
-recasts Rust's trait system explicitly in terms of logic programming. It does
-this by "lowering" Rust code into a kind of logic program we can then execute
-queries against.
+新しいスタイルのトレイトソルバーは、[chalk] で行われた作業に基づいています。
+Chalk は、Rust のトレイトシステムを論理プログラミングの観点から
+明示的に再構成します。これは、Rust コードを一種の論理プログラムに
+「降下」させ、そのプログラムに対してクエリを実行できるようにすることで
+行われます。
 
-The key observation here is that the Rust trait system is basically a
-kind of logic, and it can be mapped onto standard logical inference
-rules. We can then look for solutions to those inference rules in a
-very similar fashion to how e.g. a [Prolog] solver works. It turns out
-that we can't *quite* use Prolog rules (also called Horn clauses) but
-rather need a somewhat more expressive variant.
+ここでの重要な観察は、Rust のトレイトシステムは基本的に一種の論理であり、
+標準的な論理推論規則にマッピングできるということです。次に、例えば
+[Prolog] ソルバーがどのように動作するかと非常に似た方法で、
+これらの推論規則の解決策を探すことができます。*完全に* Prolog 規則
+（ホーン節とも呼ばれる）を使用することはできませんが、やや表現力の高い
+バリアントが必要であることがわかります。
 
 [Prolog]: https://en.wikipedia.org/wiki/Prolog
 
-You can read more about chalk itself in the
-[Chalk book](https://rust-lang.github.io/chalk/book/) section.
+chalk 自体について詳しくは、
+[Chalk book](https://rust-lang.github.io/chalk/book/) セクションをご覧ください。
 
-## Ongoing work
-The design of the new-style trait solving happens in two places:
+## 進行中の作業
+新しいスタイルのトレイト解決の設計は、2つの場所で行われています：
 
-**chalk**. The [chalk] repository is where we experiment with new ideas
-and designs for the trait system.
+**chalk**。[chalk] リポジトリは、トレイトシステムの新しいアイデアと
+設計を実験する場所です。
 
-**rustc**. Once we are happy with the logical rules, we proceed to
-implementing them in rustc. We map our struct, trait, and impl declarations
-into logical inference rules in the lowering module in rustc.
+**rustc**。論理規則に満足したら、rustc でそれらを実装することに進みます。
+rustc の降下モジュールで、構造体、トレイト、impl 宣言を論理推論規則に
+マッピングします。
 
 [chalk]: https://github.com/rust-lang/chalk
 [rustc_traits]: https://github.com/rust-lang/rust/tree/HEAD/compiler/rustc_traits

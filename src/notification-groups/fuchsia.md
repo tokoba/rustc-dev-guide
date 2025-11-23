@@ -1,12 +1,10 @@
-# Fuchsia notification group
+# Fuchsia通知グループ
 
-**Github Label:** [O-fuchsia] <br>
-**Ping command:** `@rustbot ping fuchsia`
+**Githubラベル:** [O-fuchsia] <br>
+**Pingコマンド:** `@rustbot ping fuchsia`
 
 [O-fuchsia]: https://github.com/rust-lang/rust/labels/O-fuchsia
 
-This list will be used to notify [Fuchsia][fuchsia] maintainers
-when the compiler or the standard library changes in a way that would
-break the Fuchsia integration.
+このリストは、コンパイラまたは標準ライブラリがFuchsia統合を破壊する方法で変更された場合に、[Fuchsia][fuchsia]メンテナーに通知するために使用されます。
 
 [fuchsia]: ../tests/ecosystem-test-jobs/fuchsia.md

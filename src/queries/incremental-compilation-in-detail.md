@@ -1,21 +1,20 @@
-# Incremental compilation in detail
+# インクリメンタルコンパイルの詳細
 
-The incremental compilation scheme is, in essence, a surprisingly
-simple extension to the overall query system. It relies on the fact that:
+インクリメンタルコンパイルスキームは、本質的には、
+全体的なクエリシステムへの驚くほどシンプルな拡張です。これは次の事実に依存しています:
 
-  1. queries are pure functions -- given the same inputs, a query will always
-     yield the same result, and
-  2. the query model structures compilation in an acyclic graph that makes
-     dependencies between individual computations explicit.
+  1. クエリは純粋関数です -- 同じ入力が与えられると、クエリは常に
+     同じ結果を生成し、
+  2. クエリモデルは、個々の計算間の依存関係を明示的にする非循環グラフで
+     コンパイルを構造化します。
 
-This chapter will explain how we can use these properties for making things
-incremental and then goes on to discuss version implementation issues.
+この章では、これらのプロパティを使用してインクリメンタルにする方法を説明し、
+次にバージョン実装の問題について説明します。
 
-## A Basic Algorithm For Incremental Query Evaluation
+## インクリメンタルクエリ評価の基本アルゴリズム
 
-As explained in the [query evaluation model primer][query-model], query
-invocations form a directed-acyclic graph. Here's the example from the
-previous chapter again:
+[クエリ評価モデル入門][query-model]で説明されているように、クエリ
+呼び出しは有向非循環グラフを形成します。前の章からの例をもう一度示します:
 
 ```ignore
   list_of_all_hir_items <----------------------------- type_check_crate()
@@ -29,135 +28,127 @@ previous chapter again:
   Hir(bar) <--- type_of(bar) <--- type_check_item(bar) <-------+
 ```
 
-Since every access from one query to another has to go through the query
-context, we can record these accesses and thus actually build this dependency
-graph in memory. With dependency tracking enabled, when compilation is done,
-we know which queries were invoked (the nodes of the graph) and for each
-invocation, which other queries or input has gone into computing the query's
-result (the edges of the graph).
+1つのクエリから別のクエリへのすべてのアクセスはクエリ
+コンテキストを経由する必要があるため、これらのアクセスを記録して、
+メモリ内に依存関係グラフを実際に構築できます。依存関係追跡が有効な場合、
+コンパイルが完了すると、どのクエリが呼び出されたか(グラフのノード)と、
+各呼び出しについて、クエリの結果の計算に使用された他のどのクエリまたは入力があったか
+(グラフのエッジ)がわかります。
 
-Now suppose we change the source code of our program so that
-HIR of `bar` looks different than before. Our goal is to only recompute
-those queries that are actually affected by the change while re-using
-the cached results of all the other queries. Given the dependency graph we can
-do exactly that. For a given query invocation, the graph tells us exactly
-what data has gone into computing its results, we just have to follow the
-edges until we reach something that has changed. If we don't encounter
-anything that has changed, we know that the query still would evaluate to
-the same result we already have in our cache.
+ここで、プログラムのソースコードを変更して、
+`bar`のHIRが以前とは異なるとします。私たちの目標は、
+変更によって実際に影響を受けるクエリのみを再計算し、
+他のすべてのクエリのキャッシュされた結果を再利用することです。
+依存関係グラフがあれば、まさにそれを行うことができます。特定のクエリ呼び出しについて、
+グラフは、その結果の計算に使用されたデータを正確に示しており、
+変更されたものに到達するまでエッジをたどるだけです。変更されたものに
+遭遇しない場合、すでにキャッシュにある結果がクエリが評価する
+結果と同じであることがわかります。
 
-Taking the `type_of(foo)` invocation from above as an example, we can check
-whether the cached result is still valid by following the edges to its
-inputs. The only edge leads to `Hir(foo)`, an input that has not been affected
-by the change. So we know that the cached result for `type_of(foo)` is still
-valid.
+上記の`type_of(foo)`呼び出しを例にとると、エッジをたどって
+入力を確認することで、キャッシュされた結果がまだ有効かどうかを確認できます。
+唯一のエッジは、変更の影響を受けていない入力である`Hir(foo)`に至ります。
+したがって、`type_of(foo)`のキャッシュされた結果はまだ有効であることがわかります。
 
-The story is a bit different for `type_check_item(foo)`: We again walk the
-edges and already know that `type_of(foo)` is fine. Then we get to
-`type_of(bar)` which we have not checked yet, so we walk the edges of
-`type_of(bar)` and encounter `Hir(bar)` which *has* changed. Consequently
-the result of `type_of(bar)` might yield a different result than what we
-have in the cache and, transitively, the result of `type_check_item(foo)`
-might have changed too. We thus re-run `type_check_item(foo)`, which in
-turn will re-run `type_of(bar)`, which will yield an up-to-date result
-because it reads the up-to-date version of `Hir(bar)`. Also, we re-run
-`type_check_item(bar)` because result of `type_of(bar)` might have changed.
+`type_check_item(foo)`の場合は少し異なります: エッジを歩いていくと、
+`type_of(foo)`が問題ないことがすでにわかっています。次に`type_of(bar)`に到達しますが、
+まだ確認していないので、`type_of(bar)`のエッジを歩いて、`Hir(bar)`に遭遇します。
+これは*変更されました*。その結果、`type_of(bar)`の結果は、キャッシュにあるものとは
+異なる結果を生成する可能性があり、推移的に、`type_check_item(foo)`の結果も
+変更された可能性があります。したがって、`type_check_item(foo)`を再実行し、
+順番に`type_of(bar)`を再実行します。これは、`Hir(bar)`の最新バージョンを読み取るため、
+最新の結果を生成します。また、`type_of(bar)`の結果が変更された可能性があるため、
+`type_check_item(bar)`も再実行します。
 
 
-## The problem with the basic algorithm: false positives
+## 基本アルゴリズムの問題: 偽陽性
 
-If you read the previous paragraph carefully you'll notice that it says that
-`type_of(bar)` *might* have changed because one of its inputs has changed.
-There's also the possibility that it might still yield exactly the same
-result *even though* its input has changed. Consider an example with a
-simple query that just computes the sign of an integer:
+前の段落を注意深く読むと、`type_of(bar)`は、その入力の1つが変更されたため、
+*変更された可能性がある*と書かれていることに気付くでしょう。
+その入力が変更されたとしても、*まったく*同じ
+結果を生成する可能性もあります。整数の符号を計算する単純なクエリの例を考えてみましょう:
 
 ```ignore
   IntValue(x) <---- sign_of(x) <--- some_other_query(x)
 ```
 
-Let's say that `IntValue(x)` starts out as `1000` and then is set to `2000`.
-Even though `IntValue(x)` is different in the two cases, `sign_of(x)` yields
-the result `+` in both cases.
+`IntValue(x)`が最初は`1000`で、その後`2000`に設定されたとします。
+`IntValue(x)`は2つのケースで異なりますが、`sign_of(x)`は両方のケースで
+結果`+`を生成します。
 
-If we follow the basic algorithm, however, `some_other_query(x)` would have to
-(unnecessarily) be re-evaluated because it transitively depends on a changed
-input. Change detection yields a "false positive" in this case because it has
-to conservatively assume that `some_other_query(x)` might be affected by that
-changed input.
+ただし、基本アルゴリズムに従うと、`some_other_query(x)`は推移的に変更された
+入力に依存しているため、(不必要に)再評価する必要があります。変更検出は、
+この場合、`some_other_query(x)`がその変更された入力によって影響を受ける可能性があると
+保守的に仮定する必要があるため、「偽陽性」を生成します。
 
-Unfortunately it turns out that the actual queries in the compiler are full
-of examples like this and small changes to the input often potentially affect
-very large parts of the output binaries. As a consequence, we had to make the
-change detection system smarter and more accurate.
+残念ながら、コンパイラの実際のクエリは、このような例でいっぱいであり、
+入力への小さな変更が出力バイナリの非常に大きな部分に影響を与える可能性が
+よくあることがわかります。その結果、変更検出システムをよりスマートで正確にする必要がありました。
 
-## Improving accuracy: the red-green algorithm
+## 精度の向上: red-greenアルゴリズム
 
-The "false positives" problem can be solved by interleaving change detection
-and query re-evaluation. Instead of walking the graph all the way to the
-inputs when trying to find out if some cached result is still valid, we can
-check if a result has *actually* changed after we were forced to re-evaluate
-it.
+「偽陽性」問題は、変更検出とクエリの再評価をインターリーブすることで解決できます。
+キャッシュされた結果がまだ有効かどうかを確認しようとするときに
+入力までグラフをたどる代わりに、再評価を余儀なくされた後に
+結果が*実際に*変更されたかどうかを確認できます。
 
-We call this algorithm the red-green algorithm because nodes
-in the dependency graph are assigned the color green if we were able to prove
-that its cached result is still valid and the color red if the result has
-turned out to be different after re-evaluating it.
+このアルゴリズムをred-greenアルゴリズムと呼びます。これは、キャッシュされた結果が
+まだ有効であることを証明できた場合、依存関係グラフ内のノードに緑色が割り当てられ、
+再評価後に結果が異なることが判明した場合は赤色が割り当てられるためです。
 
-The meat of red-green change tracking is implemented in the try-mark-green
-algorithm, that, you've guessed it, tries to mark a given node as green:
+red-green変更追跡の核心は、try-mark-green
+アルゴリズムに実装されています。これは、あなたが推測したように、
+特定のノードを緑色としてマークしようとします:
 
 ```rust,ignore
 fn try_mark_green(tcx, current_node) -> bool {
 
-    // Fetch the inputs to `current_node`, i.e. get the nodes that the direct
-    // edges from `node` lead to.
+    // `current_node`への入力、つまり`node`からの直接エッジが
+    // 至るノードを取得します。
     let dependencies = tcx.dep_graph.get_dependencies_of(current_node);
 
-    // Now check all the inputs for changes
+    // 次に、すべての入力の変更を確認します
     for dependency in dependencies {
 
         match tcx.dep_graph.get_node_color(dependency) {
             Green => {
-                // This input has already been checked before and it has not
-                // changed; so we can go on to check the next one
+                // この入力は以前に確認されており、変更されていません;
+                // したがって、次の確認に進むことができます
             }
             Red => {
-                // We found an input that has changed. We cannot mark
-                // `current_node` as green without re-running the
-                // corresponding query.
+                // 変更された入力が見つかりました。キャッシュされた
+                // クエリを再実行せずに、`current_node`を緑色として
+                // マークすることはできません。
                 return false
             }
             Unknown => {
-                // This is the first time we look at this node. Let's try
-                // to mark it green by calling try_mark_green() recursively.
+                // このノードを最初に見るのはこれが初めてです。
+                // try_mark_green()を再帰的に呼び出して、緑色としてマークしようとします。
                 if try_mark_green(tcx, dependency) {
-                    // We successfully marked the input as green, on to the
-                    // next.
+                    // 入力を緑色としてマークすることに成功しました。
+                    // 次に進みます。
                 } else {
-                    // We could *not* mark the input as green. This means we
-                    // don't know if its value has changed. In order to find
-                    // out, we re-run the corresponding query now!
+                    // 入力を緑色としてマークすることが*できませんでした*。
+                    // これは、その値が変更されたかどうかがわからないことを意味します。
+                    // 調べるために、対応するクエリを今すぐ再実行します!
                     tcx.run_query_for(dependency);
 
-                    // Fetch and check the node color again. Running the query
-                    // has forced it to either red (if it yielded a different
-                    // result than we have in the cache) or green (if it
-                    // yielded the same result).
+                    // ノードの色を再度フェッチして確認します。クエリを実行すると、
+                    // キャッシュにある結果とは異なる結果を生成した場合は赤
+                    // (同じ結果を生成した場合は緑)になります。
                     match tcx.dep_graph.get_node_color(dependency) {
                         Red => {
-                            // The input turned out to be red, so we cannot
-                            // mark `current_node` as green.
+                            // 入力が赤であることが判明しました。したがって、
+                            // `current_node`を緑色としてマークすることはできません。
                             return false
                         }
                         Green => {
-                            // Re-running the query paid off! The result is the
-                            // same as before, so this particular input does
-                            // not invalidate `current_node`.
+                            // クエリの再実行が成功しました! 結果は
+                            // 以前と同じであるため、この特定の入力は
+                            // `current_node`を無効にしません。
                         }
                         Unknown => {
-                            // There is no way a node has no color after
-                            // re-running the query.
+                            // クエリを再実行した後、ノードに色がないことはあり得ません。
                             panic!("unreachable")
                         }
                     }
@@ -166,320 +157,311 @@ fn try_mark_green(tcx, current_node) -> bool {
         }
     }
 
-    // If we have gotten through the entire loop, it means that all inputs
-    // have turned out to be green. If all inputs are unchanged, it means
-    // that the query result corresponding to `current_node` cannot have
-    // changed either.
+    // ループ全体を通過した場合、すべての入力が
+    // 緑色であることが判明したことを意味します。すべての入力が変更されていない場合、
+    // `current_node`に対応するクエリ結果も
+    // 変更できなかったことを意味します。
     tcx.dep_graph.mark_green(current_node);
 
     true
 }
 ```
 
-> NOTE:
-> The actual implementation can be found in
-> [`compiler/rustc_query_system/src/dep_graph/graph.rs`][try_mark_green]
+> 注意:
+> 実際の実装は
+> [`compiler/rustc_query_system/src/dep_graph/graph.rs`][try_mark_green]にあります
 
-By using red-green marking we can avoid the devastating cumulative effect of
-having false positives during change detection. Whenever a query is executed
-in incremental mode, we first check if its already green. If not, we run
-`try_mark_green()` on it. If it still isn't green after that, then we actually
-invoke the query provider to re-compute the result. Re-computing the query might 
-then itself involve recursively invoking more queries, which can mean we come back
-to the `try_mark_green()` algorithm for the dependencies recursively.
-
-
-## The real world: how persistence makes everything complicated
-
-The sections above described the underlying algorithm for incremental
-compilation but because the compiler process exits after being finished and
-takes the query context with its result cache with it into oblivion, we have to
-persist data to disk, so the next compilation session can make use of it.
-This comes with a whole new set of implementation challenges:
-
-- The query result cache is stored to disk, so they are not readily available
-  for change comparison.
-- A subsequent compilation session will start off with new version of the code
-  that has arbitrary changes applied to it. All kinds of IDs and indices that
-  are generated from a global, sequential counter (e.g. `NodeId`, `DefId`, etc)
-  might have shifted, making the persisted results on disk not immediately
-  usable anymore because the same numeric IDs and indices might refer to
-  completely new things in the new compilation session.
-- Persisting things to disk comes at a cost, so not every tiny piece of
-  information should be actually cached in between compilation sessions.
-  Fixed-sized, plain-old-data is preferred to complex things that need to run
-  through an expensive (de-)serialization step.
-
-The following sections describe how the compiler solves these issues.
-
-### A Question Of Stability: Bridging The Gap Between Compilation Sessions
-
-As noted before, various IDs (like `DefId`) are generated by the compiler in a
-way that depends on the contents of the source code being compiled. ID assignment
-is usually deterministic, that is, if the exact same code is compiled twice,
-the same things will end up with the same IDs. However, if something
-changes, e.g. a function is added in the middle of a file, there is no
-guarantee that anything will have the same ID as it had before.
-
-As a consequence we cannot represent the data in our on-disk cache the same
-way it is represented in memory. For example, if we just stored a piece
-of type information like `TyKind::FnDef(DefId, &'tcx Substs<'tcx>)` (as we do
-in memory) and then the contained `DefId` points to a different function in
-a new compilation session we'd be in trouble.
-
-The solution to this problem is to find "stable" forms for IDs which remain
-valid in between compilation sessions. For the most important case, `DefId`s,
-these are the so-called `DefPath`s. Each `DefId` has a
-corresponding `DefPath` but in place of a numeric ID, a `DefPath` is based on
-the path to the identified item, e.g. `std::collections::HashMap`. The
-advantage of an ID like this is that it is not affected by unrelated changes.
-For example, one can add a new function to `std::collections` but
-`std::collections::HashMap` would still be `std::collections::HashMap`. A
-`DefPath` is "stable" across changes made to the source code while a `DefId`
-isn't.
-
-There is also the `DefPathHash` which is just a 128-bit hash value of the
-`DefPath`. The two contain the same information and we mostly use the
-`DefPathHash` because it simpler to handle, being `Copy` and self-contained.
-
-This principle of stable identifiers is used to make the data in the on-disk
-cache resilient to source code changes. Instead of storing a `DefId`, we store
-the `DefPathHash` and when we deserialize something from the cache, we map the
-`DefPathHash` to the corresponding `DefId` in the *current* compilation session
-(which is just a simple hash table lookup).
-
-The `HirId`, used for identifying HIR components that don't have their own
-`DefId`, is another such stable ID. It is (conceptually) a pair of a `DefPath`
-and a `LocalId`, where the `LocalId` identifies something (e.g. a `hir::Expr`)
-locally within its "owner" (e.g. a `hir::Item`). If the owner is moved around,
-the `LocalId`s within it are still the same.
+red-greenマーキングを使用することで、変更検出中に偽陽性が発生する壊滅的な累積効果を
+回避できます。クエリがインクリメンタルモードで実行されるときは常に、
+まずすでに緑色かどうかを確認します。そうでない場合は、`try_mark_green()`を実行します。
+それでも緑色でない場合は、実際にクエリプロバイダーを呼び出して結果を再計算します。
+クエリを再計算すると、さらにクエリを再帰的に呼び出すことになる可能性があり、
+これは依存関係に対して`try_mark_green()`アルゴリズムに再帰的に戻ることを意味する可能性があります。
 
 
+## 現実の世界: 永続性がすべてを複雑にする方法
 
-### Checking query results for changes: `HashStable` and `Fingerprint`s
+上記のセクションでは、インクリメンタル
+コンパイルの基礎となるアルゴリズムについて説明しましたが、
+コンパイラプロセスは終了後に終了し、
+結果キャッシュを含むクエリコンテキストを忘却の彼方に持っていくため、
+次のコンパイルセッションが使用できるように、データをディスクに永続化する必要があります。
+これには、まったく新しい実装上の課題があります:
 
-In order to do red-green-marking we often need to check if the result of a
-query has changed compared to the result it had during the previous
-compilation session. There are two performance problems with this though:
+- クエリ結果キャッシュはディスクに保存されるため、
+  変更比較にすぐに使用できません。
+- 後続のコンパイルセッションは、任意の変更が適用されたコードの新しいバージョンで
+  開始されます。グローバルで連続したカウンターから生成されるすべての種類のIDとインデックス
+  (`NodeId`、`DefId`など)がシフトした可能性があり、
+  ディスク上の永続化された結果が同じ数値のIDとインデックスがまったく新しいものを参照する可能性があるため、
+  新しいコンパイルセッションですぐには使用できなくなります。
+- ディスクにものを永続化するにはコストがかかるため、すべての小さな情報が
+  実際にコンパイルセッション間でキャッシュされるべきではありません。
+  固定サイズのプレーンオールドデータは、高価な(デ)シリアライゼーションステップを
+  経る必要がある複雑なものよりも好まれます。
 
-- We'd like to avoid having to load the previous result from disk just for
-  doing the comparison. We already computed the new result and will use that.
-  Also loading a result from disk will "pollute" the interners with data that
-  is unlikely to ever be used.
-- We don't want to store each and every result in the on-disk cache. For
-  example, it would be wasted effort to persist things to disk that are
-  already available in upstream crates.
+以下のセクションでは、コンパイラがこれらの問題をどのように解決するかについて説明します。
 
-The compiler avoids these problems by using so-called `Fingerprint`s. Each time
-a new query result is computed, the query engine will compute a 128 bit hash
-value of the result. We call this hash value "the `Fingerprint` of the query
-result". The hashing is (and has to be) done "in a stable way". This means
-that whenever something is hashed that might change in between compilation
-sessions (e.g. a `DefId`), we instead hash its stable equivalent
-(e.g. the corresponding `DefPath`). That's what the whole `HashStable`
-infrastructure is for. This way `Fingerprint`s computed in two
-different compilation sessions are still comparable.
+### 安定性の問題: コンパイルセッション間のギャップを埋める
 
-The next step is to store these fingerprints along with the dependency graph.
-This is cheap since fingerprints are just bytes to be copied. It's also cheap to
-load the entire set of fingerprints together with the dependency graph.
+前述のように、様々なID(`DefId`など)は、コンパイルされるソースコードの内容に
+依存する方法でコンパイラによって生成されます。ID割り当ては
+通常、決定論的です。つまり、まったく同じコードを2回コンパイルすると、
+同じものが同じIDになります。ただし、何かが
+変更された場合、たとえば関数がファイルの途中に追加された場合、
+何も同じIDを持つという保証はありません。
 
-Now, when red-green-marking reaches the point where it needs to check if a
-result has changed, it can just compare the (already loaded) previous
-fingerprint to the fingerprint of the new result.
+その結果、オンディスクキャッシュのデータを、
+メモリ内の表現と同じように表現することはできません。たとえば、
+`TyKind::FnDef(DefId, &'tcx Substs<'tcx>)`のような型情報を保存し
+(メモリ内で行うように)、含まれる`DefId`が新しい
+コンパイルセッションで異なる関数を指す場合、問題になります。
 
-This approach works rather well but it's not without flaws:
+この問題の解決策は、コンパイルセッション間で有効なままのIDの「安定した」形式を
+見つけることです。最も重要なケースである`DefId`については、
+これらはいわゆる`DefPath`です。各`DefId`には対応する`DefPath`がありますが、
+数値IDの代わりに、`DefPath`は識別されたアイテムへのパスに基づいており、
+例えば`std::collections::HashMap`です。このようなIDの利点は、
+無関係な変更の影響を受けないことです。たとえば、
+`std::collections`に新しい関数を追加できますが、
+`std::collections::HashMap`は依然として`std::collections::HashMap`です。
+`DefPath`は、ソースコードに加えられた変更にわたって「安定」しており、
+`DefId`はそうではありません。
 
-- There is a small possibility of hash collisions. That is, two different
-  results could have the same fingerprint and the system would erroneously
-  assume that the result hasn't changed, leading to a missed update.
+`DefPathHash`もあります。これは、`DefPath`の128ビットハッシュ値です。
+2つは同じ情報を含んでおり、`DefPathHash`は`Copy`で自己完結型であるため、
+扱いがより簡単であるため、ほとんど使用しています。
 
-  We mitigate this risk by using a high-quality hash function and a 128 bit
-  wide hash value. Due to these measures the practical risk of a hash
-  collision is negligible.
+この安定した識別子の原則は、オンディスク
+キャッシュ内のデータをソースコードの変更に対して耐性を持たせるために使用されます。
+`DefId`を保存する代わりに、`DefPathHash`を保存し、
+キャッシュから何かをデシリアライズするときに、`DefPathHash`を
+*現在の*コンパイルセッションの対応する`DefId`にマッピングします
+(これは単純なハッシュテーブルルックアップです)。
 
-- Computing fingerprints is quite costly. It is the main reason why incremental
-  compilation can be slower than non-incremental compilation. We are forced to
-  use a good and thus expensive hash function, and we have to map things to
-  their stable equivalents while doing the hashing.
-
-
-### A tale of two `DepGraph`s: the old and the new
-
-The initial description of dependency tracking glosses over a few details
-that quickly become a head scratcher when actually trying to implement things.
-In particular it's easy to overlook that we are actually dealing with *two*
-dependency graphs: The one we built during the previous compilation session and
-the one that we are building for the current compilation session.
-
-When a compilation session starts, the compiler loads the previous dependency
-graph into memory as an immutable piece of data. Then, when a query is invoked,
-it will first try to mark the corresponding node in the graph as green. This
-means really that we are trying to mark the node in the *previous* dep-graph
-as green that corresponds to the query key in the *current* session. How do we
-do this mapping between current query key and previous `DepNode`? The answer
-is again `Fingerprint`s: Nodes in the dependency graph are identified by a
-fingerprint of the query key. Since fingerprints are stable across compilation
-sessions, computing one in the current session allows us to find a node
-in the dependency graph from the previous session. If we don't find a node with
-the given fingerprint, it means that the query key refers to something that
-did not yet exist in the previous session.
-
-So, having found the dep-node in the previous dependency graph, we can look
-up its dependencies (i.e. also dep-nodes in the previous graph) and continue with
-the rest of the try-mark-green algorithm. The next interesting thing happens
-when we successfully marked the node as green. At that point we copy the node
-and the edges to its dependencies from the old graph into the new graph. We
-have to do this because the new dep-graph cannot acquire the
-node and edges via the regular dependency tracking. The tracking system can
-only record edges while actually running a query -- but running the query,
-although we have the result already cached, is exactly what we want to avoid.
-
-Once the compilation session has finished, all the unchanged parts have been
-copied over from the old into the new dependency graph, while the changed parts
-have been added to the new graph by the tracking system. At this point, the
-new graph is serialized out to disk, alongside the query result cache, and can
-act as the previous dep-graph in a subsequent compilation session.
+独自の`DefId`を持たないHIRコンポーネントを識別するために使用される`HirId`は、
+もう1つのそのような安定したIDです。これは(概念的には)`DefPath`と`LocalId`のペアで、
+`LocalId`は「所有者」内の何か(例: `hir::Expr`)をローカルに識別します
+(例: `hir::Item`)。所有者が移動された場合でも、その中の`LocalId`は同じままです。
 
 
-### Didn't you forget something?: cache promotion
 
-The system described so far has a somewhat subtle property: If all inputs of a
-dep-node are green then the dep-node itself can be marked as green without
-computing or loading the corresponding query result. Applying this property
-transitively often leads to the situation that some intermediate results are
-never actually loaded from disk, as in the following example:
+### クエリ結果の変更の確認: `HashStable`と`Fingerprint`
+
+red-greenマーキングを行うためには、クエリの結果が
+前回のコンパイルセッション中の結果と比較して変更されたかどうかを確認する必要があります。
+ただし、これには2つのパフォーマンスの問題があります:
+
+- 比較のためだけに、ディスクから前の結果をロードすることを避けたいと思います。
+  すでに新しい結果を計算しており、それを使用します。また、ディスクから結果をロードすると、
+  使用される可能性が低いデータでインターナーが「汚染」されます。
+- すべての結果をオンディスクキャッシュに保存したくありません。たとえば、
+  すでにアップストリームクレートで利用可能なものをディスクに永続化することは
+  無駄な努力になります。
+
+コンパイラは、いわゆる`Fingerprint`を使用してこれらの問題を回避します。
+新しいクエリ結果が計算されるたびに、クエリエンジンは結果の128ビットハッシュ値を
+計算します。このハッシュ値を「クエリ結果の`Fingerprint`」と呼びます。
+ハッシュは(そしてそうである必要があります)「安定した方法」で行われます。これは、
+コンパイルセッション間で変更される可能性のある何かをハッシュするときはいつでも
+(例: `DefId`)、代わりに安定した同等物をハッシュすることを意味します
+(例: 対応する`DefPath`)。これが`HashStable`
+インフラストラクチャ全体の目的です。このようにして、2つの
+異なるコンパイルセッションで計算された`Fingerprint`は依然として比較可能です。
+
+次のステップは、これらのフィンガープリントを依存関係グラフとともに保存することです。
+フィンガープリントは単にコピーされるバイトであるため、これは安価です。
+依存関係グラフとともにフィンガープリントのセット全体をロードすることも安価です。
+
+これで、red-greenマーキングが結果が変更されたかどうかを確認する必要がある
+ポイントに到達すると、(すでにロードされた)前の
+フィンガープリントを新しい結果のフィンガープリントと比較するだけです。
+
+このアプローチはかなりうまく機能しますが、欠陥がないわけではありません:
+
+- ハッシュの衝突の可能性はわずかです。つまり、2つの異なる
+  結果が同じフィンガープリントを持つ可能性があり、システムは誤って
+  結果が変更されていないと仮定し、見逃された更新につながります。
+
+  高品質のハッシュ関数と128ビット幅のハッシュ値を使用することで、
+  このリスクを軽減します。これらの対策により、ハッシュ衝突の実際のリスクは
+  無視できます。
+
+- フィンガープリントの計算はかなりコストがかかります。これは、インクリメンタル
+  コンパイルが非インクリメンタルコンパイルよりも遅くなる可能性がある主な理由です。
+  優れた、したがって高価なハッシュ関数を使用することを余儀なくされ、
+  ハッシュ中に物事を安定した同等物にマッピングする必要があります。
+
+
+### 2つの`DepGraph`の物語: 古いものと新しいもの
+
+依存関係追跡の最初の説明では、実際に物事を実装しようとするときにすぐに
+頭を悩ませるいくつかの詳細を省略しています。特に、実際には*2つ*の
+依存関係グラフを扱っていることを見落としやすいです:前回のコンパイルセッション中に
+構築したものと、現在のコンパイルセッション用に構築しているものです。
+
+コンパイルセッションが開始されると、コンパイラは前の依存関係
+グラフを不変のデータとしてメモリにロードします。次に、クエリが呼び出されると、
+まず、グラフ内の対応するノードを緑色としてマークしようとします。これは
+実際には、*現在の*セッションのクエリキーに対応する*前の* dep-graphのノードを
+緑色としてマークしようとしていることを意味します。現在のクエリキーと前の`DepNode`の
+間のこのマッピングをどのように行いますか?答えは再び`Fingerprint`です:
+依存関係グラフ内のノードは、クエリキーのフィンガープリントによって識別されます。
+フィンガープリントはコンパイルセッション間で安定しているため、
+現在のセッションで1つを計算すると、前回のセッションの依存関係グラフで
+ノードを見つけることができます。指定されたフィンガープリントを持つノードが見つからない場合は、
+クエリキーが前回のセッションにまだ存在しなかった何かを参照していることを意味します。
+
+したがって、前の依存関係グラフでdep-nodeを見つけたら、その依存関係
+(つまり、前のグラフのdep-nodeも)を検索し、
+try-mark-greenアルゴリズムの残りを続行できます。次に興味深いことが起こるのは、
+ノードを緑色としてマークすることに成功したときです。その時点で、ノードと
+その依存関係へのエッジを古いグラフから新しいグラフにコピーします。
+新しいdep-graphは通常の依存関係追跡を介して
+ノードとエッジを取得できないため、これを行う必要があります。追跡システムは、
+クエリを実際に実行している間にのみエッジを記録できます -- しかし、結果が
+すでにキャッシュされているにもかかわらず、クエリを実行することは、まさに避けたいことです。
+
+コンパイルセッションが終了すると、変更されていない部分はすべて
+古い依存関係グラフから新しい依存関係グラフにコピーされ、変更された部分は
+追跡システムによって新しいグラフに追加されています。この時点で、
+新しいグラフはクエリ結果キャッシュとともにディスクにシリアライズされ、
+後続のコンパイルセッションで前のdep-graphとして機能できます。
+
+
+### 何か忘れていませんか?: キャッシュプロモーション
+
+これまでに説明したシステムには、やや微妙なプロパティがあります: dep-nodeの
+すべての入力が緑色の場合、対応するクエリ結果を計算またはロードすることなく、
+dep-node自体を緑色としてマークできます。このプロパティを推移的に適用すると、
+次の例のように、一部の中間結果が実際にディスクからロードされない状況に
+つながることがよくあります:
 
 ```ignore
    input(A) <-- intermediate_query(B) <-- leaf_query(C)
 ```
 
-The compiler might need the value of `leaf_query(C)` in order to generate some
-output artifact. If it can mark `leaf_query(C)` as green, it will load the
-result from the on-disk cache. The result of `intermediate_query(B)` is never
-loaded though. As a consequence, when the compiler persists the *new* result
-cache by writing all in-memory query results to disk, `intermediate_query(B)`
-will not be in memory and thus will be missing from the new result cache.
+コンパイラは、何らかの出力アーティファクトを生成するために`leaf_query(C)`の値が
+必要になる場合があります。`leaf_query(C)`を緑色としてマークできる場合、
+オンディスクキャッシュから結果をロードします。ただし、`intermediate_query(B)`の結果は
+決してロードされません。その結果、コンパイラがすべてのメモリ内クエリ結果を
+ディスクに書き込むことによって*新しい*結果キャッシュを永続化すると、
+`intermediate_query(B)`はメモリ内にないため、新しい結果キャッシュから欠落します。
 
-If there subsequently is another compilation session that actually needs the
-result of `intermediate_query(B)` it will have to be re-computed even though we
-had a perfectly valid result for it in the cache just before.
+その後、`intermediate_query(B)`の結果が実際に必要な別のコンパイルセッションがある場合、
+直前のキャッシュに完全に有効な結果があったにもかかわらず、
+再計算する必要があります。
 
-In order to prevent this from happening, the compiler does something called
-"cache promotion": Before emitting the new result cache it will walk all green
-dep-nodes and make sure that their query result is loaded into memory. That way
-the result cache doesn't unnecessarily shrink again.
-
-
-
-# Incremental compilation and the compiler backend
-
-The compiler backend, the part involving LLVM, is using the query system but
-it is not implemented in terms of queries itself. As a consequence it does not
-automatically partake in dependency tracking. However, the manual integration
-with the tracking system is pretty straight-forward. The compiler simply tracks
-what queries get invoked when generating the initial LLVM version of each
-codegen unit (CGU), which results in a dep-node for each CGU. In subsequent
-compilation sessions it then tries to mark the dep-node for a CGU as green. If
-it succeeds, it knows that the corresponding object and bitcode files on disk
-are still valid. If it doesn't succeed, the entire CGU has to be recompiled.
-
-This is the same approach that is used for regular queries. The main differences
-are:
-
- - that we cannot easily compute a fingerprint for LLVM modules (because
-   they are opaque C++ objects),
-
- - that the logic for dealing with cached values is rather different from
-   regular queries because here we have bitcode and object files instead of
-   serialized Rust values in the common result cache file, and
-
- - the operations around LLVM are so expensive in terms of computation time and
-   memory consumption that we need to have tight control over what is
-   executed when and what stays in memory for how long.
-
-The query system could probably be extended with general purpose mechanisms to
-deal with all of the above but so far that seemed like more trouble than it
-would save.
+これが起こらないようにするために、コンパイラは「キャッシュプロモーション」と呼ばれるものを
+行います: 新しい結果キャッシュを発行する前に、すべての緑の
+dep-nodeを歩いて、そのクエリ結果がメモリにロードされていることを確認します。そうすれば、
+結果キャッシュが不必要に再び縮小することはありません。
 
 
 
-## Query modifiers
+# インクリメンタルコンパイルとコンパイラバックエンド
 
-The query system allows for applying [modifiers][mod] to queries. These
-modifiers affect certain aspects of how the system treats the query with
-respect to incremental compilation:
+LLVMを含むコンパイラバックエンドは、クエリシステムを使用していますが、
+クエリ自体の観点から実装されていません。その結果、依存関係追跡に
+自動的に参加しません。ただし、追跡システムとの手動統合は
+非常に簡単です。コンパイラは、各コード生成ユニット(CGU)の初期LLVMバージョンを生成するときに
+呼び出されるクエリを単に追跡し、各CGUのdep-nodeが生成されます。後続の
+コンパイルセッションでは、CGUのdep-nodeを緑色としてマークしようとします。
+成功した場合、ディスク上の対応するオブジェクトおよびビットコードファイルが
+まだ有効であることがわかります。成功しない場合は、CGU全体を再コンパイルする必要があります。
 
- - `eval_always` - A query with the `eval_always` attribute is re-executed
-   unconditionally during incremental compilation. I.e. the system will not
-   even try to mark the query's dep-node as green. This attribute has two use
-   cases:
+これは、通常のクエリに使用されるのと同じアプローチです。主な違いは
+次のとおりです:
 
-    - `eval_always` queries can read inputs (from files, global state, etc).
-      They can also produce side effects like writing to files and changing global state.
+ - LLVMモジュールのフィンガープリントを簡単に計算できない
+   (不透明なC++オブジェクトであるため)、
 
-    - Some queries are very likely to be re-evaluated because their result
-      depends on the entire source code. In this case `eval_always` can be used
-      as an optimization because the system can skip recording dependencies in
-      the first place.
+ - キャッシュされた値を処理するためのロジックは、通常のクエリとはかなり異なります。
+   ここには、共通の結果キャッシュファイルのシリアライズされたRust値の代わりに、
+   ビットコードおよびオブジェクトファイルがあるためです。
 
- - `no_hash` - Applying `no_hash` to a query tells the system to not compute
-   the fingerprint of the query's result. This has two consequences:
+ - LLVMに関する操作は、計算時間とメモリ消費の観点から非常に高価であるため、
+   何がいつ実行され、何がどのくらいメモリに留まるかを厳密に制御する必要があります。
 
-    - Not computing the fingerprint can save quite a bit of time because
-      fingerprinting is expensive, especially for large, complex values.
+クエリシステムは、上記のすべてを処理する汎用メカニズムで拡張できる可能性がありますが、
+これまでのところ、それは節約するよりも面倒だと思われました。
 
-    - Without the fingerprint, the system has to unconditionally assume that
-      the result of the query has changed. As a consequence anything depending
-      on a `no_hash` query will always be re-executed.
 
-   Using `no_hash` for a query can make sense in two circumstances:
 
-    - If the result of the query is very likely to change whenever one of its
-      inputs changes, e.g. a function like `|a, b, c| -> (a * b * c)`. In such
-      a case recomputing the query will always yield a red node if one of the
-      inputs is red so we can spare us the trouble and default to red immediately.
-      A counter example would be a function like `|a| -> (a == 42)` where the
-      result does not change for most changes of `a`.
+## クエリ修飾子
 
-    - If the result of a query is a big, monolithic collection (e.g. `index_hir`)
-      and there are "projection queries" reading from that collection
-      (e.g. `hir_owner`). In such a case the big collection will likely fulfill the
-      condition above (any changed input means recomputing the whole collection)
-      and the results of the projection queries will be hashed anyway. If we also
-      hashed the collection query it would mean that we effectively hash the same
-      data twice: once when hashing the collection and another time when hashing all
-      the projection query results. `no_hash` allows us to avoid that redundancy
-      and the projection queries act as a "firewall", shielding their dependents
-      from the unconditionally red `no_hash` node.
+クエリシステムでは、クエリに[修飾子][mod]を適用できます。これらの
+修飾子は、インクリメンタルコンパイルに関してシステムがクエリを処理する方法の
+特定の側面に影響します:
 
- - `cache_on_disk_if` - This attribute is what determines which query results
-   are persisted in the incremental compilation query result cache. The
-   attribute takes an expression that allows per query invocation
-   decisions. For example, it makes no sense to store values from upstream
-   crates in the cache because they are already available in the upstream
-   crate's metadata.
+ - `eval_always` - `eval_always`属性を持つクエリは、インクリメンタルコンパイル中に
+   無条件に再実行されます。つまり、システムはクエリのdep-nodeを緑色として
+   マークしようとすらしません。この属性には2つのユースケースがあります:
 
- - `anon` - This attribute makes the system use "anonymous" dep-nodes for the
-   given query. An anonymous dep-node is not identified by the corresponding
-   query key, instead its ID is computed from the IDs of its dependencies. This
-   allows the red-green system to do its change detection even if there is no
-   query key available for a given dep-node -- something which is needed for
-   handling trait selection because it is not based on queries.
+    - `eval_always`クエリは入力(ファイルから、グローバル状態などから)を読み取ることができます。
+      また、ファイルへの書き込みやグローバル状態の変更などの副作用を生成することもできます。
+
+    - 一部のクエリは、その結果が
+      ソースコード全体に依存しているため、再評価される可能性が非常に高いです。この場合、`eval_always`を
+      最適化として使用できます。システムは最初から依存関係の記録をスキップできるためです。
+
+ - `no_hash` - クエリに`no_hash`を適用すると、クエリの結果の
+   フィンガープリントを計算しないようにシステムに指示します。これには2つの結果があります:
+
+    - フィンガープリントを計算しないことで、かなりの時間を節約できます。
+      フィンガープリントは、特に大きくて複雑な値の場合、高価です。
+
+    - フィンガープリントがないと、システムはクエリの結果が
+      変更されたと無条件に仮定する必要があります。その結果、`no_hash`クエリに依存する
+      ものはすべて常に再実行されます。
+
+   クエリに`no_hash`を使用することは、2つの状況で意味があります:
+
+    - クエリの結果が、入力の1つが変更されるたびに変更される可能性が非常に高い場合、
+      例えば`|a, b, c| -> (a * b * c)`のような関数。このような
+      場合、クエリを再計算すると、入力の1つが赤の場合、常に赤いノードが生成されるため、
+      トラブルを節約してすぐにデフォルトで赤にすることができます。
+      反例は、`|a| -> (a == 42)`のような関数です。この場合、
+      結果は`a`のほとんどの変更に対して変更されません。
+
+    - クエリの結果が大きくてモノリシックなコレクション(例: `index_hir`)で、
+      そのコレクションから読み取る「プロジェクションクエリ」がある場合
+      (例: `hir_owner`)。このような場合、大きなコレクションは上記の
+      条件を満たす可能性が高く(変更された入力は、コレクション全体の再計算を意味します)、
+      プロジェクションクエリの結果はとにかくハッシュされます。
+      コレクションクエリもハッシュする場合、同じデータを実質的に2回ハッシュすることになります:
+      コレクションをハッシュするときに1回、すべての
+      プロジェクションクエリ結果をハッシュするときにもう1回。`no_hash`を使用すると、
+      その冗長性を回避でき、プロジェクションクエリは「ファイアウォール」として機能し、
+      無条件に赤い`no_hash`ノードから依存者を保護します。
+
+ - `cache_on_disk_if` - この属性は、インクリメンタルコンパイルクエリ結果
+   キャッシュに永続化されるクエリ結果を決定するものです。
+   属性は、クエリ呼び出しごとの
+   決定を可能にする式を取ります。たとえば、アップストリーム
+   クレートの値をキャッシュに保存しても意味がありません。これらはアップストリーム
+   クレートのメタデータですでに利用可能だからです。
+
+ - `anon` - この属性により、システムは
+   特定のクエリに「匿名」dep-nodeを使用します。匿名dep-nodeは、対応する
+   クエリキーによって識別されるのではなく、そのIDは依存関係のIDから計算されます。これにより、
+   red-greenシステムは、特定のdep-nodeで利用可能なクエリキーがない場合でも
+   変更検出を行うことができます -- これは、クエリに基づいていないため、
+   トレイト選択の処理に必要です。
 
 [mod]: ../query.html#adding-a-new-kind-of-query
 
 
-## The projection query pattern
+## プロジェクションクエリパターン
 
-It's interesting to note that `eval_always` and `no_hash` can be used together
-in the so-called "projection query" pattern. It is often the case that there is
-one query that depends on the entirety of the compiler's input (e.g. the indexed HIR)
-and another query that projects individual values out of this monolithic value
-(e.g. a HIR item with a certain `DefId`). These projection queries allow for
-building change propagation "firewalls" because even if the result of the
-monolithic query changes (which it is very likely to do) the small projections
-can still mostly be marked as green.
+`eval_always`と`no_hash`をいわゆる「プロジェクションクエリ」パターンで
+一緒に使用できることは興味深いことです。多くの場合、コンパイラの入力全体に依存する
+1つのクエリ(例: インデックス付きHIR)と、このモノリシックな値から
+個々の値を投影する別のクエリがあります
+(例: 特定の`DefId`を持つHIRアイテム)。これらのプロジェクションクエリは、
+モノリシッククエリの結果が変更されたとしても(これは非常に可能性が高い)、
+小さなプロジェクションは依然としてほとんど緑色としてマークできるため、
+変更伝播「ファイアウォール」を構築できます。
 
 
 ```ignore
@@ -498,39 +480,38 @@ can still mostly be marked as green.
   +------------+
 ```
 
-Let's assume that the result `monolithic_query` changes so that also the result
-of `projection(x)` has changed, i.e. both their dep-nodes are being marked as
-red. As a consequence `foo(a)` needs to be re-executed; but `bar(b)` and
-`baz(c)` can be marked as green. However, if `foo`, `bar`, and `baz` would have
-directly depended on `monolithic_query` then all of them would have had to be
-re-evaluated.
+`monolithic_query`の結果が変更されて、`projection(x)`の結果も変更されたとします。
+つまり、両方のdep-nodeが赤としてマークされます。その結果、`foo(a)`を再実行する必要があります。
+しかし、`bar(b)`と`baz(c)`は緑色としてマークできます。ただし、`foo`、`bar`、`baz`が
+`monolithic_query`に直接依存していた場合、それらすべてを
+再評価する必要がありました。
 
-This pattern works even without `eval_always` and `no_hash` but the two
-modifiers can be used to avoid unnecessary overhead. If the monolithic query
-is likely to change at any minor modification of the compiler's input it makes
-sense to mark it as `eval_always`, thus getting rid of its dependency tracking
-cost. And it always makes sense to mark the monolithic query as `no_hash`
-because we have the projections to take care of keeping things green as much
-as possible.
+このパターンは`eval_always`と`no_hash`なしでも機能しますが、
+2つの修飾子を使用すると、不必要なオーバーヘッドを回避できます。モノリシッククエリが
+コンパイラの入力のわずかな変更でも変更される可能性が高い場合、
+`eval_always`としてマークすることは理にかなっており、依存関係追跡
+コストを取り除くことができます。また、プロジェクションができるだけ多くのものを
+緑色に保つように注意しているため、モノリシッククエリを`no_hash`として
+マークすることは常に意味があります。
 
 
-# Shortcomings of the current system
+# 現在のシステムの欠点
 
-There are many things that still can be improved.
+改善できることはまだたくさんあります。
 
-## Incrementality of on-disk data structures
+## オンディスクデータ構造のインクリメンタリティ
 
-The current system is not able to update on-disk caches and the dependency graph
-in-place. Instead it has to rewrite each file entirely in each compilation
-session. The overhead of doing so is a few percent of total compilation time.
+現在のシステムは、オンディスクキャッシュと依存関係グラフを
+インプレースで更新できません。代わりに、各コンパイル
+セッションで各ファイルを完全に書き直す必要があります。そうするオーバーヘッドは、
+総コンパイル時間の数パーセントです。
 
-## Unnecessary data dependencies
+## 不必要なデータ依存関係
 
-Data structures used as query results could be factored in a way that removes
-edges from the dependency graph. Especially "span" information is very volatile,
-so including it in query result will increase the chance that the result won't
-be reusable. See <https://github.com/rust-lang/rust/issues/47389> for more
-information.
+クエリ結果として使用されるデータ構造は、依存関係グラフから
+エッジを削除する方法で因数分解できます。特に「span」情報は非常に揮発性が高いため、
+クエリ結果に含めると、結果が再利用できない可能性が高くなります。
+詳細については、<https://github.com/rust-lang/rust/issues/47389>を参照してください。
 
 
 [query-model]: ./query-evaluation-model-in-detail.html

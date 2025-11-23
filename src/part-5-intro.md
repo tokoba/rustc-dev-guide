@@ -1,57 +1,55 @@
-# From MIR to binaries
+# MIRからバイナリへ
 
-All of the preceding chapters of this guide have one thing in common:
-we never generated any executable machine code at all!
-With this chapter, all of that changes.
+このガイドの前述の章には1つの共通点があります：
+実行可能なマシンコードをまったく生成していません！
+この章で、すべてが変わります。
 
-So far,
-we've shown how the compiler can take raw source code in text format
-and transform it into [MIR].
-We have also shown how the compiler does various
-analyses on the code to detect things like type or lifetime errors.
-Now, we will finally take the MIR and produce some executable machine code.
+これまで、
+コンパイラがUTF-8テキスト形式の生のソースコードを取得し、[MIR]に変換する方法を示しました。
+また、コンパイラがコードに対して様々な解析を行い、型エラーやライフタイムエラーなどを検出する方法も示しました。
+今度は、MIRを取得して実行可能なマシンコードを生成します。
 
 [MIR]: ./mir/index.md
 
-> NOTE: This part of a compiler is often called the _backend_.
-> The term is a bit overloaded because in the compiler source,
-> it usually refers to the "codegen backend" (i.e. LLVM, Cranelift, or GCC).
-> Usually, when you see the word "backend"  in this part,
-> we are referring to the "codegen backend".
+> 注：コンパイラのこの部分は、しばしば_バックエンド_と呼ばれます。
+> この用語は、コンパイラソースでは少し過負荷です。
+> 通常、「コード生成バックエンド」（つまり、LLVM、Cranelift、またはGCC）を指します。
+> 通常、このパートで「バックエンド」という言葉を見かける場合、
+> 「コード生成バックエンド」を指しています。
 
-So what do we need to do?
+では、何をする必要がありますか？
 
-1. First, we need to collect the set of things to generate code for.
-   In particular,
-   we need to find out which concrete types to substitute for generic ones,
-   since we need to generate code for the concrete types.
-   Generating code for the concrete types
-   (i.e. emitting a copy of the code for each concrete type) is called _monomorphization_,
-   so the process of collecting all the concrete types is called _monomorphization collection_.
-2. Next, we need to actually lower the MIR to a codegen IR
-   (usually LLVM IR) for each concrete type we collected.
-3. Finally, we need to invoke the codegen backend,
-   which runs a bunch of optimization passes,
-   generates executable code,
-   and links together an executable binary.
+1. まず、コードを生成する対象のセットを収集する必要があります。
+   特に、
+   ジェネリック型に代入する具体的な型を見つける必要があります。
+   具体的な型のコードを生成する必要があるためです。
+   具体的な型のコードを生成すること
+   （つまり、各具体的な型に対してコードのコピーを出力すること）は_単相化_と呼ばれ、
+   すべての具体的な型を収集するプロセスは_単相化収集_と呼ばれます。
+2. 次に、収集した各具体的な型に対して、MIRをコード生成IR
+   （通常はLLVM IR）に実際に下げる必要があります。
+3. 最後に、コード生成バックエンドを呼び出す必要があります。
+   これは一連の最適化パスを実行し、
+   実行可能なコードを生成し、
+   実行可能なバイナリをリンクします。
 
 [codegen1]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/base/fn.codegen_crate.html
 
-The code for codegen is actually a bit complex due to a few factors:
+コード生成のコードは、いくつかの要因により実際には少し複雑です：
 
-- Support for multiple codegen backends (LLVM, Cranelift, and GCC).
-  We try to share as much backend code between them as possible,
-  so a lot of it is generic over the codegen implementation.
-  This means that there are often a lot of layers of abstraction.
-- Codegen happens asynchronously in another thread for performance.
-- The actual codegen is done by a third-party library (either of the 3 backends).
+- 複数のコード生成バックエンド（LLVM、Cranelift、およびGCC）のサポート。
+  それらの間でできるだけ多くのバックエンドコードを共有しようとするため、
+  その多くはコード生成実装に対してジェネリックです。
+  これは、多くの場合、多くの抽象化レイヤーがあることを意味します。
+- コード生成はパフォーマンスのために別のスレッドで非同期に行われます。
+- 実際のコード生成はサードパーティのライブラリ（3つのバックエンドのいずれか）によって行われます。
 
-Generally, the [`rustc_codegen_ssa`][ssa] crate contains backend-agnostic code,
-while the [`rustc_codegen_llvm`][llvm] crate contains code specific to LLVM codegen.
+一般的に、[`rustc_codegen_ssa`][ssa]クレートにはバックエンド非依存のコードが含まれており、
+[`rustc_codegen_llvm`][llvm]クレートにはLLVMコード生成に固有のコードが含まれています。
 
 [ssa]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/index.html
 [llvm]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_llvm/index.html
 
-At a very high level, the entry point is
-[`rustc_codegen_ssa::base::codegen_crate`][codegen1].
-This function starts the process discussed in the rest of this chapter.
+非常に高いレベルでは、エントリーポイントは
+[`rustc_codegen_ssa::base::codegen_crate`][codegen1]です。
+この関数は、この章の残りで説明するプロセスを開始します。

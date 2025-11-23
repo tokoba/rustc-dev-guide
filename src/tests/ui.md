@@ -1,152 +1,102 @@
-# UI tests
+# UI テスト
 
-UI tests are a particular [test suite](compiletest.md#test-suites) of
-compiletest.
+UI テストは compiletest の特定の[テストスイート](compiletest.md#test-suites)です。
 
-## Introduction
+## はじめに
 
-The tests in [`tests/ui`] are a collection of general-purpose tests which
-primarily focus on validating the console output of the compiler, but can be
-used for many other purposes. For example, tests can also be configured to [run
-the resulting program](#controlling-passfail-expectations) to verify its
-behavior.
+[`tests/ui`] のテストは、主にコンパイラのコンソール出力の検証に焦点を当てた汎用テストのコレクションですが、他の多くの目的にも使用できます。例えば、テストは結果として得られるプログラムを[実行](#controlling-passfail-expectations)してその動作を検証するように構成することもできます。
 
-For a survey of each subdirectory's purpose under `tests/ui`, consult the
-[SUMMARY.md](https://github.com/rust-lang/rust/tree/HEAD/tests/ui/SUMMARY.md).
-This is useful if you write a new test, and are looking for a category to
-place it in.
+`tests/ui` 配下の各サブディレクトリの目的の調査については、[SUMMARY.md](https://github.com/rust-lang/rust/tree/HEAD/tests/ui/SUMMARY.md) を参照してください。
+新しいテストを書く場合、それを配置するカテゴリを探す際に便利です。
 
-If you need to work with `#![no_std]` cross-compiling tests, consult the
-[`minicore` test auxiliary](./minicore.md) chapter.
+`#![no_std]` クロスコンパイルテストを扱う必要がある場合は、[`minicore` テスト補助](./minicore.md) の章を参照してください。
 
 [`tests/ui`]: https://github.com/rust-lang/rust/blob/HEAD/tests/ui
 
-## General structure of a test
+## テストの一般的な構造
 
-A test consists of a Rust source file located in the `tests/ui` directory.
-**Tests must be placed in the appropriate subdirectory** based on their purpose
-and testing category - placing tests directly in `tests/ui` is not permitted.
+テストは `tests/ui` ディレクトリに配置された Rust ソースファイルで構成されます。
+**テストは目的とテストカテゴリに基づいて適切なサブディレクトリに配置する必要があります** - `tests/ui` に直接テストを配置することは許可されていません。
 
-Compiletest will use `rustc` to compile the test, and compare the output against
-the expected output which is stored in a `.stdout` or `.stderr` file located
-next to the test. See [Output comparison](#output-comparison) for more.
+Compiletest は `rustc` を使用してテストをコンパイルし、出力をテストの隣に配置された `.stdout` または `.stderr` ファイルに保存された期待される出力と比較します。詳細については、[出力の比較](#output-comparison) を参照してください。
 
-Additionally, errors and warnings should be annotated with comments within the
-source file. See [Error annotations](#error-annotations) for more.
+さらに、エラーと警告はソースファイル内のコメントでアノテーションする必要があります。詳細については、[エラーアノテーション](#error-annotations) を参照してください。
 
-Compiletest [directives](directives.md) in the form of special comments prefixed
-with `//@` control how the test is compiled and what the expected behavior is.
+`//@` で始まる特別なコメントの形式の Compiletest [ディレクティブ](directives.md) は、テストのコンパイル方法と期待される動作を制御します。
 
-Tests are expected to fail to compile, since most tests are testing compiler
-errors. You can change that behavior with a directive, see [Controlling
-pass/fail expectations](#controlling-passfail-expectations).
+テストはコンパイルに失敗することが期待されます。ほとんどのテストはコンパイラエラーをテストしているためです。ディレクティブでその動作を変更できます。[pass/fail 期待値の制御](#controlling-passfail-expectations) を参照してください。
 
-By default, a test is built as an executable binary. If you need a different
-crate type, you can use the `#![crate_type]` attribute to set it as needed.
+デフォルトでは、テストは実行可能バイナリとしてビルドされます。異なるクレートタイプが必要な場合は、必要に応じて `#![crate_type]` 属性を使用して設定できます。
 
-## Output comparison
+## 出力の比較
 
-UI tests store the expected output from the compiler in `.stderr` and `.stdout`
-snapshots next to the test. You normally generate these files with the `--bless`
-CLI option, and then inspect them manually to verify they contain what you
-expect.
+UI テストは、コンパイラからの期待される出力を、テストの隣にある `.stderr` および `.stdout` スナップショットに保存します。通常、これらのファイルは `--bless` CLI オプションで生成し、それらが期待するものを含んでいるかを手動で検証します。
 
-The output is normalized to ignore unwanted differences, see the
-[Normalization](#normalization) section. If the file is missing, then
-compiletest expects the corresponding output to be empty.
+出力は不要な差異を無視するために正規化されます。[正規化](#normalization) セクションを参照してください。ファイルが欠けている場合、compiletest は対応する出力が空であることを期待します。
 
-A common reason to use normalization, revisions, and most of the other following tools,
-is to account for platform differences. Consider alternatives to these tools, like
-e.g. using the `extern "rust-invalid"` ABI that is invalid on every platform
-instead of fixing the test to use cross-compilation and testing every possibly-invalid ABI.
+正規化、リビジョン、およびその他のほとんどのツールを使用する一般的な理由は、プラットフォームの違いを考慮することです。これらのツールの代替案を検討してください。例えば、クロスコンパイルを使用してすべての可能性のある無効な ABI をテストする代わりに、すべてのプラットフォームで無効な `extern "rust-invalid"` ABI を使用することなどです。
 
-There can be multiple stdout/stderr files. The general form is:
+複数の stdout/stderr ファイルが存在する可能性があります。一般的な形式は次のとおりです：
 
 ```text
 *test-name*`.`*revision*`.`*compare_mode*`.`*extension*
 ```
 
-- *test-name* cannot contain dots. This is so that the general form of test
-  output filenames have a predictable form we can pattern match on in order to
-  track stray test output files.
-- *revision* is the [revision](#cfg-revisions) name. This is not included when
-  not using revisions.
-- *compare_mode* is the [compare mode](#compare-modes). This will only be
-  checked when the given compare mode is active. If the file does not exist,
-  then compiletest will check for a file without the compare mode.
-- *extension* is the kind of output being checked:
-  - `stderr` — compiler stderr
-  - `stdout` — compiler stdout
-  - `run.stderr` — stderr when running the test
-  - `run.stdout` — stdout when running the test
-  - `64bit.stderr` — compiler stderr with `stderr-per-bitwidth` directive on a
-    64-bit target
-  - `32bit.stderr` — compiler stderr with `stderr-per-bitwidth` directive on a
-    32-bit target
+- *test-name* にはドットを含めることができません。これにより、テスト出力ファイル名の一般的な形式が予測可能なパターンマッチングが可能になり、迷子のテスト出力ファイルを追跡できます。
+- *revision* は[リビジョン](#cfg-revisions) 名です。リビジョンを使用していない場合は含まれません。
+- *compare_mode* は[比較モード](#compare-modes)です。これは、指定された比較モードがアクティブな場合にのみチェックされます。ファイルが存在しない場合、compiletest は比較モードなしのファイルをチェックします。
+- *extension* はチェックされる出力の種類です：
+  - `stderr` — コンパイラの stderr
+  - `stdout` — コンパイラの stdout
+  - `run.stderr` — テスト実行時の stderr
+  - `run.stdout` — テスト実行時の stdout
+  - `64bit.stderr` — 64 ビットターゲットでの `stderr-per-bitwidth` ディレクティブを持つコンパイラの stderr
+  - `32bit.stderr` — 32 ビットターゲットでの `stderr-per-bitwidth` ディレクティブを持つコンパイラの stderr
 
-A simple example would be `foo.stderr` next to a `foo.rs` test.
-A more complex example would be `foo.my-revision.polonius.stderr`.
+簡単な例は、`foo.rs` テストの隣にある `foo.stderr` です。
+より複雑な例は `foo.my-revision.polonius.stderr` です。
 
-There are several [directives](directives.md) which will change how compiletest
-will check for output files:
+compiletest が出力ファイルをチェックする方法を変更するいくつかの[ディレクティブ](directives.md) があります：
 
-- `stderr-per-bitwidth` — checks separate output files based on the target
-  pointer width. Consider using the `normalize-stderr` directive instead (see
-  [Normalization](#normalization)).
-- `dont-check-compiler-stderr` — Ignores stderr from the compiler.
-- `dont-check-compiler-stdout` — Ignores stdout from the compiler.
-- `compare-output-by-lines` — Some tests have non-deterministic orders of output, so we need to compare by lines.
+- `stderr-per-bitwidth` — ターゲットポインタ幅に基づいて個別の出力ファイルをチェックします。代わりに `normalize-stderr` ディレクティブの使用を検討してください（[正規化](#normalization) を参照）。
+- `dont-check-compiler-stderr` — コンパイラからの stderr を無視します。
+- `dont-check-compiler-stdout` — コンパイラからの stdout を無視します。
+- `compare-output-by-lines` — 一部のテストには非決定的な出力順序があるため、行ごとに比較する必要があります。
 
-UI tests run with `-Zdeduplicate-diagnostics=no` flag which disables rustc's
-built-in diagnostic deduplication mechanism. This means you may see some
-duplicate messages in the output. This helps illuminate situations where
-duplicate diagnostics are being generated.
+UI テストは、rustc の組み込み診断重複排除メカニズムを無効にする `-Zdeduplicate-diagnostics=no` フラグで実行されます。これは、出力に重複メッセージが表示される可能性があることを意味します。これは、重複診断が生成されている状況を明らかにするのに役立ちます。
 
-### Normalization
+### 正規化
 
-The compiler output is normalized to eliminate output difference between
-platforms, mainly about filenames.
+コンパイラ出力は、プラットフォーム間の出力差異（主にファイル名について）を排除するために正規化されます。
 
-Compiletest makes the following replacements on the compiler output:
+Compiletest は、コンパイラ出力に対して次の置換を行います：
 
-- The directory where the test is defined is replaced with `$DIR`. Example:
+- テストが定義されているディレクトリは `$DIR` に置き換えられます。例：
   `/path/to/rust/tests/ui/error-codes`
-- The directory to the standard library source is replaced with `$SRC_DIR`.
-  Example: `/path/to/rust/library`
-- Line and column numbers for paths in `$SRC_DIR` are replaced with `LL:COL`.
-  This helps ensure that changes to the layout of the standard library do not
-  cause widespread changes to the `.stderr` files. Example:
+- 標準ライブラリソースへのディレクトリは `$SRC_DIR` に置き換えられます。
+  例：`/path/to/rust/library`
+- `$SRC_DIR` のパスの行番号と列番号は `LL:COL` に置き換えられます。
+  これにより、標準ライブラリのレイアウトへの変更が `.stderr` ファイルへの広範な変更を引き起こさないようにします。例：
   `$SRC_DIR/alloc/src/sync.rs:53:46`
-- The base directory where the test's output goes is replaced with
-  `$TEST_BUILD_DIR`. This only comes up in a few rare circumstances. Example:
+- テストの出力が行く基本ディレクトリは `$TEST_BUILD_DIR` に置き換えられます。これはまれな状況でのみ発生します。例：
   `/path/to/rust/build/x86_64-unknown-linux-gnu/test/ui`
-- The real directory to the standard library source is replaced with `$SRC_DIR_REAL`.
-- The real directory to the compiler source is replaced with `$COMPILER_DIR_REAL`.
-- Tabs are replaced with `\t`.
-- Backslashes (`\`) are converted to forward slashes (`/`) within paths (using a
-  heuristic). This helps normalize differences with Windows-style paths.
-- CRLF newlines are converted to LF.
-- Error line annotations like `//~ ERROR some message` are removed.
-- Various v0 and legacy symbol hashes are replaced with placeholders like
-  `[HASH]` or `<SYMBOL_HASH>`.
+- 標準ライブラリソースへの実際のディレクトリは `$SRC_DIR_REAL` に置き換えられます。
+- コンパイラソースへの実際のディレクトリは `$COMPILER_DIR_REAL` に置き換えられます。
+- タブは `\t` に置き換えられます。
+- パス内のバックスラッシュ（`\`）は（ヒューリスティックを使用して）フォワードスラッシュ（`/`）に変換されます。これにより、Windows スタイルのパスとの違いを正規化するのに役立ちます。
+- CRLF 改行は LF に変換されます。
+- `//~ ERROR some message` のようなエラー行アノテーションは削除されます。
+- 様々な v0 および legacy シンボルハッシュは、`[HASH]` や `<SYMBOL_HASH>` のようなプレースホルダーに置き換えられます。
 
-Additionally, the compiler is run with the `-Z ui-testing` flag which causes
-the compiler itself to apply some changes to the diagnostic output to make it
-more suitable for UI testing.
+さらに、コンパイラは `-Z ui-testing` フラグで実行されます。これにより、
+コンパイラ自体が診断出力に一部の変更を適用し、UI テストにより適したものにします。
 
-For example, it will anonymize line numbers in the output (line numbers
-prefixing each source line are replaced with `LL`). In extremely rare
-situations, this mode can be disabled with the directive `//@
-compile-flags: -Z ui-testing=no`.
+例えば、出力の行番号を匿名化します（各ソース行の先頭にある行番号は `LL` に置き換えられます）。極めてまれな状況では、このモードはディレクティブ `//@
+compile-flags: -Z ui-testing=no` で無効にできます。
 
-Note: The line and column numbers for `-->` lines pointing to the test are *not*
-normalized, and left as-is. This ensures that the compiler continues to point to
-the correct location, and keeps the stderr files readable. Ideally all
-line/column information would be retained, but small changes to the source
-causes large diffs, and more frequent merge conflicts and test errors.
+注意：テストを指す `-->` 行の行番号と列番号は正規化*されず*、そのまま残されます。これにより、コンパイラが正しい場所を指し続け、stderr ファイルが読みやすく保たれます。理想的には、すべての行/列情報が保持されますが、ソースへの小さな変更が大きな差分を引き起こし、より頻繁なマージコンフリクトとテストエラーを引き起こします。
 
-Sometimes these built-in normalizations are not enough. In such cases, you may
-provide custom normalization rules using `normalize-*` directives, e.g.
+時には、これらの組み込み正規化では十分でない場合があります。そのような場合、`normalize-*` ディレクティブを使用してカスタム正規化ルールを提供できます。例えば：
 
 ```rust,ignore
 //@ normalize-stdout: "foo" -> "bar"
@@ -155,13 +105,11 @@ provide custom normalization rules using `normalize-*` directives, e.g.
 //@ normalize-stderr-64bit: "fn\(\) \(64 bits\)" -> "fn\(\) \($$PTR bits\)"
 ```
 
-This tells the test, on 32-bit platforms, whenever the compiler writes `fn() (32
-bits)` to stderr, it should be normalized to read `fn() ($PTR bits)` instead.
-Similar for 64-bit. The replacement is performed by regexes using default regex
-flavor provided by `regex` crate.
+これは、32 ビットプラットフォームで、コンパイラが stderr に `fn() (32
+bits)` を書き込むたびに、代わりに `fn() ($PTR bits)` と読むように正規化するようテストに指示します。
+64 ビットも同様です。置換は、`regex` クレートが提供するデフォルトの正規表現フレーバーを使用する正規表現によって実行されます。
 
-The corresponding reference file will use the normalized output to test both
-32-bit and 64-bit platforms:
+対応するリファレンスファイルは、正規化された出力を使用して 32 ビットと 64 ビットの両方のプラットフォームをテストします：
 
 ```text
 ...
@@ -171,16 +119,15 @@ The corresponding reference file will use the normalized output to test both
 ...
 ```
 
-Please see [`ui/transmute/main.rs`][mrs] and [`main.stderr`] for a concrete
-usage example.
+具体的な使用例については、[`ui/transmute/main.rs`][mrs] および [`main.stderr`] を参照してください。
 
 [mrs]: https://github.com/rust-lang/rust/blob/HEAD/tests/ui/transmute/main.rs
 [`main.stderr`]: https://github.com/rust-lang/rust/blob/HEAD/tests/ui/transmute/main.stderr
 
-## Error annotations
+## エラーアノテーション
 
-Error annotations specify the errors that the compiler is expected to emit. They
-are "attached" to the line in source where the error is located.
+エラーアノテーションは、コンパイラが発行することが期待されるエラーを指定します。
+エラーが発生するソースの行に「添付」されます。
 
 ```rust,ignore
 fn main() {
@@ -188,34 +135,18 @@ fn main() {
 }
 ```
 
-Although UI tests have a `.stderr` file which contains the entire compiler
-output, UI tests require that errors are also annotated within the source. This
-redundancy helps avoid mistakes since the `.stderr` files are usually
-auto-generated. It also helps to directly see where the error spans are expected
-to point to by looking at one file instead of having to compare the `.stderr`
-file with the source. Finally, they ensure that no additional unexpected errors
-are generated.
+UI テストにはコンパイラの出力全体を含む `.stderr` ファイルがありますが、UI テストではエラーがソース内でもアノテーションされている必要があります。この冗長性は、通常は自動生成される `.stderr` ファイルのミスを避けるのに役立ちます。また、`.stderr` ファイルとソースを比較する代わりに、1つのファイルを見るだけでエラースパンがどこを指すことが期待されているかを直接確認できます。最後に、追加の予期しないエラーが生成されないことを保証します。
 
-They have several forms, but generally are a comment with the diagnostic level
-(such as `ERROR`) and a substring of the expected error output. You don't have
-to write out the entire message, just make sure to include the important part of
-the message to make it self-documenting.
+複数の形式がありますが、一般的には診断レベル（`ERROR` など）と期待されるエラー出力のサブストリングを含むコメントです。メッセージ全体を書き出す必要はありません。メッセージの重要な部分を含めて自己文書化するようにしてください。
 
-Most error annotations need to match with the line of the diagnostic. There are
-several ways to match the message with the line (see the examples below):
+ほとんどのエラーアノテーションは診断の行と一致する必要があります。メッセージを行と一致させる方法はいくつかあります（以下の例を参照）：
 
-* `~`: Associates the error level and message with the *current* line
-* `~^`: Associates the error level and message with the *previous* error
-  annotation line. Each caret (`^`) that you add adds a line to this, so `~^^^`
-  is three lines above the error annotation line.
-* `~|`: Associates the error level and message with the *same* line as the
-  *previous comment*. This is more convenient than using multiple carets when
-  there are multiple messages associated with the same line.
-* `~v`: Associates the error level and message with the *next* error
-  annotation line. Each symbol (`v`) that you add adds a line to this, so `~vvv`
-  is three lines below the error annotation line.
+* `~`: エラーレベルとメッセージを*現在*の行に関連付けます
+* `~^`: エラーレベルとメッセージを*前の*エラーアノテーション行に関連付けます。キャレット（`^`）を追加するたびに、行が追加されるため、`~^^^` はエラーアノテーション行の3行上です。
+* `~|`: エラーレベルとメッセージを*前のコメント*と*同じ*行に関連付けます。これは、同じ行に関連付けられた複数のメッセージがある場合、複数のキャレットを使用するよりも便利です。
+* `~v`: エラーレベルとメッセージを*次の*エラーアノテーション行に関連付けます。各記号（`v`）を追加するたびに、行が追加されるため、`~vvv` はエラーアノテーション行の3行下です。
 
-Example:
+例：
 
 ```rust,ignore
 let _ = same_line; //~ ERROR undeclared variable
@@ -224,25 +155,22 @@ fn meow(_: [u8]) {}
 //~| ERROR anonymous parameters
 ```
 
-The space character between `//~` (or other variants) and the subsequent text is
-negligible (i.e. there is no semantic difference between `//~ ERROR` and
-`//~ERROR` although the former is more common in the codebase).
+`//~`（または他のバリアント）とそれに続くテキストの間のスペース文字は無視されます（つまり、`//~ ERROR` と `//~ERROR` の間に意味上の違いはありませんが、前者がコードベースでより一般的です）。
 
-`~? <diagnostic kind>` (example being `~? ERROR`)
-is used to match diagnostics _without_ line info at all,
-or where the line info is outside the main test file[^main test file].
-These annotations can be placed on any line in the test file.
+`~? <診断種類>`（例：`~? ERROR`）は、
+行情報が全くない診断、またはメインテストファイル[^main test file]の外に行情報がある診断に一致するために使用されます。
+これらのアノテーションは、テストファイルの任意の行に配置できます。
 
-[^main test file]: This is a file that has the `~?` annotations,
-as distinct from aux files, or sources that we have no control over.
+[^main test file]: これは `~?` アノテーションを持つファイルであり、
+aux ファイルや、制御できないソースとは異なります。
 
-### Error annotation examples
+### エラーアノテーションの例
 
-Here are examples of error annotations on different lines of UI test source.
+UI テストソースの異なる行のエラーアノテーションの例を示します。
 
-#### Positioned on error line
+#### エラー行に配置
 
-Use the `//~ ERROR` idiom:
+`//~ ERROR` イディオムを使用します：
 
 ```rust,ignore
 fn main() {
@@ -254,27 +182,24 @@ fn main() {
 }
 ```
 
-#### Positioned below error line
+#### エラー行の下に配置
 
-Use the `//~^` idiom with number of carets in the string to indicate the number
-of lines above. In the example below, the error line is four lines above the
-error annotation line so four carets are included in the annotation.
+`//~^` イディオムを使用し、文字列内のキャレットの数で上の行数を示します。以下の例では、エラー行はエラーアノテーション行の4行上なので、アノテーションに4つのキャレットが含まれています。
 
 ```rust,ignore
 fn main() {
     let x = (1, 2, 3);
     match x {
-        (_a, _x @ ..) => {}  // <- the error is on this line
+        (_a, _x @ ..) => {}  // <- エラーはこの行にあります
         _ => {}
     }
 }
 //~^^^^ ERROR `_x @` is not allowed in a tuple
 ```
 
-#### Use same error line as defined on error annotation line above
+#### 上のエラーアノテーション行で定義したのと同じエラー行を使用
 
-Use the `//~|` idiom to define the same error line as the error annotation
-line above:
+`//~|` イディオムを使用して、上のエラーアノテーション行と同じエラー行を定義します：
 
 ```rust,ignore
 struct Binder(i32, i32, i32);
@@ -282,7 +207,7 @@ struct Binder(i32, i32, i32);
 fn main() {
     let x = Binder(1, 2, 3);
     match x {
-        Binder(_a, _x @ ..) => {}  // <- the error is on this line
+        Binder(_a, _x @ ..) => {}  // <- エラーはこの行にあります
         _ => {}
     }
 }
@@ -290,11 +215,9 @@ fn main() {
 //~| ERROR this pattern has 1 field, but the corresponding tuple struct has 3 fields [E0023]
 ```
 
-#### Positioned above error line
+#### エラー行の上に配置
 
-Use the `//~v` idiom with number of v's in the string to indicate the number
-of lines below. This is typically used in lexer or parser tests matching on errors like unclosed
-delimiter or unclosed literal happening at the end of file.
+`//~v` イディオムを使用し、文字列内の v の数で下の行数を示します。これは通常、ファイル末尾で発生する閉じられていないデリミタや閉じられていないリテラルなどのエラーに一致するレクサーまたはパーサーテストで使用されます。
 
 ```rust,ignore
 // ignore-tidy-trailing-newlines
@@ -302,13 +225,12 @@ delimiter or unclosed literal happening at the end of file.
 fn main((ؼ
 ```
 
-#### Error without line information
+#### 行情報のないエラー
 
-Use `//~?` to match an error without line information.
-`//~?` is precise and will not match errors if their line information is available.
-It should be preferred over `//@ error-pattern`
-for tests wishing to match against compiler diagnostics,
-due to `//@ error-pattern` being imprecise and non-exhaustive.
+`//~?` を使用して、行情報のないエラーに一致させます。
+`//~?` は正確で、行情報が利用可能な場合はエラーに一致しません。
+コンパイラ診断に対して一致させたいテストでは、
+`//@ error-pattern` が不正確で非網羅的であるため、これを優先する必要があります。
 
 ```rust,ignore
 //@ compile-flags: --print yyyy
@@ -318,10 +240,9 @@ due to `//@ error-pattern` being imprecise and non-exhaustive.
 
 ### `error-pattern`
 
-The `error-pattern` [directive](directives.md) can be used for runtime messages which don't
-have a specific span, or, in exceptional cases, for compile time messages.
+`error-pattern` [ディレクティブ](directives.md) は、特定のスパンを持たないランタイムメッセージ、または例外的な場合にはコンパイル時メッセージに使用できます。
 
-Let's think about this test:
+このテストについて考えてみましょう：
 
 ```rust,ignore
 fn main() {
@@ -332,9 +253,7 @@ fn main() {
 }
 ```
 
-We want to ensure this shows "index out of bounds", but we cannot use the `ERROR`
-annotation since the runtime error doesn't have any span. Then it's time to use the
-`error-pattern` directive:
+「index out of bounds」が表示されることを保証したいのですが、ランタイムエラーにはスパンがないため、`ERROR` アノテーションを使用できません。その場合は、`error-pattern` ディレクティブを使用します：
 
 ```rust,ignore
 //@ error-pattern: index out of bounds
@@ -346,63 +265,51 @@ fn main() {
 }
 ```
 
-For strict testing of compile time output, try to use the line annotations `//~` as much as
-possible, including `//~?` annotations for diagnostics without spans.
+コンパイル時出力の厳密なテストには、`//~?` アノテーションを含め、できるだけ行アノテーション `//~` を使用するようにしてください。
 
-If the compile time output is target dependent or too verbose, use directive
-`//@ dont-require-annotations: <diagnostic-kind>` to make the line annotation checking
-non-exhaustive.
-Some of the compiler messages can stay uncovered by annotations in this mode.
+コンパイル時出力がターゲット依存または冗長すぎる場合は、ディレクティブ
+`//@ dont-require-annotations: <diagnostic-kind>` を使用して行アノテーションチェックを
+非網羅的にします。
+このモードでは、一部のコンパイラメッセージはアノテーションでカバーされなくても構いません。
 
-For checking runtime output, `//@ check-run-results` may be preferable.
+ランタイム出力をチェックする場合は、`//@ check-run-results` の方が望ましい場合があります。
 
-Only use `error-pattern` if none of the above works, such as when finding a
-specific string pattern in a runtime panic output.
+上記のいずれも機能しない場合にのみ `error-pattern` を使用してください。例えば、ランタイムパニック出力で特定の文字列パターンを見つける場合などです。
 
-Line annotations `//~` and `error-pattern` are compatible and can be used in the same test.
+行アノテーション `//~` と `error-pattern` は互換性があり、同じテストで使用できます。
 
-### Diagnostic kinds (error levels)
+### 診断の種類（エラーレベル）
 
-The diagnostic kinds that you can have are:
+使用できる診断の種類は次のとおりです：
 
 - `ERROR`
-- `WARN` (or `WARNING`)
+- `WARN`（または `WARNING`）
 - `NOTE`
 - `HELP`
 - `SUGGESTION`
 - `RAW`
 
-The `SUGGESTION` kind is used for specifying what the expected replacement text
-should be for a diagnostic suggestion.
-The `RAW` kind can be used for matching on lines from non-structured output sometimes emitted
-by the compiler instead of or in addition to structured json.
+`SUGGESTION` の種類は、診断提案の期待される置換テキストがどうあるべきかを指定するために使用されます。
+`RAW` の種類は、構造化 json の代わりにまたはそれに加えてコンパイラが時々発行する非構造化出力の行に一致させるために使用できます。
 
-`ERROR` and `WARN` kinds are required to be exhaustively covered by line annotations
-`//~` by default.
+`ERROR` および `WARN` の種類は、デフォルトで行アノテーション `//~` によって網羅的にカバーされる必要があります。
 
-Other kinds only need to be line-annotated if at least one annotation of that kind appears
-in the test file. For example, one `//~ NOTE` will also require all other `//~ NOTE`s in the file
-to be written out explicitly.
+他の種類は、その種類のアノテーションが少なくとも1つテストファイルに現れる場合にのみ、行アノテーションが必要です。例えば、1つの `//~ NOTE` があれば、ファイル内の他のすべての `//~ NOTE` も明示的に書き出す必要があります。
 
-Use directive `//@ dont-require-annotations` to opt out of exhaustive annotations.
-E.g. use `//@ dont-require-annotations: NOTE` to annotate notes selectively.
-Avoid using this directive for `ERROR`s and `WARN`ings, unless there's a serious reason, like
-target-dependent compiler output.
+ディレクティブ `//@ dont-require-annotations` を使用して、網羅的なアノテーションをオプトアウトします。
+例えば、`//@ dont-require-annotations: NOTE` を使用してノートを選択的にアノテーションします。
+`ERROR` と `WARN` にこのディレクティブを使用することは避けてください。ターゲット依存のコンパイラ出力など、深刻な理由がない限りです。
 
-Some diagnostics are never required to be line-annotated, regardless of their kind or directives,
-for example secondary lines of multiline diagnostics,
-or ubiquitous diagnostics like `aborting due to N previous errors`.
+一部の診断は、その種類やディレクティブに関係なく、行アノテーションが決して必要ありません。
+例えば、複数行診断のセカンダリ行や、
+`aborting due to N previous errors` のような遍在する診断などです。
 
-UI tests use the `-A unused` flag by default to ignore all unused warnings, as
-unused warnings are usually not the focus of a test. However, simple code
-samples often have unused warnings. If the test is specifically testing an
-unused warning, just add the appropriate `#![warn(unused)]` attribute as needed.
+UI テストはデフォルトで `-A unused` フラグを使用してすべての未使用警告を無視します。
+未使用警告は通常テストの焦点ではないためです。ただし、単純なコードサンプルには未使用警告がよくあります。テストが特に未使用警告をテストしている場合は、必要に応じて適切な `#![warn(unused)]` 属性を追加するだけです。
 
-### `cfg` revisions
+### `cfg` リビジョン
 
-When using [revisions](compiletest.md#revisions), different messages can be
-conditionally checked based on the current revision. This is done by placing the
-revision cfg name in brackets like this:
+[リビジョン](compiletest.md#revisions) を使用する場合、現在のリビジョンに基づいて異なるメッセージを条件付きでチェックできます。これは、次のようにリビジョン cfg 名をブラケットに入れることによって行われます：
 
 ```rust,ignore
 //@ edition:2018
@@ -420,141 +327,100 @@ fn main() {
 }
 ```
 
-In this example, the second error message is only emitted in the `mir` revision.
-The `thir` revision only emits the first error.
+この例では、2番目のエラーメッセージは `mir` リビジョンでのみ発行されます。
+`thir` リビジョンは最初のエラーのみを発行します。
 
-If the `cfg` causes the compiler to emit different output, then a test can have
-multiple `.stderr` files for the different outputs. In the example above, there
-would be a `.mir.stderr` and `.thir.stderr` file with the different outputs of
-the different revisions.
+`cfg` がコンパイラに異なる出力を発行させる場合、テストには異なる出力用の複数の `.stderr` ファイルを持つことができます。上記の例では、異なるリビジョンの異なる出力を含む `.mir.stderr` および `.thir.stderr` ファイルがあります。
 
-> Note: cfg revisions also work inside the source code with `#[cfg]` attributes.
+> 注意：cfg リビジョンは `#[cfg]` 属性を使用してソースコード内でも機能します。
 >
-> By convention, the `FALSE` cfg is used to have an always-false config.
+> 慣例により、`FALSE` cfg は常に false の設定を持つために使用されます。
 
-## Controlling pass/fail expectations
+## pass/fail 期待値の制御
 
-By default, a UI test is expected to **generate a compile error** because most
-of the tests are checking for invalid input and error diagnostics. However, you
-can also make UI tests where compilation is expected to succeed, and you can
-even run the resulting program. Just add one of the following
-[directives](directives.md):
+デフォルトでは、UI テストは**コンパイルエラーを生成する**ことが期待されます。ほとんどのテストは無効な入力とエラー診断をチェックしているためです。ただし、コンパイルが成功することが期待される UI テストを作成することもできますし、結果として得られるプログラムを実行することさえできます。次の[ディレクティブ](directives.md) のいずれかを追加するだけです：
 
-- Pass directives:
-  - `//@ check-pass` — compilation should succeed but skip codegen
-    (which is expensive and isn't supposed to fail in most cases).
-  - `//@ build-pass` — compilation and linking should succeed but do
-    not run the resulting binary.
-  - `//@ run-pass` — compilation should succeed and running the resulting
-    binary should make it exit with code 0 which indicates success.
-- Fail directives:
-  - `//@ check-fail` — compilation should fail (the codegen phase is skipped).
-    This is the default for UI tests.
-  - `//@ build-fail` — compilation should fail during the codegen phase.
-    This will run `rustc` twice:
-    - First time is to ensure that the compile succeeds without the codegen phase
-    - Second time is to ensure that the full compile fails
-  - `//@ run-fail` — compilation should succeed, but running the resulting
-    binary should make it exit with a code in the range `1..=127` which
-    indicates regular failure. On targets without unwind support, crashes
-    are also accepted.
-  - `//@ run-crash` — compilation should succeed, but running the resulting
-    binary should fail with a crash. Crashing is defined as "not exiting with
-    a code in the range `0..=127`". Example on Linux: Termination by `SIGABRT`
-    or `SIGSEGV`. Example on Windows: Exiting with the code for
-    `STATUS_ILLEGAL_INSTRUCTION` (`0xC000001D`).
-  - `//@ run-fail-or-crash` — compilation should succeed, but running the
-    resulting binary should either `run-fail` or `run-crash`. Useful if a test
-    crashes on some targets but just fails on others.
+- Pass ディレクティブ：
+  - `//@ check-pass` — コンパイルは成功するがコード生成をスキップする必要があります
+    （コード生成は高価で、ほとんどの場合失敗しないはずです）。
+  - `//@ build-pass` — コンパイルとリンクは成功するが、
+    結果のバイナリは実行しません。
+  - `//@ run-pass` — コンパイルは成功し、結果のバイナリを実行するとコード 0 で終了する必要があります（成功を示します）。
+- Fail ディレクティブ：
+  - `//@ check-fail` — コンパイルは失敗する必要があります（コード生成フェーズはスキップされます）。
+    これは UI テストのデフォルトです。
+  - `//@ build-fail` — コンパイルはコード生成フェーズ中に失敗する必要があります。
+    これは `rustc` を2回実行します：
+    - 1回目はコード生成フェーズなしでコンパイルが成功することを確認します
+    - 2回目は完全なコンパイルが失敗することを確認します
+  - `//@ run-fail` — コンパイルは成功するが、結果のバイナリを実行すると
+    `1..=127` の範囲のコードで終了する必要があります（通常の失敗を示します）。unwind サポートのないターゲットでは、
+    クラッシュも受け入れられます。
+  - `//@ run-crash` — コンパイルは成功するが、結果のバイナリを実行すると
+    クラッシュで失敗する必要があります。クラッシュは「`0..=127` の範囲のコードで終了しない」と定義されます。Linux での例：`SIGABRT`
+    または `SIGSEGV` による終了。Windows での例：`STATUS_ILLEGAL_INSTRUCTION`（`0xC000001D`）のコードで終了。
+  - `//@ run-fail-or-crash` — コンパイルは成功するが、結果のバイナリを実行すると
+    `run-fail` または `run-crash` のいずれかになる必要があります。一部のターゲットでクラッシュするが、他のターゲットでは失敗するだけのテストに便利です。
 
-For `run-pass`. `run-fail`, `run-crash` and `run-fail-or-crash` tests, by
-default the output of the program itself is not checked.
+`run-pass`、`run-fail`、`run-crash`、`run-fail-or-crash` テストの場合、
+デフォルトではプログラム自体の出力はチェックされません。
 
-If you want to check the output of running the program, include the
-`check-run-results` directive. This will check for a `.run.stderr` and
-`.run.stdout` files to compare against the actual output of the program.
+プログラムを実行した出力をチェックしたい場合は、
+`check-run-results` ディレクティブを含めてください。これにより、プログラムの実際の出力と比較する `.run.stderr` および
+`.run.stdout` ファイルがチェックされます。
 
-Tests with the `*-pass` directives can be overridden with the `--pass`
-command-line option:
+`*-pass` ディレクティブを持つテストは、`--pass` コマンドラインオプションでオーバーライドできます：
 
 ```sh
 ./x test tests/ui --pass check
 ```
 
-The `--pass` option only affects UI tests. Using `--pass check` can run the UI
-test suite much faster (roughly twice as fast on my system), though obviously
-not exercising as much.
+`--pass` オプションは UI テストにのみ影響します。`--pass check` を使用すると、UI テストスイートをはるかに高速に（私のシステムでは約2倍高速に）実行できますが、明らかにそれほど多くは実行されません。
 
-The `ignore-pass` directive can be used to ignore the `--pass` CLI flag if the
-test won't work properly with that override.
+`ignore-pass` ディレクティブを使用して、テストがそのオーバーライドで正しく機能しない場合に `--pass` CLI フラグを無視できます。
 
 
-## Known bugs
+## 既知のバグ
 
-The `known-bug` directive may be used for tests that demonstrate a known bug
-that has not yet been fixed. Adding tests for known bugs is helpful for several
-reasons, including:
+`known-bug` ディレクティブは、まだ修正されていない既知のバグを示すテストに使用できます。既知のバグのテストを追加すると、いくつかの理由で役立ちます：
 
-1. Maintaining a functional test that can be conveniently reused when the bug is
-   fixed.
-2. Providing a sentinel that will fail if the bug is incidentally fixed. This
-   can alert the developer so they know that the associated issue has been fixed
-   and can possibly be closed.
+1. バグが修正されたときに便利に再利用できる機能テストを維持します。
+2. バグが偶然修正された場合に失敗するセンチネルを提供します。これにより、開発者はバグが修正されたことを知り、関連する issue をクローズできる可能性があります。
 
-This directive takes comma-separated issue numbers as arguments, or `"unknown"`:
+このディレクティブは、カンマ区切りの issue 番号を引数として取るか、`"unknown"` を取ります：
 
-- `//@ known-bug: #123, #456` (when the issues are on rust-lang/rust)
+- `//@ known-bug: #123, #456`（issue が rust-lang/rust にある場合）
 - `//@ known-bug: rust-lang/chalk#123456`
-  (allows arbitrary text before the `#`, which is useful when the issue is on another repo)
+  （`#` の前に任意のテキストを許可します。これは issue が別のリポジトリにある場合に便利です）
 - `//@ known-bug: unknown`
-  (when there is no known issue yet; preferably open one if it does not already exist)
+  （既知の issue がまだない場合。可能であれば、まだ存在しない場合は開いてください）
 
-Do not include [error annotations](#error-annotations) in a test with
-`known-bug`. The test should still include other normal directives and
-stdout/stderr files.
+`known-bug` を持つテストには[エラーアノテーション](#error-annotations) を含めないでください。テストには他の通常のディレクティブと stdout/stderr ファイルを含める必要があります。
 
 
-## Test organization
+## テストの整理
 
-When deciding where to place a test file, please try to find a subdirectory that
-best matches what you are trying to exercise. Do your best to keep things
-organized. Admittedly it can be difficult as some tests can overlap different
-categories, and the existing layout may not fit well.
+テストファイルを配置する場所を決定するときは、何をテストしようとしているかに最も適合するサブディレクトリを見つけるようにしてください。できる限り整理された状態を保つようにしてください。一部のテストは異なるカテゴリにまたがる可能性があり、既存のレイアウトがうまく適合しない可能性があるため、難しい場合があることは認めます。
 
-Name the test by a concise description of what the test is checking. Avoid
-including the issue number in the test name. See [best
-practices](best-practices.md) for a more in-depth discussion of this.
+テストがチェックしている内容の簡潔な説明でテストに名前を付けてください。テスト名に issue 番号を含めることは避けてください。これについての詳細な議論については、[ベストプラクティス](best-practices.md) を参照してください。
 
-Ideally, the test should be added to a directory that helps identify what piece
-of code is being tested here (e.g.,
-`tests/ui/borrowck/reject-move-out-of-borrow-via-pat.rs`)
+理想的には、テストはここでテストされているコードの部分を識別するのに役立つディレクトリに追加する必要があります（例：
+`tests/ui/borrowck/reject-move-out-of-borrow-via-pat.rs`）
 
-When writing a new feature, you may want to **create a subdirectory to store
-your tests**. For example, if you are implementing RFC 1234 ("Widgets"), then it
-might make sense to put the tests in a directory like
-`tests/ui/rfc1234-widgets/`.
+新しい機能を書くときは、**テストを保存するサブディレクトリを作成する**ことをお勧めします。例えば、RFC 1234（「Widgets」）を実装している場合、
+`tests/ui/rfc1234-widgets/` のようなディレクトリにテストを配置するのが理にかなっているかもしれません。
 
-In other cases, there may already be a suitable directory.
+他の場合には、既に適切なディレクトリがあるかもしれません。
 
-Over time, the [`tests/ui`] directory has grown very fast. There is a check in
-[tidy](intro.md#tidy) that will ensure none of the subdirectories has more than
-1000 entries. Having too many files causes problems because it isn't editor/IDE
-friendly and the GitHub UI won't show more than 1000 entries. However, since
-`tests/ui` (UI test root directory) and `tests/ui/issues` directories have more
-than 1000 entries, we set a different limit for those directories. So, please
-avoid putting a new test there and try to find a more relevant place.
+時間の経過とともに、[`tests/ui`] ディレクトリは非常に速く成長しました。[tidy](intro.md#tidy) には、サブディレクトリのいずれかが 1000 以上のエントリを持たないことを保証するチェックがあります。ファイルが多すぎると、エディタ/IDE に優しくなく、GitHub UI が 1000 以上のエントリを表示しないため、問題が発生します。ただし、`tests/ui`（UI テストルートディレクトリ）と `tests/ui/issues` ディレクトリには 1000 以上のエントリがあるため、これらのディレクトリには異なる制限を設定しています。したがって、新しいテストをそこに配置することは避け、より関連性の高い場所を見つけるようにしてください。
 
-For example, if your test is related to closures, you should put it in
-`tests/ui/closures`. When you reach the limit, you could increase it by tweaking
-[here][ui test tidy].
+例えば、テストがクロージャに関連している場合は、`tests/ui/closures` に配置する必要があります。制限に達したら、[ここ][ui test tidy]を調整して増やすことができます。
 
 [ui test tidy]: https://github.com/rust-lang/rust/blob/HEAD/src/tools/tidy/src/ui_tests.rs
 
-## Rustfix tests
+## Rustfix テスト
 
-UI tests can validate that diagnostic suggestions apply correctly and that the
-resulting changes compile correctly. This can be done with the `run-rustfix`
-directive:
+UI テストは、診断提案が正しく適用され、結果の変更が正しくコンパイルされることを検証できます。これは `run-rustfix` ディレクティブで行うことができます：
 
 ```rust,ignore
 //@ run-rustfix
@@ -567,84 +433,59 @@ pub struct not_camel_case {}
 //~| SUGGESTION NotCamelCase
 ```
 
-Rustfix tests should have a file with the `.fixed` extension which contains the
-source file after the suggestion has been applied.
+Rustfix テストには、提案が適用された後のソースファイルを含む `.fixed` 拡張子のファイルが必要です。
 
-- When the test is run, compiletest first checks that the correct lint/warning
-  is generated.
-- Then, it applies the suggestion and compares against `.fixed` (they must
-  match).
-- Finally, the fixed source is compiled, and this compilation is required to
-  succeed.
+- テストが実行されると、compiletest は最初に正しい lint/警告が
+  生成されることをチェックします。
+- 次に、提案を適用して `.fixed` と比較します（一致する必要があります）。
+- 最後に、修正されたソースがコンパイルされ、このコンパイルは
+  成功する必要があります。
 
-Usually when creating a rustfix test you will generate the `.fixed` file
-automatically with the `x test --bless` option.
+通常、rustfix テストを作成するときは、`x test --bless` オプションで `.fixed` ファイルを自動的に生成します。
 
-The `run-rustfix` directive will cause *all* suggestions to be applied, even if
-they are not [`MachineApplicable`](../diagnostics.md#suggestions). If this is a
-problem, then you can add the `rustfix-only-machine-applicable` directive in
-addition to `run-rustfix`. This should be used if there is a mixture of
-different suggestion levels, and some of the non-machine-applicable ones do not
-apply cleanly.
+`run-rustfix` ディレクティブは、[`MachineApplicable`](../diagnostics.md#suggestions) でなくても、*すべての*提案を適用します。これが問題である場合は、`run-rustfix` に加えて `rustfix-only-machine-applicable` ディレクティブを追加できます。これは、異なる提案レベルが混在しており、一部の非機械適用可能なものがきれいに適用されない場合に使用する必要があります。
 
 
-## Compare modes
+## 比較モード
 
-[Compare modes](compiletest.md#compare-modes) can be used to run all tests with
-different flags from what they are normally compiled with. In some cases, this
-might result in different output from the compiler. To support this, different
-output files can be saved which contain the output based on the compare mode.
+[比較モード](compiletest.md#compare-modes) を使用すると、通常とは異なるフラグですべてのテストを実行できます。場合によっては、これによりコンパイラからの出力が異なる可能性があります。これをサポートするために、比較モードに基づいた出力を含む異なる出力ファイルを保存できます。
 
-For example, when using the Polonius mode, a test `foo.rs` will first look for
-expected output in `foo.polonius.stderr`, falling back to the usual `foo.stderr`
-if not found. This is useful as different modes can sometimes result in
-different diagnostics and behavior. This can help track which tests have
-differences between the modes, and to visually inspect those diagnostic
-differences.
+例えば、Polonius モードを使用する場合、テスト `foo.rs` はまず期待される出力を `foo.polonius.stderr` で探し、見つからない場合は通常の `foo.stderr` にフォールバックします。これは、異なるモードが時々異なる診断と動作をもたらす可能性があるため便利です。これにより、モード間で違いのあるテストを追跡し、それらの診断の違いを視覚的に検査するのに役立ちます。
 
-If in the rare case you encounter a test that has different behavior, you can
-run something like the following to generate the alternate stderr file:
+まれにテストが異なる動作をする場合は、次のようなものを実行して代替 stderr ファイルを生成できます：
 
 ```sh
 ./x test tests/ui --compare-mode=polonius --bless
 ```
 
-Currently none of the compare modes are checked in CI for UI tests.
+現在、UI テストの比較モードのいずれも CI でチェックされていません。
 
-## `rustc_*` TEST attributes
+## `rustc_*` TEST 属性
 
-The compiler defines several perma-unstable `#[rustc_*]` attributes gated behind
-the internal feature `rustc_attrs` that dump extra compiler-internal
-information. See the corresponding subsection in [compiler debugging] for more
-details.
+コンパイラは、内部機能 `rustc_attrs` の背後にゲートされた、コンパイラ内部の
+追加情報をダンプするいくつかの perma-unstable `#[rustc_*]` 属性を定義しています。詳細については、[コンパイラデバッグ] の対応するサブセクションを参照してください。
 
-They can be used in tests to more precisely, legibly and easily test internal
-compiler state in cases where it would otherwise be very hard to do the same
-with "user-facing" Rust alone. Indeed, one could say that this slightly abuses
-the term "UI" (*user* interface) and turns such UI tests from black-box tests
-into white-box ones. Use them carefully and sparingly.
+これらは、「ユーザー向け」の Rust だけでは同じことを行うのが非常に困難な場合に、内部コンパイラの状態をより正確に、読みやすく、簡単にテストするためにテストで使用できます。実際、これは「UI」（*ユーザー*インターフェース）という用語を若干悪用し、そのような UI テストをブラックボックステストからホワイトボックステストに変えます。慎重かつ控えめに使用してください。
 
-[compiler debugging]: ../compiler-debugging.md#rustc_-test-attributes
+[コンパイラデバッグ]: ../compiler-debugging.md#rustc_-test-attributes
 
-## UI test mode preset lint levels
+## UI テストモードのプリセット lint レベル
 
-By default, test suites under UI test mode (`tests/ui`, `tests/ui-fulldeps`,
-but not `tests/rustdoc-ui`) will specify
+デフォルトでは、UI テストモード配下のテストスイート（`tests/ui`、`tests/ui-fulldeps`、
+ただし `tests/rustdoc-ui` は除く）は次を指定します：
 
 - `-A unused`
 - `-A internal_features`
 
-If:
+次の場合：
 
-- The ui test's pass mode is below `run` (i.e. check or build).
-- No compare modes are specified.
+- ui テストの pass モードが `run` より下（つまり check または build）。
+- 比較モードが指定されていない。
 
-Since they can be very noisy in ui tests.
+UI テストでは非常にノイジーになる可能性があるためです。
 
-You can override them with `compile-flags` lint level flags or
-in-source lint level attributes as required.
+必要に応じて、`compile-flags` lint レベルフラグまたは
+ソース内 lint レベル属性でこれらをオーバーライドできます。
 
-Note that the `rustfix` version will *not* have `-A unused` passed,
-meaning that you may have to `#[allow(unused)]` to suppress `unused`
-lints on the rustfix'd file (because we might be testing rustfix
-on `unused` lints themselves).
+`rustfix` バージョンには `-A unused` が渡*されない*ことに注意してください。
+つまり、rustfix されたファイル（`unused` lint 自体で rustfix をテストしている可能性があるため）で `unused` lint を抑制するために `#[allow(unused)]` が必要になる場合があります。

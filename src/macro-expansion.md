@@ -1,89 +1,84 @@
-# Macro expansion
+# マクロ展開
 
-Rust has a very powerful macro system. In the previous chapter, we saw how
-the parser sets aside macros to be expanded (using temporary [placeholders]).
-This chapter is about the process of expanding those macros iteratively until
-we have a complete [*Abstract Syntax Tree* (AST)][ast] for our crate with no
-unexpanded macros (or a compile error).
+Rustには非常に強力なマクロシステムがあります。前の章では、
+パーサーがマクロを展開のために（一時的な[プレースホルダー]を使用して）どのように保留するかを見ました。
+この章では、クレートのマクロが展開されていない（またはコンパイルエラー）完全な
+[*抽象構文木*（AST）][ast]を得るまで、これらのマクロを反復的に展開するプロセスについて説明します。
 
 [ast]: ./ast-validation.md
 [placeholders]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/placeholders/index.html
 
-First, we discuss the algorithm that expands and integrates macro output into
-ASTs. Next, we take a look at how hygiene data is collected. Finally, we look
-at the specifics of expanding different types of macros.
+まず、マクロ出力を展開してASTに統合するアルゴリズムについて説明します。次に、
+ハイジーンデータの収集方法を見ていきます。最後に、
+さまざまなタイプのマクロの展開の詳細を見ていきます。
 
-Many of the algorithms and data structures described below are in [`rustc_expand`],
-with fundamental data structures in [`rustc_expand::base`][base].
+以下で説明する多くのアルゴリズムとデータ構造は、[`rustc_expand`]にあり、
+基本的なデータ構造は[`rustc_expand::base`][base]にあります。
 
-Also of note, `cfg` and `cfg_attr` are treated specially from other macros, and are
-handled in [`rustc_expand::config`][cfg].
+また、`cfg`と`cfg_attr`は他のマクロとは特別に扱われ、
+[`rustc_expand::config`][cfg]で処理されることにも注意してください。
 
 [`rustc_expand`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/index.html
 [base]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/base/index.html
 [cfg]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/config/index.html
 
-## Expansion and AST Integration
+## 展開とAST統合
 
-Firstly, expansion happens at the crate level. Given a raw source code for
-a crate, the compiler will produce a massive AST with all macros expanded, all
-modules inlined, etc. The primary entry point for this process is the
-[`MacroExpander::fully_expand_fragment`][fef] method. With few exceptions, we
-use this method on the whole crate (see ["Eager Expansion"](#eager-expansion)
-below for more detailed discussion of edge case expansion issues).
+まず、展開はクレートレベルで行われます。クレートの生のソースコードが与えられると、
+コンパイラは、すべてのマクロが展開され、すべてのモジュールがインライン化された、
+巨大なASTを生成します。このプロセスの主なエントリポイントは、
+[`MacroExpander::fully_expand_fragment`][fef]メソッドです。いくつかの例外を除いて、
+クレート全体でこのメソッドを使用します
+（エッジケース展開の問題の詳細については、以下の[「Eager Expansion」](#eager-expansion)を参照してください）。
 
 [`rustc_builtin_macros`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_builtin_macros/index.html
 [reb]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/build/index.html
 
-At a high level, [`fully_expand_fragment`][fef] works in iterations. We keep a
-queue of unresolved macro invocations (i.e. macros we haven't found the
-definition of yet). We repeatedly try to pick a macro from the queue, resolve
-it, expand it, and integrate it back. If we can't make progress in an
-iteration, this represents a compile error.  Here is the [algorithm][original]:
+高レベルでは、[`fully_expand_fragment`][fef]は反復で機能します。
+未解決のマクロ呼び出し（つまり、定義がまだ見つかっていないマクロ）のキューを保持します。
+キューからマクロを繰り返し取り出して、解決し、展開し、統合し直します。
+反復で進展しない場合、これはコンパイルエラーを表します。以下は[アルゴリズム][original]です。
 
 [fef]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/expand/struct.MacroExpander.html#method.fully_expand_fragment
 [original]: https://github.com/rust-lang/rust/pull/53778#issuecomment-419224049
 
-1. Initialize a `queue` of unresolved macros.
-2. Repeat until `queue` is empty (or we make no progress, which is an error):
-   1. [Resolve](./name-resolution.md) imports in our partially built crate as
-      much as possible.
-   2. Collect as many macro [`Invocation`s][inv] as possible from our
-      partially built crate (`fn`-like, attributes, derives) and add them to the
-      queue.
-   3. Dequeue the first element and attempt to resolve it.
-   4. If it's resolved:
-      1. Run the macro's expander function that consumes a [`TokenStream`] or
-         AST and produces a [`TokenStream`] or [`AstFragment`] (depending on
-         the macro kind). (A [`TokenStream`] is a collection of [`TokenTree`s][tt],
-         each of which are a token (punctuation, identifier, or literal) or a
-         delimited group (anything inside `()`/`[]`/`{}`)).
-         - At this point, we know everything about the macro itself and can
-           call [`set_expn_data`] to fill in its properties in the global
-           data; that is the [hygiene] data associated with [`ExpnId`] (see
-           [Hygiene][hybelow] below).
-      2. Integrate that piece of AST into the currently-existing though
-         partially-built AST. This is essentially where the "token-like mass"
-         becomes a proper set-in-stone AST with side-tables. It happens as
-         follows:
-         - If the macro produces tokens (e.g. a proc macro), we parse into
-           an AST, which may produce parse errors.
-         - During expansion, we create [`SyntaxContext`]s (hierarchy 2) (see
-           [Hygiene][hybelow] below).
-         - These three passes happen one after another on every AST fragment
-           freshly expanded from a macro:
-           - [`NodeId`]s are assigned by [`InvocationCollector`]. This
-             also collects new macro calls from this new AST piece and
-             adds them to the queue.
-           - ["Def paths"][defpath] are created and [`DefId`]s are
-             assigned to them by [`DefCollector`].
-           - Names are put into modules (from the resolver's point of
-             view) by [`BuildReducedGraphVisitor`].
-      3. After expanding a single macro and integrating its output, continue
-         to the next iteration of [`fully_expand_fragment`][fef].
-   5. If it's not resolved:
-      1. Put the macro back in the queue.
-      2. Continue to next iteration...
+1. 未解決のマクロの`queue`を初期化します。
+2. `queue`が空になるまで（または進展しない場合、これはエラーです）繰り返します。
+   1. 部分的に構築されたクレートのインポートを可能な限り[解決](./name-resolution.md)します。
+   2. 部分的に構築されたクレートからできるだけ多くのマクロ[`Invocation`s][inv]
+      （`fn`のような、属性、派生）を収集し、キューに追加します。
+   3. 最初の要素をデキューして、解決を試みます。
+   4. 解決された場合：
+      1. [`TokenStream`]またはASTを消費し、[`TokenStream`]または[`AstFragment`]
+         （マクロの種類による）を生成するマクロの展開関数を実行します。
+         （[`TokenStream`]は[`TokenTree`s][tt]のコレクションであり、
+         それぞれはトークン（句読点、識別子、またはリテラル）または
+         区切られたグループ（`()`/`[]`/`{}`内のもの）です）。
+         - この時点で、マクロ自体についてすべてを知っており、
+           グローバルデータでそのプロパティを埋めるために[`set_expn_data`]を
+           呼び出すことができます。つまり、[`ExpnId`]に関連付けられた[hygiene]データです
+           （以下の[Hygiene][hybelow]を参照）。
+      2. そのASTの断片を、現在存在するが部分的に構築されたASTに統合します。
+         これは本質的に「トークンのような塊」が適切に確定したASTとサイドテーブルになる場所です。
+         次のように行われます。
+         - マクロがトークンを生成する場合（例：procマクロ）、ASTに解析します。
+           これは解析エラーを生成する可能性があります。
+         - 展開中に、[`SyntaxContext`]s（階層2）を作成します
+           （以下の[Hygiene][hybelow]を参照）。
+         - これらの3つのパスは、マクロから新しく展開されたすべてのASTフラグメントで
+           次々に行われます。
+           - [`NodeId`]sは[`InvocationCollector`]によって割り当てられます。
+             これは、この新しいAST断片から新しいマクロ呼び出しも収集し、
+             キューに追加します。
+           - [「Defパス」][defpath]が作成され、[`DefId`]sが
+             [`DefCollector`]によって割り当てられます。
+           - 名前は、[`BuildReducedGraphVisitor`]によって
+             モジュール（リゾルバーの観点から）に配置されます。
+      3. 単一のマクロを展開してその出力を統合した後、
+         [`fully_expand_fragment`][fef]の次の反復に進みます。
+   5. 解決されない場合：
+      1. マクロをキューに戻します。
+      2. 次の反復に進みます...
 
 [`AstFragment`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/expand/enum.AstFragment.html
 [`BuildReducedGraphVisitor`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/build_reduced_graph/struct.BuildReducedGraphVisitor.html
@@ -101,36 +96,35 @@ iteration, this represents a compile error.  Here is the [algorithm][original]:
 [inv]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/expand/struct.Invocation.html
 [tt]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast/tokenstream/enum.TokenTree.html
 
-### Error Recovery
+### エラー回復
 
-If we make no progress in an iteration we have reached a compilation error
-(e.g. an undefined macro). We attempt to recover from failures (i.e.
-unresolved macros or imports) with the intent of generating diagnostics.
-Failure recovery happens by expanding unresolved macros into
-[`ExprKind::Err`][err] and allows compilation to continue past the first error
-so that `rustc` can report more errors than just the original failure.
+反復で進展しない場合、コンパイルエラーに到達しました
+（例：未定義のマクロ）。失敗（つまり、未解決のマクロまたはインポート）から
+診断を生成する意図で回復を試みます。
+失敗回復は、未解決のマクロを[`ExprKind::Err`][err]に展開することで行われ、
+`rustc`が元の失敗だけでなくより多くのエラーを報告できるように、
+最初のエラーを超えてコンパイルを続行できるようにします。
 
 [err]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast/ast/enum.ExprKind.html#variant.Err
 
-### Name Resolution
+### 名前解決
 
-Notice that name resolution is involved here: we need to resolve imports and
-macro names in the above algorithm. This is done in
-[`rustc_resolve::macros`][mresolve], which resolves macro paths, validates
-those resolutions, and reports various errors (e.g. "not found", "found, but
-it's unstable", "expected x, found y"). However, we don't try to resolve
-other names yet. This happens later, as we will see in the chapter: [Name
-Resolution](./name-resolution.md).
+名前解決がここに関与していることに注意してください。上記のアルゴリズムでは、
+インポートとマクロ名を解決する必要があります。これは、
+[`rustc_resolve::macros`][mresolve]で行われ、マクロパスを解決し、
+これらの解決を検証し、さまざまなエラー（例：「見つからない」、「見つかったが不安定」、
+「xが期待されたが、yが見つかった」）を報告します。ただし、
+他の名前はまだ解決しようとしません。これは後で行われます。
+章[Name Resolution](./name-resolution.md)で説明します。
 
 [mresolve]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/macros/index.html
 
 ### Eager Expansion
 
-_Eager expansion_ means we expand the arguments of a macro invocation before
-the macro invocation itself. This is implemented only for a few special
-built-in macros that expect literals; expanding arguments first for some of
-these macro results in a smoother user experience.  As an example, consider
-the following:
+_Eager expansion_とは、マクロ呼び出し自体の前にマクロ呼び出しの引数を展開することを意味します。
+これは、リテラルを期待するいくつかの特別な組み込みマクロに対してのみ実装されています。
+これらのマクロの一部で最初に引数を展開すると、よりスムーズなユーザー体験が得られます。
+例として、次のことを考えてください。
 
 ```rust,ignore
 macro bar($i: ident) { $i }
@@ -139,35 +133,32 @@ macro foo($i: ident) { $i }
 foo!(bar!(baz));
 ```
 
-A lazy-expansion would expand `foo!` first. An eager-expansion would expand
-`bar!` first.
+遅延展開は、最初に`foo!`を展開します。eager-expansionは、最初に`bar!`を展開します。
 
-Eager-expansion is not a generally available feature of Rust.  Implementing
-eager-expansion more generally would be challenging, so we implement it for a
-few special built-in macros for the sake of user-experience.  The built-in
-macros are implemented in [`rustc_builtin_macros`], along with some other
-early code generation facilities like injection of standard library imports or
-generation of test harness. There are some additional helpers for building
-AST fragments in [`rustc_expand::build`][reb]. Eager-expansion generally
-performs a subset of the things that lazy (normal) expansion does. It is done
-by invoking [`fully_expand_fragment`][fef] on only part of a crate (as opposed
-to the whole crate, like we normally do).
+Eager-expansionは、Rustの一般的に利用可能な機能ではありません。
+eager-expansionをより一般的に実装することは困難なので、
+ユーザー体験のために、いくつかの特別な組み込みマクロに対して実装します。
+組み込みマクロは、[`rustc_builtin_macros`]で実装されており、
+標準ライブラリのインポートの注入やテストハーネスの生成など、
+他の初期のコード生成機能と共に実装されています。
+ASTフラグメントを構築するための追加のヘルパーが[`rustc_expand::build`][reb]にあります。
+Eager-expansionは一般的に、遅延（通常）展開が行うことのサブセットを実行します。
+これは、クレート全体ではなく（通常のように）、クレートの一部のみで
+[`fully_expand_fragment`][fef]を呼び出すことによって行われます。
 
-### Other Data Structures
+### その他のデータ構造
 
-Here are some other notable data structures involved in expansion and
-integration:
-- [`ResolverExpand`] - a `trait` used to break crate dependencies. This allows the
-  resolver services to be used in [`rustc_ast`], despite [`rustc_resolve`] and
-  pretty much everything else depending on [`rustc_ast`].
-- [`ExtCtxt`]/[`ExpansionData`] - holds various intermediate expansion
-  infrastructure data.
-- [`Annotatable`] - a piece of AST that can be an attribute target, almost the same
-  thing as [`AstFragment`] except for types and patterns that can be produced by
-  macros but cannot be annotated with attributes.
-- [`MacResult`] - a "polymorphic" AST fragment, something that can turn into
-  a different [`AstFragment`] depending on its [`AstFragmentKind`] (i.e. an item,
-  expression, pattern, etc).
+展開と統合に関与する他の注目すべきデータ構造は次のとおりです。
+- [`ResolverExpand`] - クレートの依存関係を壊すために使用される`trait`。
+  これにより、[`rustc_resolve`]とほぼすべてが[`rustc_ast`]に依存しているにもかかわらず、
+  [`rustc_ast`]でリゾルバーサービスを使用できます。
+- [`ExtCtxt`]/[`ExpansionData`] - さまざまな中間展開インフラストラクチャデータを保持します。
+- [`Annotatable`] - 属性ターゲットになり得るASTの断片。
+  マクロによって生成できるが属性で注釈を付けることができない型とパターンを除いて、
+  [`AstFragment`]とほぼ同じです。
+- [`MacResult`] - 「ポリモーフィック」ASTフラグメント。
+  [`AstFragmentKind`]（つまり、アイテム、式、パターンなど）に応じて、
+  異なる[`AstFragment`]に変換できるもの。
 
 [`AstFragment`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/expand/enum.AstFragment.html
 [`rustc_ast`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast/index.html
@@ -179,10 +170,11 @@ integration:
 [`MacResult`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/base/trait.MacResult.html
 [`AstFragmentKind`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/expand/enum.AstFragmentKind.html
 
-## Hygiene and Hierarchies
+## ハイジーンと階層
 
-If you have ever used the C/C++ preprocessor macros, you know that there are some
-annoying and hard-to-debug gotchas! For example, consider the following C code:
+C/C++プリプロセッサマクロを使用したことがある場合、
+いくつかの厄介でデバッグが困難な落とし穴があることをご存知でしょう！
+たとえば、次のCコードを考えてみましょう。
 
 ```c
 #define DEFINE_FOO struct Bar {int x;}; struct Foo {Bar bar;};
@@ -195,9 +187,9 @@ struct Bar {
 DEFINE_FOO
 ```
 
-Most people avoid writing C like this – and for good reason: it doesn't
-compile. The `struct Bar` defined by the macro clashes names with the `struct
-Bar` defined in the code. Consider also the following example:
+ほとんどの人はこのようなCを書くことを避けます。そして正当な理由があります。
+コンパイルされません。マクロによって定義された`struct Bar`は、
+コードで定義された`struct Bar`と名前が衝突します。次の例も考えてみましょう。
 
 ```c
 #define DO_FOO(x) {\
@@ -210,21 +202,22 @@ int y = 22;
 DO_FOO(y);
 ```
 
-Do you see the problem? We wanted to generate a call `foo(22, 0)`, but instead
-we got `foo(0, 0)` because the macro defined its own `y`!
+問題がわかりますか？`foo(22, 0)`の呼び出しを生成したかったのですが、
+代わりに`foo(0, 0)`を取得しました。マクロが独自の`y`を定義したためです！
 
-These are both examples of _macro hygiene_ issues. _Hygiene_ relates to how to
-handle names defined _within a macro_. In particular, a hygienic macro system
-prevents errors due to names introduced within a macro. Rust macros are hygienic
-in that they do not allow one to write the sorts of bugs above.
+これらは両方とも_マクロハイジーン_の問題の例です。_ハイジーン_は、
+_マクロ内で_定義された名前の処理方法に関連しています。特に、
+衛生的なマクロシステムは、マクロ内で導入された名前によるエラーを防ぎます。
+Rustマクロは衛生的であり、上記のようなバグを書くことを許可しません。
 
-At a high level, hygiene within the Rust compiler is accomplished by keeping
-track of the context where a name is introduced and used. We can then
-disambiguate names based on that context. Future iterations of the macro system
-will allow greater control to the macro author to use that context. For example,
-a macro author may want to introduce a new name to the context where the macro
-was called. Alternately, the macro author may be defining a variable for use
-only within the macro (i.e. it should not be visible outside the macro).
+高レベルでは、Rustコンパイラ内のハイジーンは、
+名前が導入および使用されるコンテキストを追跡することによって達成されます。
+次に、そのコンテキストに基づいて名前を明確にできます。
+マクロシステムの将来の反復により、
+マクロ作成者はそのコンテキストを使用してより大きな制御を得ることができます。
+たとえば、マクロ作成者は、マクロが呼び出されたコンテキストに新しい名前を導入したい場合があります。
+または、マクロ作成者は、マクロ内でのみ使用する変数を定義している可能性があります
+（つまり、マクロの外部には表示されないようにする必要があります）。
 
 [code_dir]: https://github.com/rust-lang/rust/tree/HEAD/compiler/rustc_expand/src/mbe
 [code_mp]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/mbe/macro_parser
@@ -232,38 +225,37 @@ only within the macro (i.e. it should not be visible outside the macro).
 [code_parse_int]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/mbe/macro_parser/struct.TtParser.html#method.parse_tt
 [parsing]: ./the-parser.html
 
-The context is attached to AST nodes. All AST nodes generated by macros have
-context attached. Additionally, there may be other nodes that have context
-attached, such as some desugared syntax (non-macro-expanded nodes are
-considered to just have the "root" context, as described below).
-Throughout the compiler, we use [`rustc_span::Span`s][span] to refer to code locations.
-This struct also has hygiene information attached to it, as we will see later.
+コンテキストはASTノードに添付されます。マクロによって生成されたすべてのASTノードには、
+コンテキストが添付されています。さらに、一部の脱糖構文など、
+コンテキストが添付された他のノードがある場合があります
+（マクロ以外で展開されたノードは、以下で説明するように、
+「ルート」コンテキストを持つだけと見なされます）。
+コンパイラ全体で、[`rustc_span::Span`s][span]を使用してコードの場所を参照します。
+この構造体には、後で見るように、ハイジーン情報も添付されています。
 
 [span]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/struct.Span.html
 
-Because macros invocations and definitions can be nested, the syntax context of
-a node must be a hierarchy. For example, if we expand a macro and there is
-another macro invocation or definition in the generated output, then the syntax
-context should reflect the nesting.
+マクロの呼び出しと定義はネストできるため、
+ノードの構文コンテキストは階層である必要があります。たとえば、
+マクロを展開し、生成された出力に別のマクロ呼び出しまたは定義がある場合、
+構文コンテキストはネストを反映する必要があります。
 
-However, it turns out that there are actually a few types of context we may
-want to track for different purposes. Thus, there are not just one but _three_
-expansion hierarchies that together comprise the hygiene information for a
-crate.
+ただし、実際には、異なる目的のために追跡したいコンテキストのタイプが
+いくつかあることがわかります。したがって、1つではなく_3つ_の
+展開階層があり、それらが一緒になってクレートのハイジーン情報を構成します。
 
-All of these hierarchies need some sort of "macro ID" to identify individual
-elements in the chain of expansions. This ID is [`ExpnId`].  All macros receive
-an integer ID, assigned continuously starting from 0 as we discover new macro
-calls.  All hierarchies start at [`ExpnId::root`][rootid], which is its own
-parent.
+これらの階層はすべて、展開のチェーン内の個々の要素を識別するために、
+ある種の「マクロID」を必要とします。このIDは[`ExpnId`]です。すべてのマクロは、
+新しいマクロ呼び出しを発見するときに0から連続して割り当てられた整数IDを受け取ります。
+すべての階層は、それ自体の親である[`ExpnId::root`][rootid]から始まります。
 
-The [`rustc_span::hygiene`][hy] crate contains all of the hygiene-related algorithms
-(with the exception of some hacks in [`Resolver::resolve_crate_root`][hacks])
-and structures related to hygiene and expansion that are kept in global data.
+[`rustc_span::hygiene`][hy]クレートには、すべてのハイジーン関連のアルゴリズム
+（[`Resolver::resolve_crate_root`][hacks]のいくつかのハックを除く）と、
+グローバルデータに保持されているハイジーンと展開に関連する構造が含まれています。
 
-The actual hierarchies are stored in [`HygieneData`][hd]. This is a global
-piece of data containing hygiene and expansion info that can be accessed from
-any [`Ident`] without any context.
+実際の階層は[`HygieneData`][hd]に格納されています。これは、
+任意の[`Ident`]からコンテキストなしでアクセスできる、
+ハイジーンと展開情報を含むグローバルなデータです。
 
 
 [`ExpnId`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/hygiene/struct.ExpnId.html
@@ -273,20 +265,20 @@ any [`Ident`] without any context.
 [hacks]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/struct.Resolver.html#method.resolve_crate_root
 [`Ident`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/symbol/struct.Ident.html
 
-### The Expansion Order Hierarchy
+### 展開順序階層
 
-The first hierarchy tracks the order of expansions, i.e., when a macro
-invocation is in the output of another macro.
+最初の階層は、展開の順序を追跡します。
+つまり、マクロ呼び出しが別のマクロの出力にある場合です。
 
-Here, the children in the hierarchy will be the "innermost" tokens.  The
-[`ExpnData`] struct itself contains a subset of properties from both macro
-definition and macro call available through global data.
-[`ExpnData::parent`][edp] tracks the child-to-parent link in this hierarchy.
+ここで、階層の子は「最も内側の」トークンになります。
+[`ExpnData`]構造体自体には、グローバルデータを介して利用可能な
+マクロ定義とマクロ呼び出しの両方からのプロパティのサブセットが含まれています。
+[`ExpnData::parent`][edp]は、この階層の子から親へのリンクを追跡します。
 
 [`ExpnData`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/hygiene/struct.ExpnData.html
 [edp]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/hygiene/struct.ExpnData.html#structfield.parent
 
-For example:
+例えば：
 
 ```rust,ignore
 macro_rules! foo { () => { println!(); } }
@@ -294,26 +286,26 @@ macro_rules! foo { () => { println!(); } }
 fn main() { foo!(); }
 ```
 
-In this code, the AST nodes that are finally generated would have hierarchy
-`root -> id(foo) -> id(println)`.
+このコードでは、最終的に生成されるASTノードは、階層
+`root -> id(foo) -> id(println)`を持ちます。
 
-### The Macro Definition Hierarchy
+### マクロ定義階層
 
-The second hierarchy tracks the order of macro definitions, i.e., when we are
-expanding one macro another macro definition is revealed in its output.  This
-one is a bit tricky and more complex than the other two hierarchies.
+2番目の階層は、マクロ定義の順序を追跡します。
+つまり、1つのマクロを展開しているときに、その出力に別のマクロ定義が明らかにされる場合です。
+これは、他の2つの階層よりも少し厄介で複雑です。
 
-[`SyntaxContext`][sc] represents a whole chain in this hierarchy via an ID.
-[`SyntaxContextData`][scd] contains data associated with the given
-[`SyntaxContext`][sc]; mostly it is a cache for results of filtering that chain in
-different ways.  [`SyntaxContextData::parent`][scdp] is the child-to-parent
-link here, and [`SyntaxContextData::outer_expns`][scdoe] are individual
-elements in the chain.  The "chaining-operator" is
-[`SyntaxContext::apply_mark`][am] in compiler code.
+[`SyntaxContext`][sc]は、IDを介してこの階層のチェーン全体を表します。
+[`SyntaxContextData`][scd]には、指定された[`SyntaxContext`][sc]に関連付けられたデータが含まれています。
+ほとんどの場合、さまざまな方法でそのチェーンをフィルタリングした結果のキャッシュです。
+[`SyntaxContextData::parent`][scdp]がここでの子から親へのリンクであり、
+[`SyntaxContextData::outer_expns`][scdoe]がチェーン内の個々の要素です。
+「連鎖演算子」は、コンパイラコードの[`SyntaxContext::apply_mark`][am]です。
 
-A [`Span`][span], mentioned above, is actually just a compact representation of
-a code location and [`SyntaxContext`][sc]. Likewise, an [`Ident`] is just an interned
-[`Symbol`] + `Span` (i.e. an interned string + hygiene data).
+上記で述べた[`Span`][span]は、実際には、
+コードの場所と[`SyntaxContext`][sc]のコンパクトな表現にすぎません。
+同様に、[`Ident`]は、インターンされた[`Symbol`] + `Span`
+（つまり、インターンされた文字列 + ハイジーンデータ）にすぎません。
 
 [`Symbol`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/symbol/struct.Symbol.html
 [scd]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/hygiene/struct.SyntaxContextData.html
@@ -322,17 +314,19 @@ a code location and [`SyntaxContext`][sc]. Likewise, an [`Ident`] is just an int
 [scdoe]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/hygiene/struct.SyntaxContextData.html#structfield.outer_expn
 [am]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/hygiene/struct.SyntaxContext.html#method.apply_mark
 
-For built-in macros, we use the context:
-[`SyntaxContext::empty().apply_mark(expn_id)`], and such macros are
-considered to be defined at the hierarchy root. We do the same for `proc
-macro`s because we haven't implemented cross-crate hygiene yet.
+組み込みマクロの場合、コンテキスト：
+[`SyntaxContext::empty().apply_mark(expn_id)`]を使用し、
+そのようなマクロは階層ルートで定義されていると見なされます。
+クレート間のハイジーンをまだ実装していないため、
+`proc macro`に対しても同じことを行います。
 
 [`SyntaxContext::empty().apply_mark(expn_id)`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/hygiene/struct.SyntaxContext.html#method.apply_mark
 
-If the token had context `X` before being produced by a macro then after being
-produced by the macro it has context `X -> macro_id`. Here are some examples:
+トークンがマクロによって生成される前にコンテキスト`X`を持っていた場合、
+マクロによって生成された後、コンテキスト`X -> macro_id`を持ちます。
+いくつかの例を次に示します。
 
-Example 0:
+例 0:
 
 ```rust,ignore
 macro m() { ident }
@@ -340,12 +334,12 @@ macro m() { ident }
 m!();
 ```
 
-Here `ident` which initially has context [`SyntaxContext::root`][scr] has
-context `ROOT -> id(m)` after it's produced by `m`.
+ここで、最初は[`SyntaxContext::root`][scr]コンテキストを持つ`ident`は、
+`m`によって生成された後、コンテキスト`ROOT -> id(m)`を持ちます。
 
 [scr]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/hygiene/struct.SyntaxContext.html#method.root
 
-Example 1:
+例 1:
 
 ```rust,ignore
 macro m() { macro n() { ident } }
@@ -354,13 +348,14 @@ m!();
 n!();
 ```
 
-In this example the `ident` has context `ROOT` initially, then `ROOT -> id(m)`
-after the first expansion, then `ROOT -> id(m) -> id(n)`.
+この例では、`ident`は最初に`ROOT`コンテキストを持ち、
+次に最初の展開後に`ROOT -> id(m)`、
+次に`ROOT -> id(m) -> id(n)`を持ちます。
 
-Example 2:
+例 2:
 
-Note that these chains are not entirely determined by their last element, in
-other words [`ExpnId`] is not isomorphic to [`SyntaxContext`][sc].
+これらのチェーンは、最後の要素によって完全に決定されるわけではないことに注意してください。
+つまり、[`ExpnId`]は[`SyntaxContext`][sc]に同型ではありません。
 
 ```rust,ignore
 macro m($i: ident) { macro n() { ($i, bar) } }
@@ -368,28 +363,27 @@ macro m($i: ident) { macro n() { ($i, bar) } }
 m!(foo);
 ```
 
-After all expansions, `foo` has context `ROOT -> id(n)` and `bar` has context
-`ROOT -> id(m) -> id(n)`.
+すべての展開後、`foo`はコンテキスト`ROOT -> id(n)`を持ち、
+`bar`はコンテキスト`ROOT -> id(m) -> id(n)`を持ちます。
 
-Currently this hierarchy for tracking macro definitions is subject to the
-so-called ["context transplantation hack"][hack]. Modern (i.e. experimental)
-macros have stronger hygiene than the legacy "Macros By Example" (MBE)
-system which can result in weird interactions between the two. The hack is
-intended to make things "just work" for now.
+現在、マクロ定義を追跡するこの階層は、
+いわゆる[「コンテキスト移植ハック」][hack]の対象となっています。
+モダン（つまり実験的）マクロは、レガシーの「Macros By Example」（MBE）
+システムよりも強力なハイジーンを持っており、2つの間の奇妙な相互作用を引き起こす可能性があります。
+ハックは、今のところ物事を「うまく機能させる」ことを目的としています。
 
 [`ExpnId`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/hygiene/struct.ExpnId.html
 [hack]: https://github.com/rust-lang/rust/pull/51762#issuecomment-401400732
 
-### The Call-site Hierarchy
+### 呼び出しサイト階層
 
-The third and final hierarchy tracks the location of macro invocations.
+3番目で最後の階層は、マクロ呼び出しの場所を追跡します。
 
-In this hierarchy [`ExpnData::call_site`][callsite] is the `child -> parent`
-link.
+この階層では、[`ExpnData::call_site`][callsite]が`子 -> 親`リンクです。
 
 [callsite]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/hygiene/struct.ExpnData.html#structfield.call_site
 
-Here is an example:
+例を示します。
 
 ```rust,ignore
 macro bar($i: ident) { $i }
@@ -398,41 +392,41 @@ macro foo($i: ident) { $i }
 foo!(bar!(baz));
 ```
 
-For the `baz` AST node in the final output, the expansion-order hierarchy is
-`ROOT -> id(foo) -> id(bar) -> baz`, while the call-site hierarchy is `ROOT ->
-baz`.
+最終出力の`baz` ASTノードの場合、展開順序階層は
+`ROOT -> id(foo) -> id(bar) -> baz`ですが、呼び出しサイト階層は`ROOT ->
+baz`です。
 
-### Macro Backtraces
+### マクロバックトレース
 
-Macro backtraces are implemented in [`rustc_span`] using the hygiene machinery
-in [`rustc_span::hygiene`][hy].
+マクロバックトレースは、[`rustc_span::hygiene`][hy]のハイジーン機構を使用して
+[`rustc_span`]で実装されています。
 
 [`rustc_span`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/index.html
 
-## Producing Macro Output
+## マクロ出力の生成
 
-Above, we saw how the output of a macro is integrated into the AST for a crate,
-and we also saw how the hygiene data for a crate is generated. But how do we
-actually produce the output of a macro? It depends on the type of macro.
+上記では、マクロの出力がクレートのASTにどのように統合されるかを見て、
+クレートのハイジーンデータがどのように生成されるかも見ました。
+しかし、実際にマクロの出力をどのように生成するのでしょうか？
+それはマクロのタイプによって異なります。
 
-There are two types of macros in Rust: 
-  1. `macro_rules!` macros (a.k.a. "Macros By Example" (MBE)), and,
-  2. procedural macros (proc macros); including custom derives. 
-  
-During the parsing phase, the normal Rust parser will set aside the contents of
-macros and their invocations. Later, macros are expanded using these
-portions of the code.
+Rustには2種類のマクロがあります。
+  1. `macro_rules!`マクロ（別名「Macros By Example」（MBE））、および、
+  2. 手続きマクロ（procマクロ）。カスタム派生を含みます。
 
-Some important data structures/interfaces here:
-- [`SyntaxExtension`] - a lowered macro representation, contains its expander
-  function, which transforms a [`TokenStream`] or AST into another
-  [`TokenStream`] or AST + some additional data like stability, or a list of
-  unstable features allowed inside the macro.
-- [`SyntaxExtensionKind`] - expander functions may have several different
-  signatures (take one token stream, or two, or a piece of AST, etc). This is
-  an `enum` that lists them.
+解析フェーズ中、通常のRustパーサーは、
+マクロとその呼び出しの内容を保留します。後で、マクロは、
+コードのこれらの部分を使用して展開されます。
+
+ここでのいくつかの重要なデータ構造/インターフェース：
+- [`SyntaxExtension`] - 低レベルのマクロ表現。展開関数が含まれており、
+  [`TokenStream`]またはASTを別の[`TokenStream`]またはASTに変換します。
+  さらに、安定性や、マクロ内で許可される不安定な機能のリストなどの追加データも含まれます。
+- [`SyntaxExtensionKind`] - 展開関数にはいくつかの異なるシグネチャがある場合があります
+  （1つのトークンストリームを取るか、2つを取るか、ASTの一部を取るかなど）。
+  これは、それらをリストする`enum`です。
 - [`BangProcMacro`]/[`TTMacroExpander`]/[`AttrProcMacro`]/[`MultiItemModifier`] -
-  `trait`s representing the expander function signatures.
+  展開関数のシグネチャを表す`trait`。
 
 [`SyntaxExtension`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/base/struct.SyntaxExtension.html
 [`SyntaxExtensionKind`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/base/enum.SyntaxExtensionKind.html
@@ -443,14 +437,13 @@ Some important data structures/interfaces here:
 
 ## Macros By Example
 
-MBEs have their own parser distinct from the Rust parser. When macros are
-expanded, we may invoke the MBE parser to parse and expand a macro.  The
-MBE parser, in turn, may call the Rust parser when it needs to bind a
-metavariable (e.g. `$my_expr`) while parsing the contents of a macro
-invocation. The code for macro expansion is in
-[`compiler/rustc_expand/src/mbe/`][code_dir].
+MBEには、Rustパーサーとは別の独自のパーサーがあります。
+マクロが展開されると、MBEパーサーを呼び出してマクロを解析して展開します。
+MBEパーサーは、メタ変数（例：`$my_expr`）をバインドする必要がある場合、
+Rustパーサーを呼び出すことができます。マクロ拡張のコードは
+[`compiler/rustc_expand/src/mbe/`][code_dir]にあります。
 
-### Example
+### 例
 
 ```rust,ignore
 macro_rules! printer {
@@ -464,43 +457,44 @@ macro_rules! printer {
 }
 ```
 
-Here `$mvar` is called a _metavariable_. Unlike normal variables, rather than
-binding to a value _at runtime_, a metavariable binds _at compile time_ to a
-tree of _tokens_.  A _token_ is a single "unit" of the grammar, such as an
-identifier (e.g. `foo`) or punctuation (e.g. `=>`). There are also other
-special tokens, such as `EOF`, which its self indicates that there are no more
-tokens. There are token trees resulting from the paired parentheses-like
-characters (`(`...`)`, `[`...`]`, and `{`...`}`) – they include the open and
-close and all the tokens in between (Rust requires that parentheses-like
-characters be balanced). Having macro expansion operate on token streams
-rather than the raw bytes of a source-file abstracts away a lot of complexity.
-The macro expander (and much of the rest of the compiler) doesn't consider
-the exact line and column of some syntactic construct in the code; it considers
-which constructs are used in the code. Using tokens allows us to care about
-_what_ without worrying about _where_. For more information about tokens, see
-the [Parsing][parsing] chapter of this book.
+ここで`$mvar`は_メタ変数_と呼ばれます。通常の変数とは異なり、
+_実行時_に値にバインドするのではなく、メタ変数は_コンパイル時_に
+_トークン_のツリーにバインドします。_トークン_は、
+識別子（例：`foo`）や句読点（例：`=>`）など、文法の単一の「単位」です。
+`EOF`など、他の特別なトークンもあり、それ自体はトークンがこれ以上ないことを示します。
+対になった括弧のような文字（`(`...`)`、`[`...`]`、`{`...`}`）から生成されるトークンツリーもあります。
+これには、開閉と、その間のすべてのトークンが含まれます
+（Rustでは、括弧のような文字がバランスしている必要があります）。
+トークンストリームでマクロ展開を操作することで、多くの複雑さが抽象化されます。
+マクロ展開（およびコンパイラの残りの大部分）は、
+ソースファイルの生のバイトではなく、
+コードで使用される構成要素を考慮します。
+マクロ展開は、コード内のいくつかの構文構成の正確な行と列を考慮しません。
+コードで使用される構成要素を考慮します。トークンを使用すると、
+_どこ_を心配することなく_何_を気にすることができます。トークンの詳細については、
+この本の[Parsing][parsing]章を参照してください。
 
 ```rust,ignore
 printer!(print foo); // `foo` is a variable
 ```
 
-The process of expanding the macro invocation into the syntax tree
-`println!("{}", foo)` and then expanding the syntax tree into a call to
-`Display::fmt` is one common example of _macro expansion_.
+マクロ呼び出しを構文木`println!("{}", foo)`に展開し、
+次に構文木を`Display::fmt`への呼び出しに展開するプロセスは、
+_マクロ展開_の一般的な例の1つです。
 
-### The MBE parser
+### MBEパーサー
 
-There are two parts to MBE expansion done by the macro parser: 
-  1. parsing the definition, and,
-  2. parsing the invocations. 
+マクロパーサーによって行われるMBE展開には2つの部分があります。
+  1. 定義の解析、および、
+  2. 呼び出しの解析。
 
-We think of the MBE parser as a nondeterministic finite automaton (NFA) based
-regex parser since it uses an algorithm similar in spirit to the [Earley
-parsing algorithm](https://en.wikipedia.org/wiki/Earley_parser). The macro
-parser is defined in
-[`compiler/rustc_expand/src/mbe/macro_parser.rs`][code_mp].
+MBEパーサーは、[Earley
+parsing algorithm](https://en.wikipedia.org/wiki/Earley_parser)と精神的に類似したアルゴリズムを使用するため、
+非決定性有限オートマトン（NFA）ベースの正規表現パーサーと考えています。
+マクロパーサーは、
+[`compiler/rustc_expand/src/mbe/macro_parser.rs`][code_mp]で定義されています。
 
-The interface of the macro parser is as follows (this is slightly simplified):
+マクロパーサーのインターフェースは次のとおりです（これは少し簡略化されています）。
 
 ```rust,ignore
 fn parse_tt(
@@ -510,77 +504,73 @@ fn parse_tt(
 ) -> ParseResult
 ```
 
-We use these items in macro parser:
+マクロパーサーで次のアイテムを使用します。
 
-- a `parser` variable is a reference to the state of a normal Rust parser,
-  including the token stream and parsing session. The token stream is what we
-  are about to ask the MBE parser to parse. We will consume the raw stream of
-  tokens and output a binding of metavariables to corresponding token trees.
-  The parsing session can be used to report parser errors.
-- a `matcher` variable is a sequence of [`MatcherLoc`]s that we want to match the token stream
-  against. They're converted from the original token trees in the macro's definition before
-  matching.
+- `parser`変数は、通常のRustパーサーの状態への参照です。
+  トークンストリームと解析セッションが含まれます。トークンストリームは、
+  MBEパーサーに解析を求めようとしているものです。トークンの生ストリームを消費し、
+  メタ変数と対応するトークンツリーのバインディングを出力します。
+  解析セッションを使用して、パーサーエラーを報告できます。
+- `matcher`変数は、トークンストリームと照合したい[`MatcherLoc`]sのシーケンスです。
+  これらは、一致前にマクロの定義の元のトークンツリーから変換されます。
 
 [`MatcherLoc`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/mbe/macro_parser/enum.MatcherLoc.html
 
-In the analogy of a regex parser, the token stream is the input and we are
-matching it against the pattern defined by matcher. Using our examples, the
-token stream could be the stream of tokens containing the inside of the example
-invocation `print foo`, while matcher might be the sequence of token (trees)
-`print $mvar:ident`.
+正規表現パーサーの類推では、トークンストリームは入力であり、
+matcherで定義されたパターンと照合しています。例を使用すると、
+トークンストリームは、例の呼び出し`print foo`の内部を含むトークンのストリームである可能性がありますが、
+matcherは、トークン（ツリー）のシーケンス`print $mvar:ident`である可能性があります。
 
-The output of the parser is a [`ParseResult`], which indicates which of
-three cases has occurred:
+パーサーの出力は[`ParseResult`]であり、
+次の3つのケースのいずれかが発生したことを示します。
 
-- **Success**: the token stream matches the given matcher and we have produced a
-  binding from metavariables to the corresponding token trees.
-- **Failure**: the token stream does not match matcher and results in an error
-  message such as "No rule expected token ...".
-- **Error**: some fatal error has occurred _in the parser_. For example, this
-  happens if there is more than one pattern match, since that indicates the
-  macro is ambiguous.
+- **Success**: トークンストリームは指定されたmatcherと一致し、
+  メタ変数から対応するトークンツリーへのバインディングを生成しました。
+- **Failure**: トークンストリームはmatcherと一致せず、
+  「予期されるトークンのルールがありません...」などのエラーメッセージが表示されます。
+- **Error**: _パーサー内_で致命的なエラーが発生しました。たとえば、
+  これは、パターンマッチが複数ある場合に発生します。これは、
+  マクロがあいまいであることを示しているためです。
 
-The full interface is defined [here][code_parse_int].
+完全なインターフェースは[ここ][code_parse_int]で定義されています。
 
-The macro parser does pretty much exactly the same as a normal regex parser
-with one exception: in order to parse different types of metavariables, such as
-`ident`, `block`, `expr`, etc., the macro parser must call back to the normal
-Rust parser.
+マクロパーサーは、通常の正規表現パーサーとほぼ同じことを行います。
+ただし、1つの例外があります。`ident`、`block`、`expr`などのさまざまなタイプのメタ変数を解析するために、
+マクロパーサーは通常のRustパーサーにコールバックする必要があります。
 
-The code to parse macro definitions is in [`compiler/rustc_expand/src/mbe/macro_rules.rs`][code_mr].
-For more information about the macro parser's implementation, see the comments in
-[`compiler/rustc_expand/src/mbe/macro_parser.rs`][code_mp].
+マクロ定義を解析するコードは、[`compiler/rustc_expand/src/mbe/macro_rules.rs`][code_mr]にあります。
+マクロパーサーの実装の詳細については、
+[`compiler/rustc_expand/src/mbe/macro_parser.rs`][code_mp]のコメントを参照してください。
 
-Using our example, we would try to match the token stream `print foo` from the invocation against
-the matchers `print $mvar:ident` and `print twice $mvar:ident` that we previously extracted from the
-rules in the macro definition. When the macro parser comes to a place in the current matcher where
-it needs to match a _non-terminal_ (e.g. `$mvar:ident`), it calls back to the normal Rust parser to
-get the contents of that non-terminal. In this case, the Rust parser would look for an `ident`
-token, which it finds (`foo`) and returns to the macro parser. Then, the macro parser continues
-parsing.
+例を使用すると、呼び出しからのトークンストリーム`print foo`を、
+マクロ定義のルールから以前に抽出したmatcher`print $mvar:ident`と`print twice $mvar:ident`と
+照合しようとします。マクロパーサーが現在のmatcherで_非終端_（例：`$mvar:ident`）を
+照合する必要がある場所に到達すると、通常のRustパーサーにコールバックして、
+その非終端の内容を取得します。この場合、Rustパーサーは`ident`トークンを探し、
+それを見つけ（`foo`）、マクロパーサーに返します。次に、マクロパーサーは解析を続行します。
 
-Note that exactly one of the matchers from the various rules should match the invocation; if there is
-more than one match, the parse is ambiguous, while if there are no matches at all, there is a syntax
-error.
+呼び出しと一致するのは、さまざまなルールからのmatcherの1つだけであることに注意してください。
+複数の一致がある場合、解析はあいまいですが、一致がまったくない場合は構文エラーです。
 
-Assuming exactly one rule matches, macro expansion will then *transcribe* the right-hand side of the
-rule, substituting the values of any matches it captured when matching against the left-hand side.
+正確に1つのルールが一致すると仮定すると、マクロ展開は次に、ルールの右側を*書き写し*、
+左側と照合するときにキャプチャした一致の値を置換します。
 
-## Procedural Macros
+## 手続きマクロ
 
-Procedural macros are also expanded during parsing. However, rather than
-having a parser in the compiler, proc macros are implemented as custom,
-third-party crates. The compiler will compile the proc macro crate and
-specially annotated functions in them (i.e. the proc macro itself), passing
-them a stream of tokens. A proc macro can then transform the token stream and
-output a new token stream, which is synthesized into the AST.
+手続きマクロも解析中に展開されます。ただし、
+コンパイラにパーサーがあるのではなく、procマクロはカスタムの
+サードパーティクレートとして実装されています。コンパイラは、
+procマクロクレートとその中の特別に注釈が付けられた関数（つまり、procマクロ自体）をコンパイルし、
+トークンのストリームを渡します。次に、procマクロは、
+トークンストリームを変換して新しいトークンストリームを出力できます。
+これは、ASTに合成されます。
 
-The token stream type used by proc macros is _stable_, so `rustc` does not
-use it internally. The compiler's (unstable) token stream is defined in
-[`rustc_ast::tokenstream::TokenStream`][rustcts]. This is converted into the
-stable [`proc_macro::TokenStream`][stablets] and back in
-[`rustc_expand::proc_macro`][pm] and [`rustc_expand::proc_macro_server`][pms].
-Since the Rust ABI is currently unstable, we use the C ABI for this conversion.
+procマクロで使用されるトークンストリームタイプは_安定_しているため、`rustc`は
+内部的には使用しません。コンパイラの（不安定な）トークンストリームは、
+[`rustc_ast::tokenstream::TokenStream`][rustcts]で定義されています。これは、
+[`rustc_expand::proc_macro`][pm]と[`rustc_expand::proc_macro_server`][pms]で、
+安定版[`proc_macro::TokenStream`][stablets]に変換されてから戻されます。
+Rust ABIは現在不安定なので、この変換にはC ABIを使用します。
 
 [tsmod]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast/tokenstream/index.html
 [rustcts]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast/tokenstream/struct.TokenStream.html
@@ -591,15 +581,15 @@ Since the Rust ABI is currently unstable, we use the C ABI for this conversion.
 
 <!-- TODO(rylev): more here. [#1160](https://github.com/rust-lang/rustc-dev-guide/issues/1160) -->
 
-### Custom Derive
+### カスタム派生
 
-Custom derives are a special type of proc macro.
+カスタム派生は、特別なタイプのprocマクロです。
 
-### Macros By Example and Macros 2.0
+### Macros By ExampleとMacros 2.0
 
-There is an legacy and mostly undocumented effort to improve the MBE system
-by giving it more hygiene-related features, better scoping and visibility
-rules, etc. Internally this uses the same machinery as today's MBEs with some
-additional syntactic sugar and are allowed to be in namespaces.
+より多くのハイジーン関連機能、より良いスコープと可視性ルールなどを提供することにより、
+MBEシステムを改善するためのレガシーでほとんど文書化されていない取り組みがあります。
+内部的には、今日のMBEと同じ機構を使用し、
+いくつかの追加の構文糖を使用し、名前空間に配置できます。
 
 <!-- TODO(rylev): more? [#1160](https://github.com/rust-lang/rustc-dev-guide/issues/1160) -->

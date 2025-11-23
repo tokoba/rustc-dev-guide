@@ -1,17 +1,16 @@
-# Rustdoc search
+# Rustdoc検索
 
-Rustdoc Search is two programs: `search_index.rs`
-and `search.js`. The first generates a nasty JSON
-file with a full list of items and function signatures
-in the crates in the doc bundle, and the second reads
-it, turns it into some in-memory structures, and
-scans them linearly to search.
+Rustdoc検索は2つのプログラムです：`search_index.rs`と`search.js`です。
+最初のものは、ドキュメントバンドル内のクレートにある
+アイテムと関数シグネチャの完全なリストを含む厄介なJSONファイルを生成し、
+2番目のものはそれを読み込み、いくつかのインメモリ構造に変換し、
+それらを線形にスキャンして検索します。
 
-## Search index format
+## 検索インデックス形式
 
-`search.js` calls this Raw, because it turns it into
-a more normal object tree after loading it.
-For space savings, it's also written without newlines or spaces.
+`search.js`は、読み込み後にそれをより通常のオブジェクトツリーに変換するため、
+これをRawと呼びます。
+スペースを節約するために、改行やスペースなしで書かれています。
 
 ```json
 [
@@ -44,71 +43,71 @@ For space savings, it's also written without newlines or spaces.
 ]
 ```
 
-[`src/librustdoc/html/static/js/rustdoc.d.ts`]
-defines an actual schema in a TypeScript `type`.
+[`src/librustdoc/html/static/js/rustdoc.d.ts`]は、
+TypeScript `type`で実際のスキーマを定義しています。
 
-| Key | Name                 | Description  |
+| キー | 名前                 | 説明  |
 | --- | -------------------- | ------------ |
-| `n` | Names                | Item names   |
-| `t` | Item Type            | One-char item type code |
-| `q` | Parent module        | `Map<index, path>` |
-| `i` | Parent type          | list of indexes |
-| `f` | Function signature   | [encoded](#i-f-and-p) |
-| `b` | Impl disambiguator   | `Map<index, string>` |
-| `c` | Deprecation flag     | [roaring bitmap](#roaring-bitmaps) |
-| `e` | Description is empty | [roaring bitmap](#roaring-bitmaps) |
-| `p` | Type dictionary      | `[[item type, path]]` |
-| `a` | Alias                | `Map<string, index>` |
-| `D` | description shards   | [encoded](#how-descriptions-are-stored) |
+| `n` | 名前                | アイテム名   |
+| `t` | アイテムタイプ            | 1文字のアイテムタイプコード |
+| `q` | 親モジュール        | `Map<index, path>` |
+| `i` | 親タイプ          | インデックスのリスト |
+| `f` | 関数シグネチャ   | [エンコード済み](#i-f-and-p) |
+| `b` | impl曖昧性除去   | `Map<index, string>` |
+| `c` | 非推奨フラグ     | [roaringビットマップ](#roaring-bitmaps) |
+| `e` | 説明は空 | [roaringビットマップ](#roaring-bitmaps) |
+| `p` | 型辞書      | `[[item type, path]]` |
+| `a` | エイリアス                | `Map<string, index>` |
+| `D` | 説明シャード   | [エンコード済み](#how-descriptions-are-stored) |
 
-The above index defines a crate called `crate_name`
-with a free function called `function_name` and a struct called `Data`,
-with the type signature `Data, i32 -> str`,
-and an alias, `get_name`, that equivalently refers to `function_name`.
+上記のインデックスは、`crate_name`というクレートを定義し、
+`function_name`というfree関数と`Data`という構造体を持ち、
+型シグネチャは`Data, i32 -> str`で、
+`get_name`というエイリアスがあり、これは`function_name`と等価に参照します。
 
 [`src/librustdoc/html/static/js/rustdoc.d.ts`]: https://github.com/rust-lang/rust/blob/2f92f050e83bf3312ce4ba73c31fe843ad3cbc60/src/librustdoc/html/static/js/rustdoc.d.ts#L344-L390
 
-The search index needs to fit the needs of the `rustdoc` compiler,
-the `search.js` frontend,
-and also be compact and fast to decode.
-It makes a lot of compromises:
+検索インデックスは、`rustdoc`コンパイラのニーズ、
+`search.js`フロントエンドのニーズ、
+そしてコンパクトで高速にデコードできる必要性に合わせる必要があります。
+多くの妥協をしています：
 
-* The `rustdoc` compiler runs on one crate at a time,
-  so each crate has an essentially separate search index.
-  It [merges] them by having each crate on one line
-  and looking at the first quoted string.
-* Names in the search index are given
-  in their original case and with underscores.
-  When the search index is loaded,
-  `search.js` stores the original names for display,
-  but also folds them to lowercase and strips underscores for search.
-  You'll see them called `normalized`.
-* The `f` array stores types as offsets into the `p` array.
-  These types might actually be from another crate,
-  so `search.js` has to turn the numbers into names and then
-  back into numbers to deduplicate them if multiple crates in the
-  same index mention the same types.
-* It's a JSON file, but not designed to be human-readable.
-  Browsers already include an optimized JSON decoder,
-  so this saves on `search.js` code and performs better for small crates,
-  but instead of using objects like normal JSON formats do,
-  it tries to put data of the same type next to each other
-  so that the sliding window used by [DEFLATE] can find redundancies.
-  Where `search.js` does its own compression,
-  it's designed to save memory when the file is finally loaded,
-  not just size on disk or network transfer.
+* `rustdoc`コンパイラは一度に1つのクレートで実行されるため、
+  各クレートには本質的に別々の検索インデックスがあります。
+  各クレートを1行に配置し、
+  最初の引用符で囲まれた文字列を見ることで、それらを[マージ]します。
+* 検索インデックス内の名前は、
+  元の大文字小文字とアンダースコア付きで与えられます。
+  検索インデックスが読み込まれると、
+  `search.js`は表示用に元の名前を保存しますが、
+  検索用に小文字に変換してアンダースコアを削除します。
+  これらは`normalized`と呼ばれます。
+* `f`配列は、`p`配列へのオフセットとして型を格納します。
+  これらの型は実際には別のクレートからのものである可能性があるため、
+  `search.js`は番号を名前に変換し、次に
+  番号に戻して、同じインデックス内の複数のクレートが
+  同じ型に言及している場合に重複を除去する必要があります。
+* JSONファイルですが、人間が読めるように設計されていません。
+  ブラウザにはすでに最適化されたJSONデコーダーが含まれているため、
+  これにより`search.js`のコードが節約され、小さなクレートのパフォーマンスが向上しますが、
+  通常のJSON形式のようにオブジェクトを使用する代わりに、
+  [DEFLATE]で使用されるスライディングウィンドウが冗長性を見つけられるように、
+  同じ型のデータを隣り合わせに配置しようとします。
+  `search.js`が独自の圧縮を行う場合、
+  ファイルがついに読み込まれたときにメモリを節約するように設計されており、
+  ディスクやネットワーク転送のサイズだけではありません。
 
-[merges]: https://github.com/rust-lang/rust/blob/79b710c13968a1a48d94431d024d2b1677940866/src/librustdoc/html/render/write_shared.rs#L151-L164
+[マージ]: https://github.com/rust-lang/rust/blob/79b710c13968a1a48d94431d024d2b1677940866/src/librustdoc/html/render/write_shared.rs#L151-L164
 [DEFLATE]: https://en.wikipedia.org/wiki/Deflate
 
-### Parallel arrays and indexed maps
+### 並列配列とインデックス付きマップ
 
-Abstractly, Rustdoc Search data is a table, stored in column-major form.
-Most data in the index represents a set of parallel arrays
-(the "columns") which refer to the same data if they're at the same position.
+抽象的には、Rustdoc検索データはテーブルであり、列優先形式で保存されます。
+インデックス内のほとんどのデータは、並列配列のセット
+（「列」）を表し、同じ位置にある場合は同じデータを参照します。
 
-For example,
-the above search index can be turned into this table:
+たとえば、
+上記の検索インデックスは次のテーブルに変換できます：
 
 |   | n | t | [d] | q | i | f | b | c |
 |---|---|---|-----|---|---|---|---|---|
@@ -118,33 +117,33 @@ the above search index can be turned into this table:
 
 [d]: #how-descriptions-are-stored
 
-The crate row is implied in most columns, since its type is known (it's a crate),
-it can't have a parent (crates form the root of the module tree),
-its name is specified as the map key,
-and function-specific data like the impl disambiguator can't apply either.
-However, it can still have a description and it can still be deprecated.
-The crate, therefore, has a primary key of `0`.
+クレート行は、そのタイプが既知であるため（クレートです）、
+親を持つことができないため（クレートはモジュールツリーのルートを形成します）、
+名前はマップキーとして指定されているため、
+impl曖昧性除去のような関数固有のデータも適用できないため、
+ほとんどの列で暗黙的です。
+ただし、説明を持つことができ、非推奨にすることもできます。
+したがって、クレートには主キー`0`があります。
 
-The above code doesn't use `c`, which holds deprecated indices,
-or `b`, which maps indices to strings.
-If `crate_name::function_name` used both, it might look like this.
+上記のコードは、非推奨のインデックスを保持する`c`や、
+インデックスを文字列にマップする`b`を使用していません。
+`crate_name::function_name`が両方を使用する場合、次のようになります。
 
 ```json
         "b": [[0, "impl-Foo-for-Bar"]],
         "c": "OjAAAAEAAAAAAAIAEAAAABUAbgZYCQ==",
 ```
 
-This attaches a disambiguator to index 1 and marks it deprecated.
+これにより、インデックス1に曖昧性除去器がアタッチされ、非推奨としてマークされます。
 
-The advantage of this layout is that these APIs often have implicit structure
-that DEFLATE can take advantage of,
-but that rustdoc can't assume.
-Like how names are usually CamelCase or snake_case,
-but descriptions aren't.
-It also makes it easier to use a sparse data for things like boolean flags.
+このレイアウトの利点は、これらのAPIにDEFLATEが利用できる暗黙的な構造があることが多いことですが、
+rustdocは仮定できません。
+名前は通常CamelCaseまたはsnake_caseですが、
+説明はそうではありません。
+また、ブール値フラグのようなものにスパースデータを使用しやすくなります。
 
-`q` is a Map from *the first applicable* ID to a parent module path.
-This is a weird trick, but it makes more sense in pseudo-code:
+`q`は、*最初に適用可能な*IDから親モジュールパスへのマップです。
+これは奇妙なトリックですが、擬似コードでより理にかなっています：
 
 ```rust
 let mut parent_module = "";
@@ -152,23 +151,23 @@ for (i, entry) in search_index.iter().enumerate() {
     if q.contains(i) {
         parent_module = q.get(i);
     }
-    // ... do other stuff with `entry` ...
+    // ... `entry`で他のことをする ...
 }
 ```
 
-This is valid because everything has a parent module
-(even if it's just the crate itself),
-and is easy to assemble because the rustdoc generator sorts by path
-before serializing.
-Doing this allows rustdoc to not only make the search index smaller,
-but reuse the same string representing the parent path across multiple in-memory items.
+すべてに親モジュールがあるため（クレート自体だけでも）、
+これは有効であり、
+rustdocジェネレータがシリアル化する前にパスでソートするため、
+組み立てやすいです。
+これにより、rustdocは検索インデックスを小さくするだけでなく、
+複数のメモリ内アイテムで親パスを表す同じ文字列を再利用できます。
 
-### Representing sparse columns
+### スパース列の表現
 
-#### VLQ Hex
+#### VLQ 16進数
 
-This format is, as far as I know, used nowhere other than rustdoc.
-It follows this grammar:
+この形式は、私が知る限り、rustdoc以外ではどこでも使用されていません。
+次の文法に従います：
 
 ```ebnf
 VLQHex = { VHItem | VHBackref }
@@ -177,139 +176,140 @@ VHNumber = { '@' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | '
 VHBackref = ( '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | ':' | ';' | '<' | '=' | '>' | '?' )
 ```
 
-A VHNumber is a variable-length, self-terminating base16 number
-(terminated because the last hexit is lowercase while all others are uppercase).
-The sign bit is represented using [zig-zag encoding].
+VHNumberは、可変長、自己終端の16進数です
+（最後の16進数字が小文字で、他のすべてが大文字であるため、終端されます）。
+符号ビットは[ジグザグエンコーディング]を使用して表されます。
 
-This alphabet is chosen because the characters can be turned into hexits by
-masking off the last four bits of the ASCII encoding.
+このアルファベットが選ばれたのは、
+ASCIIエンコーディングの最後の4ビットをマスクオフすることで、
+文字を16進数字に変換できるためです。
 
-A major feature of this encoding, as with all of the "compression" done in rustdoc,
-is that it can remain in its compressed format *even in memory at runtime*.
-This is why `HBackref` is only used at the top level,
-and why we don't just use [Flate] for everything: the decoder in search.js
-will reuse the entire decoded object whenever a backref is seen,
-saving decode work and memory.
+rustdocで行われるすべての「圧縮」と同様に、
+この形式の主要な機能は、*実行時にメモリ内でも圧縮形式のままでいられる*ことです。
+これが、`HBackref`がトップレベルでのみ使用される理由であり、
+すべてに[Flate]を使用しない理由です：search.jsのデコーダーは、
+backrefが表示されるたびにデコードされたオブジェクト全体を再利用し、
+デコード作業とメモリを節約します。
 
-[zig-zag encoding]: https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
+[ジグザグエンコーディング]: https://en.wikipedia.org/wiki/Variable-length_quantity#Zigzag_encoding
 [Flate]: https://en.wikipedia.org/wiki/Deflate
 
-#### Roaring Bitmaps
+#### Roaringビットマップ
 
-Flag-style data, such as deprecation and empty descriptions,
-are stored using the [standard Roaring Bitmap serialization format with runs].
-The data is then base64 encoded when writing it.
+非推奨や空の説明などのフラグスタイルのデータは、
+[ランを含む標準のRoaringビットマップシリアル化形式]を使用して格納されます。
+データは書き込み時にbase64エンコードされます。
 
-As a brief overview: a roaring bitmap is a chunked array of bits,
-described in [this paper].
-A chunk can either be a list of integers, a bitfield, or a list of runs.
-In any case, the search engine has to base64 decode it,
-and read the chunk index itself,
-but the payload data stays as-is.
+簡単な概要：roaringビットマップは、
+[この論文]で説明されている、ビットのチャンク化された配列です。
+チャンクは、整数のリスト、ビットフィールド、またはランのリストのいずれかです。
+いずれの場合も、検索エンジンはbase64デコードし、
+チャンクインデックス自体を読み取る必要がありますが、
+ペイロードデータはそのままです。
 
-All roaring bitmaps in rustdoc currently store a flag for each item index.
-The crate is item 0, all others start at 1.
+rustdocのすべてのroaringビットマップは、現在、各アイテムインデックスのフラグを格納します。
+クレートはアイテム0で、他のすべては1から始まります。
 
-[standard Roaring Bitmap serialization format with runs]: https://github.com/RoaringBitmap/RoaringFormatSpec
-[this paper]: https://arxiv.org/pdf/1603.06549.pdf
+[ランを含む標準のRoaringビットマップシリアル化形式]: https://github.com/RoaringBitmap/RoaringFormatSpec
+[この論文]: https://arxiv.org/pdf/1603.06549.pdf
 
-### How descriptions are stored
+### 説明の保存方法
 
-The largest amount of data,
-and the main thing Rustdoc Search deals with that isn't
-actually used for searching, is descriptions.
-In a SERP table, this is what appears on the rightmost column.
+最大量のデータ、
+そしてRustdoc検索が扱う主なもので、
+実際には検索に使用されないものは、説明です。
+SERPテーブルでは、これは右端の列に表示されるものです。
 
-> | item type | item path             | ***description*** (this part)                       |
+> | アイテムタイプ | アイテムパス             | ***説明*** (この部分)                       |
 > | --------- | --------------------- | --------------------------------------------------- |
-> | function  | my_crate::my_function | This function gets the name of an integer with Data |
+> | 関数  | my_crate::my_function | This function gets the name of an integer with Data |
 
-When someone runs a search in rustdoc for the first time, their browser will
-work through a "sandwich workload" of three steps:
+誰かが初めてrustdocで検索を実行すると、ブラウザは
+3つのステップの「サンドイッチワークロード」を処理します：
 
-1. Download the search-index.js and search.js files (a network bottleneck).
-2. Perform the actual search (a CPU and memory bandwidth bottleneck).
-3. Download the description data (another network bottleneck).
+1. search-index.jsとsearch.jsファイルをダウンロードする（ネットワークボトルネック）。
+2. 実際の検索を実行する（CPUとメモリ帯域幅のボトルネック）。
+3. 説明データをダウンロードする（別のネットワークボトルネック）。
 
-Reducing the amount of data downloaded here will almost always increase latency,
-by delaying the decision of what to download behind other work and/or adding
-data dependencies where something can't be downloaded without first downloading
-something else. In this case, we can't start downloading descriptions until
-after the search is done, because that's what allows it to decide *which*
-descriptions to download (it needs to sort the results then truncate to 200).
+ここでダウンロードされるデータ量を削減すると、ほぼ常にレイテンシが増加し、
+他の作業の背後にダウンロードする内容の決定を遅らせたり、
+何かをダウンロードする前に最初に何かをダウンロードしなければならない
+データ依存関係を追加したりします。この場合、
+検索が完了するまで説明のダウンロードを開始できません。なぜなら、
+それにより*どの*説明をダウンロードするかを決定できるからです（結果をソートしてから200に切り捨てる必要があります）。
 
-To do this, two columns are stored in the search index, building on both
-Roaring Bitmaps and on VLQ Hex.
+これを行うために、検索インデックスに2つの列が格納され、
+Roaringビットマップとvlq hexの両方に基づいています。
 
-* `e` is an index of **e**mpty descriptions. It's a [roaring bitmap] of
-  each item (the crate itself is item 0, the rest start at 1).
-* `D` is a shard list, stored in [VLQ hex] as flat list of integers.
-  Each integer gives you the number of descriptions in the shard.
-  As the decoder walks the index, it checks if the description is empty.
-  if it's not, then it's in the "current" shard. When all items are
-  exhausted, it goes on to the next shard.
+* `e`は**空**の説明のインデックスです。これは、
+  各アイテム（クレート自体はアイテム0、残りは1から始まります）の[roaringビットマップ]です。
+* `D`はシャードリストで、整数のフラットリストとして[VLQ hex]に格納されます。
+  各整数は、シャード内の説明の数を示します。
+  デコーダがインデックスを歩くと、説明が空かどうかをチェックします。
+  空でない場合、「現在の」シャードにあります。すべてのアイテムが
+  使い果たされると、次のシャードに移ります。
 
-Inside each shard is a newline-delimited list of descriptions,
-wrapped in a JSONP-style function call.
+各シャード内には、改行で区切られた説明のリストがあり、
+JSONP スタイルの関数呼び出しでラップされています。
 
-[roaring bitmap]: #roaring-bitmaps
+[roaringビットマップ]: #roaring-bitmaps
 [VLQ hex]: #vlq-hex
 
-### `i`, `f`, and `p`
+### `i`、`f`、`p`
 
-`i` and `f` both index into `p`, the array of parent items.
+`i`と`f`は両方とも、親アイテムの配列`p`にインデックスを付けます。
 
-`i` is just a one-indexed number
-(not zero-indexed because `0` is used for items that have no parent item).
-It's different from `q` because `q` represents the parent *module or crate*,
-which everything has,
-while `i`/`q` are used for *type and trait-associated items* like methods.
+`i`は単なる1インデックス番号です
+（0インデックスではなく、`0`は親アイテムを持たないアイテムに使用されます）。
+`q`とは異なります。なぜなら、`q`は親*モジュールまたはクレート*を表し、
+すべてに存在しますが、
+`i`/`q`は、メソッドなどの*型およびトレイト関連アイテム*に使用されます。
 
-`f`, the function signatures, use a [VLQ hex] tree.
-A number is either a one-indexed reference into `p`,
-a negative number representing a generic,
-or zero for null.
+`f`、関数シグネチャは、[VLQ hex]ツリーを使用します。
+数値は、`p`への1インデックス参照、
+ジェネリックを表す負の数、
+またはnullの0のいずれかです。
 
-(the internal object representation also uses negative numbers,
-even after decoding,
-to represent generics).
+（内部オブジェクト表現は、
+デコード後でも負の数を使用して、
+ジェネリックを表します）。
 
-For example, `{{gb}{d}}` is equivalent to the json `[[3, 1], [2]]`.
-Because of zigzag encoding, `` ` `` is +0, `a` is -0 (which is not used),
-`b` is +1, and `c` is -1.
+たとえば、`{{gb}{d}}`はjson `[[3, 1], [2]]`と同等です。
+ジグザグエンコーディングのため、`` ` ``は+0、`a`は-0（使用されません）、
+`b`は+1、`c`は-1です。
 
-## Searching by name
+## 名前による検索
 
-Searching by name works by looping through the search index
-and running these functions on each:
+名前による検索は、検索インデックスをループして、
+それぞれに対してこれらの関数を実行することで機能します：
 
-* [`editDistance`] is always used to determine a match
-  (unless quotes are specified, which would use simple equality instead).
-  It computes the number of swaps, inserts, and removes needed to turn
-  the query name into the entry name.
-  For example, `foo` has zero distance from itself,
-  but a distance of 1 from `ofo` (one swap) and `foob` (one insert).
-  It is checked against an heuristic threshold, and then,
-  if it is within that threshold, the distance is stored for ranking.
-* [`String.prototype.indexOf`] is always used to determine a match.
-  If it returns anything other than -1, the result is added,
-  even if `editDistance` exceeds its threshold,
-  and the index is stored for ranking.
-* [`checkPath`] is used if, and only if, a parent path is specified
-  in the query. For example, `vec` has no parent path, but `vec::vec` does.
-  Within checkPath, editDistance and indexOf are used,
-  and the path query has its own heuristic threshold, too.
-  If it's not within the threshold, the entry is rejected,
-  even if the first two pass.
-  If it's within the threshold, the path distance is stored
-  for ranking.
-* [`checkType`] is used only if there's a type filter,
-  like the struct in `struct:vec`. If it fails,
-  the entry is rejected.
+* [`editDistance`]は、一致を判定するために常に使用されます
+  （引用符が指定されている場合を除き、単純な等価性が使用されます）。
+  クエリ名をエントリ名に変換するために必要な
+  スワップ、挿入、削除の数を計算します。
+  たとえば、`foo`は自身から距離0ですが、
+  `ofo`（1つのスワップ）と`foob`（1つの挿入）からは距離1です。
+  これはヒューリスティックしきい値に対してチェックされ、
+  しきい値内にある場合、距離はランキングのために保存されます。
+* [`String.prototype.indexOf`]は、一致を判定するために常に使用されます。
+  -1以外を返す場合、結果が追加されます。
+  `editDistance`がしきい値を超えていても、
+  インデックスはランキングのために保存されます。
+* [`checkPath`]は、親パスがクエリで指定されている場合にのみ使用されます。
+  たとえば、`vec`には親パスがありませんが、`vec::vec`にはあります。
+  checkPath内では、editDistanceとindexOfが使用され、
+  パスクエリには独自のヒューリスティックしきい値もあります。
+  しきい値内にない場合、エントリは拒否されます。
+  最初の2つがパスしても同様です。
+  しきい値内にある場合、パス距離は
+  ランキングのために保存されます。
+* [`checkType`]は、タイプフィルタがある場合にのみ使用されます。
+  `struct:vec`の構造体のようなものです。失敗すると、
+  エントリは拒否されます。
 
-If all four criteria pass
-(plus the crate filter, which isn't technically part of the query),
-the results are sorted by [`sortResults`].
+4つの基準すべてがパスした場合
+（クレートフィルターに加えて、これは技術的にはクエリの一部ではありません）、
+結果は[`sortResults`]によってソートされます。
 
 [`editDistance`]: https://github.com/rust-lang/rust/blob/79b710c13968a1a48d94431d024d2b1677940866/src/librustdoc/html/static/js/search.js#L137
 [`String.prototype.indexOf`]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/String/indexOf
@@ -317,51 +317,51 @@ the results are sorted by [`sortResults`].
 [`checkType`]: https://github.com/rust-lang/rust/blob/79b710c13968a1a48d94431d024d2b1677940866/src/librustdoc/html/static/js/search.js#L1787
 [`sortResults`]: https://github.com/rust-lang/rust/blob/79b710c13968a1a48d94431d024d2b1677940866/src/librustdoc/html/static/js/search.js#L1229
 
-## Searching by type
+## 型による検索
 
-Searching by type can be divided into two phases,
-and the second phase has two sub-phases.
+型による検索は、2つのフェーズに分けることができ、
+2番目のフェーズには2つのサブフェーズがあります。
 
-* Turn names in the query into numbers.
-* Loop over each entry in the search index:
-   * Quick rejection using a bloom filter.
-   * Slow rejection using a recursive type unification algorithm.
+* クエリ内の名前を数値に変換する。
+* 検索インデックスの各エントリをループする：
+   * ブルームフィルターを使用した高速拒否。
+   * 再帰的型統一アルゴリズムを使用した低速拒否。
 
-In the names->numbers phase, if the query has only one name in it,
-the editDistance function is used to find a near match if the exact match fails,
-but if there's multiple items in the query,
-non-matching items are treated as generics instead.
-This means `hahsmap` will match hashmap on its own, but `hahsmap, u32`
-is going to match the same things `T, u32` matches
-(though rustdoc will detect this particular problem and warn about it).
+名前->数値フェーズでは、クエリに名前が1つしかない場合、
+完全一致が失敗した場合、editDistance関数を使用してほぼ一致を見つけますが、
+クエリに複数のアイテムがある場合、
+一致しないアイテムは代わりにジェネリックとして扱われます。
+これは、`hahsmap`が単独でhashmapと一致することを意味しますが、`hahsmap, u32`は
+`T, u32`が一致するものと同じものと一致します
+（ただし、rustdocはこの特定の問題を検出し、警告します）。
 
-Then, when actually looping over each item,
-the bloom filter will probably reject entries that don't have every
-type mentioned in the query.
-For example, the bloom query allows a query of `i32 -> u32` to match
-a function with the type `i32, u32 -> bool`,
-but unification will reject it later.
+次に、実際に各アイテムをループする際、
+ブルームフィルターは、クエリで言及されているすべての型を持たない
+エントリをおそらく拒否します。
+たとえば、ブルームクエリは、`i32 -> u32`のクエリが
+`i32, u32 -> bool`の型を持つ関数と一致することを許可しますが、
+統一は後でそれを拒否します。
 
-The unification filter ensures that:
+統一フィルターは、次のことを保証します：
 
-* Bag semantics are respected. If you query says `i32, i32`,
-  then the function has to mention *two* i32s, not just one.
-* Nesting semantics are respected. If your query says `vec<option>`,
-  then `vec<option<i32>>` is fine, but `option<vec<i32>>` *is not* a match.
-* The division between return type and parameter is respected.
-  `i32 -> u32` and `u32 -> i32` are completely different.
+* バッグセマンティクスが尊重されます。クエリが`i32, i32`と言う場合、
+  関数は*2つの* i32を言及する必要があり、1つだけではありません。
+* ネストセマンティクスが尊重されます。クエリが`vec<option>`と言う場合、
+  `vec<option<i32>>`は問題ありませんが、`option<vec<i32>>`は一致*しません*。
+* 戻り値型とパラメータの間の区別が尊重されます。
+  `i32 -> u32`と`u32 -> i32`は完全に異なります。
 
-The bloom filter checks none of these things,
-and, on top of that, can have false positives.
-But it's fast and uses very little memory, so the bloom filter helps.
+ブルームフィルターは、これらのいずれもチェックせず、
+さらに、誤検出がある可能性があります。
+しかし、高速で非常に少ないメモリを使用するため、ブルームフィルターが役立ちます。
 
-## Re-exports
+## 再エクスポート
 
-[Re-export inlining] allows the same item to be found by multiple names.
-Search supports this by giving the same item multiple entries and tracking a canonical path
-for any items where that differs from the given path.
+[再エクスポートのインライン化]により、同じアイテムを複数の名前で見つけることができます。
+検索は、同じアイテムに複数のエントリを与え、
+与えられたパスと異なる正規パスを追跡することで、これをサポートします。
 
-For example, this sample index has a single struct exported from two paths:
+たとえば、このサンプルインデックスには、2つのパスからエクスポートされた単一の構造体があります：
 
 ```json
 [
@@ -382,14 +382,15 @@ For example, this sample index has a single struct exported from two paths:
 ]
 ```
 
-The important part of this example is the `r` array,
-which indicates that path entry 1 in the `q` array is
-the canonical path for item 0.
-That is, `crate_name::Data` has a canonical path of `crate_name::submodule::Data`.
+この例の重要な部分は`r`配列で、
+`q`配列のパスエントリ1が
+アイテム0の正規パスであることを示しています。
+つまり、`crate_name::Data`の正規パスは`crate_name::submodule::Data`です。
 
-This might sound like a strange design, since it has the duplicate data.
-It's done that way because inlining can happen across crates,
-which are compiled separately and might not all be present in the docs.
+これは奇妙な設計のように聞こえるかもしれませんが、重複データがあるためです。
+インライン化はクレート間で発生する可能性があり、
+これらは別々にコンパイルされ、すべてがドキュメントに存在するとは限らないため、
+そのように行われます。
 
 ```json
 [
@@ -398,93 +399,92 @@ which are compiled separately and might not all be present in the docs.
 ]
 ```
 
-In the above example, a canonical path actually comes from a dependency,
-and another one comes from an inlined standard library item:
-the canonical path isn't even in the index!
-The canonical path might also be private.
-In either case, it's never shown to the user, and is only used for deduplication.
+上記の例では、正規パスは実際には依存関係から来ており、
+別のパスはインライン化された標準ライブラリアイテムから来ています：
+正規パスはインデックスにさえありません！
+正規パスは非公開の場合もあります。
+いずれの場合も、ユーザーに表示されることはなく、重複排除にのみ使用されます。
 
-Associated types, like methods, store them differently.
-These types are connected with an entry in `p` (their "parent")
-and each one has an optional third tuple element:
+メソッドなどの関連型は、異なる方法で保存されます。
+これらの型は、`p`（その「親」）のエントリに接続され、
+それぞれにオプションの3番目のタプル要素があります：
 
     "p": [[5, "Data", 0, 1]]
 
-That's:
+つまり：
 
-- 5: It's a struct
-- "Data": Its name
-- 0: Its display path, "crate_name"
-- 1: Its canonical path, "crate_name::submodule"
+- 5: 構造体です
+- "Data": その名前
+- 0: その表示パス、"crate_name"
+- 1: その正規パス、"crate_name::submodule"
 
-In both cases, the canonical path might not be public at all,
-or it might be from another crate that isn't in the docs,
-so it's never shown to the user, but is used for deduplication.
+どちらの場合も、正規パスは全く公開されていない可能性があり、
+または別のクレートからのもので、ドキュメントにない可能性があるため、
+ユーザーに表示されることはありませんが、重複排除に使用されます。
 
-[Re-export inlining]: https://doc.rust-lang.org/nightly/rustdoc/write-documentation/re-exports.html
+[再エクスポートのインライン化]: https://doc.rust-lang.org/nightly/rustdoc/write-documentation/re-exports.html
 
-## Testing the search engine
+## 検索エンジンのテスト
 
-While the generated UI is tested using `rustdoc-gui` tests, the
-primary way the search engine is tested is the `rustdoc-js` and
-`rustdoc-js-std` tests. They run in NodeJS.
+生成されたUIは`rustdoc-gui`テストを使用してテストされていますが、
+検索エンジンをテストする主な方法は、`rustdoc-js`と
+`rustdoc-js-std`テストです。これらはNodeJSで実行されます。
 
-A `rustdoc-js` test has a `.rs` and `.js` file, with the same name.
-The `.rs` file specifies the hypothetical library crate to run
-the searches on (make sure you mark anything you need to find as `pub`).
-The `.js` file specifies the actual searches.
-The `rustdoc-js-std` tests are the same, but don't require an `.rs`
-file, since they use the standard library.
+`rustdoc-js`テストには、`.rs`と`.js`ファイルがあり、同じ名前を持ちます。
+`.rs`ファイルは、検索を実行する仮想ライブラリクレートを指定します
+（見つける必要があるものはすべて`pub`としてマークしてください）。
+`.js`ファイルは、実際の検索を指定します。
+`rustdoc-js-std`テストは同じですが、`.rs`ファイルは必要ありません。
+標準ライブラリを使用するためです。
 
-The `.js` file is like a module (except the loader takes care of
-`exports` for you). It uses these variables:
+`.js`ファイルはモジュールのようなものです（ただし、ローダーが
+`exports`を処理します）。これらの変数を使用します：
 
-|      Name      |              Type              | Description
+|      名前      |              タイプ              | 説明
 | -------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------
-| `FILTER_CRATE` | `string`                       | Only include results from the given crate. In the GUI, this is the "Results in <kbd>crate</kbd>" drop-down menu.
-| `EXPECTED`     | `[ResultsTable]\|ResultsTable` | List of tests to run, specifying what the hypothetical user types into the search box and sees in the tabs
-| `PARSED`       | `[ParsedQuery]\|ParsedQuery`   | List of parser tests to run, without running an actual search
+| `FILTER_CRATE` | `string`                       | 指定されたクレートからの結果のみを含めます。GUIでは、これは「結果 in <kbd>crate</kbd>」ドロップダウンメニューです。
+| `EXPECTED`     | `[ResultsTable]\|ResultsTable` | 実行するテストのリストで、仮想ユーザーが検索ボックスに入力し、タブに表示されるものを指定します
+| `PARSED`       | `[ParsedQuery]\|ParsedQuery`   | 実行するパーサーテストのリストで、実際の検索を実行せずに
 
-`FILTER_CRATE` can be left out (equivalent to searching "all crates"), but you
-have to specify `EXPECTED` or `PARSED`.
+`FILTER_CRATE`は省略できます（「すべてのクレート」を検索するのと同等）が、
+`EXPECTED`または`PARSED`を指定する必要があります。
 
 
 
-By default, the test fails if any of the results specified in the test case are
-not found after running the search, or if the results found after running the
-search don't appear in the same order that they do in the test.
-The actual search results may, however, include results that aren't in the test.
-To override this, specify any of the following magic comments.
-Put them on their own line, without indenting.
+デフォルトでは、テストケースで指定された結果のいずれかが
+検索の実行後に見つからない場合、または検索の実行後に見つかった結果が
+テストに表示されるのと同じ順序で表示されない場合、テストは失敗します。
+ただし、実際の検索結果には、テストに含まれていない結果が含まれる場合があります。
+これをオーバーライドするには、次の魔法のコメントのいずれかを指定します。
+独自の行に配置し、インデントしないでください。
 
-* `// exact-check`: If search results appear that aren't part of the test case,
-  then fail.
-* `// ignore-order`: Allow search results to appear in any order.
-* `// should-fail`: Used to write negative tests.
+* `// exact-check`: テストケースの一部ではない検索結果が表示された場合、
+  失敗します。
+* `// ignore-order`: 検索結果が任意の順序で表示されることを許可します。
+* `// should-fail`: 否定的なテストを書くために使用されます。
 
-Standard library tests usually shouldn't specify `// exact-check`, since we
-want the libs team to be able to add new items without causing unrelated
-tests to fail, but standalone tests will use it more often.
+標準ライブラリテストは通常、`// exact-check`を指定すべきではありません。なぜなら、
+libsチームが無関係なテストを失敗させずに新しいアイテムを追加できるようにしたいからです。
+しかし、スタンドアロンテストはそれをより頻繁に使用します。
 
-The `ResultsTable` and `ParsedQuery` types are specified in
-[`rustdoc.d.ts`](https://github.com/rust-lang/rust/blob/HEAD/src/librustdoc/html/static/js/rustdoc.d.ts).
+`ResultsTable`と`ParsedQuery`型は、
+[`rustdoc.d.ts`](https://github.com/rust-lang/rust/blob/HEAD/src/librustdoc/html/static/js/rustdoc.d.ts)で指定されています。
 
-For example, imagine we needed to fix a bug where a function named
-`constructor` couldn't be found. To do this, write two files:
+たとえば、`constructor`という名前の関数が見つからないバグを修正する必要があるとします。これを行うには、2つのファイルを書きます：
 
 ```rust
 // tests/rustdoc-js/constructor_search.rs
-// The test case needs to find this result.
+// テストケースはこの結果を見つける必要があります。
 pub fn constructor(_input: &str) -> i32 { 1 }
 ```
 
 ```js
 // tests/rustdoc-js/constructor_search.js
 // exact-check
-// Since this test runs against its own crate,
-// new items should not appear in the search results.
+// このテストは独自のクレートに対して実行されるため、
+// 新しいアイテムは検索結果に表示されないはずです。
 const EXPECTED = [
-  // This first test targets name-based search.
+  // この最初のテストは、名前ベースの検索を対象としています。
   {
     query: "constructor",
     others: [
@@ -493,7 +493,7 @@ const EXPECTED = [
     in_args: [],
     returned: [],
   },
-  // This test targets the second tab.
+  // このテストは2番目のタブを対象としています。
   {
     query: "str",
     others: [],
@@ -502,7 +502,7 @@ const EXPECTED = [
     ],
     returned: [],
   },
-  // This test targets the third tab.
+  // このテストは3番目のタブを対象としています。
   {
     query: "i32",
     others: [],
@@ -511,7 +511,7 @@ const EXPECTED = [
       { path: "constructor_search", name: "constructor" },
     ],
   },
-  // This test targets advanced type-driven search.
+  // このテストは高度な型駆動検索を対象としています。
   {
     query: "str -> i32",
     others: [
@@ -523,12 +523,12 @@ const EXPECTED = [
 ]
 ```
 
-If the [`//@ revisions`] directive is used, the JS file will
-have access to a variable called `REVISION`.
+[`//@ revisions`]ディレクティブが使用されている場合、JSファイルは
+`REVISION`という変数にアクセスできます。
 
 ```js
 const EXPECTED = [
-  // This first test targets name-based search.
+  // この最初のテストは、名前ベースの検索を対象としています。
   {
     query: "constructor",
     others: REVISION === "has_constructor" ?

@@ -1,35 +1,18 @@
-# Monomorphization
+# モノモーフィゼーション
 
-As you probably know, Rust has a very expressive type system that has extensive
-support for generic types. But of course, assembly is not generic, so we need
-to figure out the concrete types of all the generics before the code can
-execute.
+ご存知のように、Rustは非常に表現力豊かな型システムを持ち、ジェネリック型を広範にサポートしています。しかし、もちろん、アセンブリはジェネリックではないため、コードが実行される前に、すべてのジェネリックの具体的な型を把握する必要があります。
 
-Different languages handle this problem differently. For example, in some
-languages, such as Java, we may not know the most precise type of value until
-runtime. In the case of Java, this is ok because (almost) all variables are
-reference values anyway (i.e. pointers to a heap allocated object). This
-flexibility comes at the cost of performance, since all accesses to an object
-must dereference a pointer.
+異なる言語は、この問題を異なる方法で処理します。例えば、Javaなどの一部の言語では、実行時まで値の最も正確な型がわからない場合があります。Javaの場合、（ほぼ）すべての変数が参照値である（つまり、ヒープに割り当てられたオブジェクトへのポインタ）ため、これは問題ありません。この柔軟性には、パフォーマンスのコストが伴います。オブジェクトへのすべてのアクセスがポインタを逆参照する必要があるためです。
 
-Rust takes a different approach: it _monomorphizes_ all generic types. This
-means that compiler stamps out a different copy of the code of a generic
-function for each concrete type needed. For example, if I use a `Vec<u64>` and
-a `Vec<String>` in my code, then the generated binary will have two copies of
-the generated code for `Vec`: one for `Vec<u64>` and another for `Vec<String>`.
-The result is fast programs, but it comes at the cost of compile time (creating
-all those copies can take a while) and binary size (all those copies might take
-a lot of space).
+Rustは異なるアプローチを取ります：すべてのジェネリック型を _モノモーフィゼーション_ します。これは、コンパイラが必要な各具体的な型に対してジェネリック関数のコードの異なるコピーをスタンプアウトすることを意味します。例えば、コードで `Vec<u64>` と `Vec<String>` を使用する場合、生成されたバイナリには `Vec` 用に生成されたコードの2つのコピーがあります：`Vec<u64>` 用と `Vec<String>` 用です。結果は高速なプログラムですが、コンパイル時間（すべてのコピーを作成するのに時間がかかる可能性がある）とバイナリサイズ（すべてのコピーが多くのスペースを取る可能性がある）のコストがかかります。
 
-Monomorphization is the first step in the backend of the Rust compiler.
+モノモーフィゼーションは、Rustコンパイラのバックエンドの最初のステップです。
 
-## Collection
+## コレクション
 
-First, we need to figure out what concrete types we need for all the generic
-things in our program. This is called _collection_, and the code that does this
-is called the _monomorphization collector_.
+まず、プログラム内のすべてのジェネリックなもののために必要な具体的な型を把握する必要があります。これは _コレクション_ と呼ばれ、これを行うコードは _モノモーフィゼーションコレクター_ と呼ばれます。
 
-Take this example:
+この例を見てみましょう：
 
 ```rust
 fn banana() {
@@ -41,38 +24,28 @@ fn main() {
 }
 ```
 
-The monomorphization collector will give you a list of `[main, banana,
-peach::<u64>]`. These are the functions that will have machine code generated
-for them. Collector will also add things like statics to that list.
+モノモーフィゼーションコレクターは、`[main, banana, peach::<u64>]` のリストを提供します。これらは、機械語が生成される関数です。コレクターは、スタティックなどもそのリストに追加します。
 
-See [the collector rustdocs][collect] for more info.
+詳細については、[コレクターのrustdoc][collect] を参照してください。
 
 [collect]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_monomorphize/collector/index.html
 
-The monomorphization collector is run just before MIR lowering and codegen.
-[`rustc_codegen_ssa::base::codegen_crate`][codegen1] calls the
-[`collect_and_partition_mono_items`][mono] query, which does monomorphization
-collection and then partitions them into [codegen
-units](../appendix/glossary.md#codegen-unit).
+モノモーフィゼーションコレクターは、MIRの低レベル化とコードジェネレーションの直前に実行されます。[`rustc_codegen_ssa::base::codegen_crate`][codegen1] は [`collect_and_partition_mono_items`][mono] クエリを呼び出します。これはモノモーフィゼーションコレクションを行い、それらを[コードジェネレーション単位](../appendix/glossary.md#codegen-unit)に分割します。
 
-## Codegen Unit (CGU) partitioning
+## コードジェネレーション単位（CGU）の分割
 
-For better incremental build times, the CGU partitioner creates two CGU for each source level
-modules. One is for "stable" i.e. non-generic code and the other is more volatile code i.e.
-monomorphized/specialized instances.
+より良いインクリメンタルビルド時間のために、CGUパーティショナーは各ソースレベルモジュールに対して2つのCGUを作成します。1つは「安定した」つまり非ジェネリックコード用で、もう1つはより揮発性のコード、つまりモノモーフィゼーション/特殊化されたインスタンス用です。
 
-For dependencies, consider Crate A and Crate B, such that Crate B depends on Crate A.
-The following table lists different scenarios for a function in Crate A that might be used by one
-or more modules in Crate B.
+依存関係については、クレートAとクレートBを考え、クレートBがクレートAに依存するとします。次の表は、クレートBの1つ以上のモジュールで使用される可能性のあるクレートA内の関数の異なるシナリオをリストしています。
 
-| Crate A function | Behavior |
+| クレートAの関数 | 動作 |
 | - | - |
-| Non-generic function | Crate A function doesn't appear in any codegen units of Crate B |
-| Non-generic `#[inline]` function |  Crate A function appears within a single CGU  of Crate B, and exists even after post-inlining stage|
-| Generic function |  Regardless of inlining, all monomorphized (specialized) functions <br> from Crate A appear within a single codegen unit for Crate B. <br> The codegen unit exists even after the post inlining stage.|
-| Generic `#[inline]` function |   - same - |
+| 非ジェネリック関数 | クレートAの関数は、クレートBのどのコードジェネレーション単位にも現れません |
+| 非ジェネリック `#[inline]` 関数 |  クレートAの関数は、クレートBの単一のCGU内に現れ、インライン化後の段階でも存在します|
+| ジェネリック関数 |  インライン化に関係なく、クレートAからのすべてのモノモーフィゼーション（特殊化）された関数は <br> クレートBの単一のコードジェネレーション単位内に現れます。<br> コードジェネレーション単位は、インライン化後の段階でも存在します。|
+| ジェネリック `#[inline]` 関数 |   - 同上 - |
 
-For more details about the partitioner read the module level [documentation].
+パーティショナーの詳細については、モジュールレベルの[ドキュメント]を読んでください。
 
 [mono]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_monomorphize/partitioning/fn.collect_and_partition_mono_items.html
 [codegen1]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/base/fn.codegen_crate.html

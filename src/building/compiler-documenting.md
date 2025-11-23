@@ -1,29 +1,24 @@
-# Building documentation
+# ドキュメントのビルド
 
-This chapter describes how to build documentation of toolchain components,
-like the standard library (std) or the compiler (rustc).
+この章では、標準ライブラリ（std）やコンパイラ（rustc）などのツールチェーンコンポーネントのドキュメントをビルドする方法について説明します。
 
-- Document everything
+- すべてをドキュメント化する
 
-  This uses `rustdoc` from the beta toolchain,
-  so will produce (slightly) different output to stage 1 rustdoc,
-  as rustdoc is under active development:
+  これはベータツールチェーンの `rustdoc` を使用するため、rustdoc が活発に開発されているため、stage 1 rustdoc とは（わずかに）異なる出力を生成します：
 
   ```bash
   ./x doc
   ```
 
-  If you want to be sure the documentation looks the same as on CI:
+  CI と同じようにドキュメントが見えることを確認したい場合：
 
   ```bash
   ./x doc --stage 1
   ```
 
-  This ensures that (current) rustdoc gets built,
-  then that is used to document the components.
+  これにより、（現在の）rustdoc がビルドされ、それがコンポーネントをドキュメント化するために使用されます。
 
-- Much like running individual tests or building specific components,
-  you can build just the documentation you want:
+- 個別のテストを実行したり、特定のコンポーネントをビルドするのと同様に、必要なドキュメントだけをビルドできます：
 
   ```bash
   ./x doc src/doc/book
@@ -31,21 +26,19 @@ like the standard library (std) or the compiler (rustc).
   ./x doc compiler library
   ```
 
-  See [the nightly docs index page](https://doc.rust-lang.org/nightly/) for a full list of books.
+  書籍の完全なリストについては、[nightly docs index page](https://doc.rust-lang.org/nightly/) をご覧ください。
 
-- Document internal rustc items
+- 内部 rustc アイテムをドキュメント化する
 
-  Compiler documentation is not built by default.
-  To create it by default with `x doc`, modify `bootstrap.toml`:
+  コンパイラのドキュメントはデフォルトではビルドされません。`x doc` でデフォルトで作成するには、`bootstrap.toml` を変更します：
 
   ```toml
   [build]
   compiler-docs = true
   ```
 
-  Note that when enabled,
-  documentation for internal compiler items will also be built.
+  有効にすると、内部コンパイラアイテムのドキュメントもビルドされることに注意してください。
 
-  NOTE: The documentation for the compiler is found at [this link].
+  注意：コンパイラのドキュメントは [this link] にあります。
 
 [this link]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/

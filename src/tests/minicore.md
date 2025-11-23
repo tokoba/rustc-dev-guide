@@ -1,50 +1,42 @@
-# `minicore` test auxiliary: using `core` stubs
+# `minicore` テスト補助：`core` スタブの使用
 
 <!-- date-check: Oct 2025 -->
 
-[`tests/auxiliary/minicore.rs`][`minicore`] is a test auxiliary for ui/codegen/assembly test suites.
-It provides `core` stubs for tests that need to
-build for cross-compiled targets but do not need/want to run.
+[`tests/auxiliary/minicore.rs`][`minicore`] は、ui/codegen/assembly テストスイートのためのテスト補助です。
+クロスコンパイルされたターゲット向けにビルドする必要があるが、実行する必要がない/したくないテストに対して、`core` スタブを提供します。
 
 <div class="warning">
 
-Please note that [`minicore`] is only intended for `core` items, and explicitly
-**not** `std` or `alloc` items because `core` items are applicable to a wider range of tests.
+[`minicore`] は `core` アイテムのみを対象としており、`std` や `alloc` アイテムは**明示的に対象外**であることに注意してください。これは、`core` アイテムがより広範なテストに適用できるためです。
 
 </div>
 
-A test can use [`minicore`] by specifying the `//@ add-minicore` directive.
-Then, mark the test with `#![feature(no_core)]` + `#![no_std]` + `#![no_core]`,
-and import the crate into the test with `extern crate minicore` (edition 2015)
-or `use minicore` (edition 2018+).
+テストで [`minicore`] を使用するには、`//@ add-minicore` ディレクティブを指定します。
+次に、`#![feature(no_core)]` + `#![no_std]` + `#![no_core]` でテストをマークし、
+`extern crate minicore` (edition 2015) または `use minicore` (edition 2018+) でクレートをテストにインポートします。
 
-## Implied compiler flags
+## 暗黙のコンパイラフラグ
 
-Due to the `no_std` + `no_core` nature of these tests, `//@ add-minicore`
-implies and requires that the test will be built with `-C panic=abort`.
-**Unwinding panics are not supported.**
+これらのテストは `no_std` + `no_core` の性質上、`//@ add-minicore` は暗黙的にテストが `-C panic=abort` でビルドされることを意味し、それを必要とします。
+**巻き戻しパニックはサポートされていません。**
 
-Tests will also be built with `-C force-unwind-tables=yes` to preserve CFI
-directives in assembly tests.
+テストはまた、アセンブリテストで CFI ディレクティブを保持するために `-C force-unwind-tables=yes` でビルドされます。
 
-TL;DR: `//@ add-minicore` implies two compiler flags:
+まとめると：`//@ add-minicore` は2つのコンパイラフラグを暗黙的に指定します：
 
 1. `-C panic=abort`
 2. `-C force-unwind-tables=yes`
 
-## Adding more `core` stubs
+## `core` スタブの追加
 
-If you find a `core` item to be missing from the [`minicore`] stub, consider
-adding it to the test auxiliary if it's likely to be used or is already needed
-by more than one test.
+[`minicore`] スタブに欠けている `core` アイテムを見つけた場合、それが使用される可能性が高い場合、または既に複数のテストで必要とされている場合は、テスト補助に追加することを検討してください。
 
-## Staying in sync with `core`
+## `core` との同期を維持
 
-The `minicore` items must be kept up to date with `core`.
-For consistent diagnostic output between using `core` and `minicore`, any `diagnostic`
-attributes (e.g. `on_unimplemented`) should be replicated exactly in `minicore`.
+`minicore` アイテムは `core` と同期を保つ必要があります。
+`core` と `minicore` を使用したときの診断出力を一貫させるため、`diagnostic` 属性（例：`on_unimplemented`）は `minicore` で正確に複製する必要があります。
 
-## Example codegen test that uses `minicore`
+## `minicore` を使用するコード生成テストの例
 
 ```rust,no_run
 //@ add-minicore
@@ -63,7 +55,7 @@ extern crate minicore;
 use minicore::*;
 
 struct Meow;
-impl Copy for Meow {} // `Copy` here is provided by `minicore`
+impl Copy for Meow {} // ここでの `Copy` は `minicore` によって提供されます
 
 // CHECK-LABEL: meow
 #[unsafe(no_mangle)]

@@ -1,32 +1,38 @@
-# Profiling with rustc-perf
+# rustc-perfを使ったプロファイリング
 
-The [Rust benchmark suite][rustc-perf] provides a comprehensive way of profiling and benchmarking
-the Rust compiler. You can find instructions on how to use the suite in its [manual][rustc-perf-readme].
+[Rustベンチマークスイート][rustc-perf]は、
+Rustコンパイラをプロファイリングおよびベンチマークするための包括的な方法を提供します。
+スイートの使用方法については、[マニュアル][rustc-perf-readme]で説明されています。
 
-However, using the suite manually can be a bit cumbersome. To make this easier for `rustc` contributors,
-the compiler build system (`bootstrap`) also provides built-in integration with the benchmarking suite,
-which will download and build the suite for you, build a local compiler toolchain and let you profile it using a simplified command-line interface.
+ただし、スイートを手動で使用するのは少し面倒な場合があります。`rustc`コントリビューターが
+これを簡単にできるように、コンパイラビルドシステム(`bootstrap`)もベンチマークスイートとの
+組み込み統合を提供しており、スイートをダウンロードしてビルドし、
+ローカルコンパイラツールチェーンをビルドして、簡略化されたコマンドラインインターフェースを
+使用してプロファイリングできるようにします。
 
-You can use the `./x perf <command> [options]` command to use this integration.
+この統合を使用するには、`./x perf <command> [options]`コマンドを使用できます。
 
-You can use normal bootstrap flags for this command, such as `--stage 1` or `--stage 2`, for example to modify the stage of the created sysroot. It might also be useful to configure `bootstrap.toml` to better support profiling, e.g. set `rust.debuginfo-level = 1` to add source line information to the built compiler.
+このコマンドには、`--stage 1`や`--stage 2`などの通常のブートストラップフラグを使用できます。
+たとえば、作成されるsysrootのステージを変更できます。プロファイリングをより適切にサポートするために
+`bootstrap.toml`を設定することも役立つ場合があります。たとえば、`rust.debuginfo-level = 1`を
+設定すると、ビルドされたコンパイラにソース行情報が追加されます。
 
-`x perf` currently supports the following commands:
-- `benchmark <id>`: Benchmark the compiler and store the results under the passed `id`.
-- `compare <baseline> <modified>`: Compare the benchmark results of two compilers with the two passed `id`s.
-- `eprintln`: Just run the compiler and capture its `stderr` output. Note that the compiler normally does not print
-  anything to `stderr`, you might want to add some `eprintln!` calls to get any output. 
-- `samply`: Profile the compiler using the [samply][samply] sampling profiler.
-- `cachegrind`: Use [Cachegrind][cachegrind] to generate a detailed simulated trace of the compiler's execution.
+`x perf`は現在、以下のコマンドをサポートしています:
+- `benchmark <id>`: コンパイラをベンチマークし、渡された`id`の下に結果を保存します。
+- `compare <baseline> <modified>`: 渡された2つの`id`を持つ2つのコンパイラのベンチマーク結果を比較します。
+- `eprintln`: コンパイラを実行して`stderr`出力をキャプチャするだけです。コンパイラは通常
+  `stderr`に何も出力しないため、出力を得るには`eprintln!`呼び出しを追加する必要があるかもしれません。
+- `samply`: [samply][samply]サンプリングプロファイラを使用してコンパイラをプロファイリングします。
+- `cachegrind`: [Cachegrind][cachegrind]を使用して、コンパイラの実行の詳細なシミュレートトレースを生成します。
 
-> You can find a more detailed description of the profilers in the [`rustc-perf` manual][rustc-perf-readme-profilers].
+> プロファイラの詳細な説明は、[`rustc-perf`マニュアル][rustc-perf-readme-profilers]にあります。
 
-You can use the following options for the `x perf` command, which mirror the corresponding options of the
-`profile_local` and `bench_local` commands that you can use in the suite:
+`x perf`コマンドには以下のオプションを使用できます。これらは、スイートで使用できる
+`profile_local`および`bench_local`コマンドの対応するオプションを反映しています:
 
-- `--include`: Select benchmarks which should be profiled/benchmarked.
-- `--profiles`: Select profiles (`Check`, `Debug`, `Opt`, `Doc`) which should be profiled/benchmarked.
-- `--scenarios`: Select scenarios (`Full`, `IncrFull`, `IncrPatched`, `IncrUnchanged`) which should be profiled/benchmarked.
+- `--include`: プロファイリング/ベンチマークするベンチマークを選択します。
+- `--profiles`: プロファイリング/ベンチマークするプロファイル(`Check`、`Debug`、`Opt`、`Doc`)を選択します。
+- `--scenarios`: プロファイリング/ベンチマークするシナリオ(`Full`、`IncrFull`、`IncrPatched`、`IncrUnchanged`)を選択します。
 
 [samply]: https://github.com/mstange/samply
 [cachegrind]: https://www.cs.cmu.edu/afs/cs.cmu.edu/project/cmt-40/Nice/RuleRefinement/bin/valgrind-3.2.0/docs/html/cg-manual.html

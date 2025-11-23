@@ -1,25 +1,14 @@
-# Background topics
+# 背景トピック
 
-This section covers a numbers of common compiler terms that arise in
-this guide. We try to give the general definition while providing some
-Rust-specific context.
+このセクションでは、本ガイドで登場する数多くの一般的なコンパイラ用語を取り上げます。Rust固有の文脈を提供しながら、一般的な定義を示すよう努めています。
 
 <a id="cfg"></a>
 
-## What is a control-flow graph?
+## 制御フローグラフとは？
 
-A control-flow graph (CFG) is a common term from compilers. If you've ever
-used a flow-chart, then the concept of a control-flow graph will be
-pretty familiar to you. It's a representation of your program that
-clearly exposes the underlying control flow.
+制御フローグラフ（CFG）はコンパイラで一般的に使用される用語です。フローチャートを使ったことがあれば、制御フローグラフの概念はとても馴染み深いものでしょう。これはプログラムの表現で、基礎となる制御フローを明確に露出させます。
 
-A control-flow graph is structured as a set of **basic blocks**
-connected by edges. The key idea of a basic block is that it is a set
-of statements that execute "together" – that is, whenever you branch
-to a basic block, you start at the first statement and then execute
-all the remainder. Only at the end of the block is there the
-possibility of branching to more than one place (in MIR, we call that
-final statement the **terminator**):
+制御フローグラフは、エッジで接続された**基本ブロック**の集合として構造化されています。基本ブロックの重要な考え方は、それが「一緒に」実行される文の集合であるということです - つまり、基本ブロックへ分岐すると、最初の文から始まり、その後残りのすべてを実行します。ブロックの最後でのみ、複数の場所への分岐の可能性があります（MIRでは、この最後の文を**ターミネーター**と呼びます）：
 
 ```mir
 bb0: {
@@ -31,8 +20,7 @@ bb0: {
 }
 ```
 
-Many expressions that you are used to in Rust compile down to multiple
-basic blocks. For example, consider an if statement:
+Rustで慣れ親しんでいる多くの式は、複数の基本ブロックにコンパイルされます。例えば、if文を考えてみましょう：
 
 ```rust,ignore
 a = 1;
@@ -44,8 +32,7 @@ if some_variable {
 d = 1;
 ```
 
-This would compile into four basic blocks in MIR. In textual form, it looks like
-this:
+これはMIRで4つの基本ブロックにコンパイルされます。テキスト形式では、次のようになります：
 
 ```mir
 BB0: {
@@ -73,7 +60,7 @@ BB3: {
 }
 ```
 
-In graphical form, it looks like this:
+グラフ形式では、次のようになります：
 
 ```
                 BB0
@@ -96,28 +83,19 @@ In graphical form, it looks like this:
             +----------+
 ```
 
-When using a control-flow graph, a loop simply appears as a cycle in
-the graph, and the `break` keyword translates into a path out of that
-cycle.
+制御フローグラフを使用する場合、ループは単にグラフ内のサイクルとして現れ、`break`キーワードはそのサイクルから出る経路に変換されます。
 
 <a id="dataflow"></a>
 
-## What is a dataflow analysis?
+## データフロー解析とは？
 
-[*Static Program Analysis*](https://cs.au.dk/~amoeller/spa/) by Anders Møller
-and Michael I. Schwartzbach is an incredible resource!
+Anders MøllerとMichael I. Schwartzbach著の[*Static Program Analysis*](https://cs.au.dk/~amoeller/spa/)は素晴らしいリソースです！
 
-_Dataflow analysis_ is a type of static analysis that is common in many
-compilers. It describes a general technique, rather than a particular analysis.
+_データフロー解析_は、多くのコンパイラで一般的な静的解析の一種です。これは特定の解析ではなく、一般的な技法を表しています。
 
-The basic idea is that we can walk over a [control-flow graph (CFG)](#cfg) and
-keep track of what some value could be. At the end of the walk, we might have
-shown that some claim is true or not necessarily true (e.g. "this variable must
-be initialized"). `rustc` tends to do dataflow analyses over the MIR, since MIR
-is already a CFG.
+基本的な考え方は、[制御フローグラフ（CFG）](#cfg)を走査して、ある値が何であるかを追跡することができるということです。走査の最後で、ある主張が真であるか必ずしも真でないかを示すことができます（例：「この変数は初期化されている必要がある」）。`rustc`はMIRがすでにCFGであるため、MIRに対してデータフロー解析を行う傾向があります。
 
-For example, suppose we want to check that `x` is initialized before it is used
-in this snippet:
+例えば、このスニペットで`x`が使用される前に初期化されていることを確認したいとします：
 
 ```rust,ignore
 fn foo() {
@@ -131,7 +109,7 @@ fn foo() {
 }
 ```
 
-A CFG for this code might look like this:
+このコードのCFGは次のようになります：
 
 ```txt
  +------+
@@ -148,186 +126,133 @@ A CFG for this code might look like this:
  +---------+
 ```
 
-We can do the dataflow analysis as follows: we will start off with a flag `init`
-which indicates if we know `x` is initialized. As we walk the CFG, we will
-update the flag. At the end, we can check its value.
+データフロー解析を次のように行うことができます：`x`が初期化されているかどうかを示すフラグ`init`を開始します。CFGを歩く際にフラグを更新します。最後に、その値を確認できます。
 
-So first, in block (A), the variable `x` is declared but not initialized, so
-`init = false`. In block (B), we initialize the value, so we know that `x` is
-initialized. So at the end of (B), `init = true`.
+まず、ブロック(A)では、変数`x`は宣言されていますが初期化されていないので、`init = false`です。ブロック(B)では、値を初期化するので、`x`が初期化されていることが分かります。したがって、(B)の最後では`init = true`です。
 
-Block (C) is where things get interesting. Notice that there are two incoming
-edges, one from (A) and one from (B), corresponding to whether `some_cond` is true or not.
-But we cannot know that! It could be the case the `some_cond` is always true,
-so that `x` is actually always initialized. It could also be the case that
-`some_cond` depends on something random (e.g. the time), so `x` may not be
-initialized. In general, we cannot know statically (due to [Rice's
-Theorem][rice]).  So what should the value of `init` be in block (C)?
+ブロック(C)が興味深いところです。2つの入力エッジがあることに注目してください。1つは(A)から、もう1つは(B)から、これは`some_cond`が真かどうかに対応します。しかし、それを知ることはできません！`some_cond`が常に真である場合もあり、その場合`x`は実際に常に初期化されています。また、`some_cond`がランダムな何か（例：時刻）に依存する場合もあり、その場合`x`は初期化されていない可能性があります。一般的に、静的に知ることはできません（[Riceの定理][rice]のため）。では、ブロック(C)での`init`の値はどうあるべきでしょうか？
 
 [rice]: https://en.wikipedia.org/wiki/Rice%27s_theorem
 
-Generally, in dataflow analyses, if a block has multiple parents (like (C) in
-our example), its dataflow value will be some function of all its parents (and
-of course, what happens in (C)).  Which function we use depends on the analysis
-we are doing.
+一般的に、データフロー解析では、ブロックに複数の親がある場合（例の(C)のように）、そのデータフロー値はすべての親の何らかの関数になります（そしてもちろん、(C)で何が起こるか）。どの関数を使用するかは、実行している解析に依存します。
 
-In this case, we want to be able to prove definitively that `x` must be
-initialized before use. This forces us to be conservative and assume that
-`some_cond` might be false sometimes. So our "merging function" is "and". That
-is, `init = true` in (C) if `init = true` in (A) _and_ in (B) (or if `x` is
-initialized in (C)). But this is not the case; in particular, `init = false` in
-(A), and `x` is not initialized in (C).  Thus, `init = false` in (C); we can
-report an error that "`x` may not be initialized before use".
+この場合、`x`が使用される前に初期化されている必要があることを確実に証明したいと考えています。これにより、保守的に`some_cond`が時々偽である可能性があると仮定することを強いられます。したがって、「マージ関数」は「and」です。つまり、(C)で`init = true`となるのは、(A)_および_(B)で`init = true`である場合（または(C)で`x`が初期化されている場合）です。しかし、これは当てはまりません。特に、(A)では`init = false`であり、(C)で`x`は初期化されていません。したがって、(C)では`init = false`です。「`x`は使用前に初期化されていない可能性がある」というエラーを報告できます。
 
-There is definitely a lot more that can be said about dataflow analyses. There is an
-extensive body of research literature on the topic, including a lot of theory.
-We only discussed a forwards analysis, but backwards dataflow analysis is also
-useful. For example, rather than starting from block (A) and moving forwards,
-we might have started with the usage of `x` and moved backwards to try to find
-its initialization.
+データフロー解析については、確かにもっと多くのことが言えます。このトピックには、多くの理論を含む広範な研究文献が存在します。ここでは順方向解析のみを議論しましたが、逆方向データフロー解析も有用です。例えば、ブロック(A)から始めて順方向に移動するのではなく、`x`の使用から始めて逆方向に移動してその初期化を見つけることもできます。
 
 <a id="quantified"></a>
 
-## What is "universally quantified"? What about "existentially quantified"?
+## 「全称量化」とは？「存在量化」は？
 
-In math, a predicate may be _universally quantified_ or _existentially
-quantified_:
+数学では、述語は_全称量化_または_存在量化_される可能性があります：
 
-- _Universal_ quantification:
-  - the predicate holds if it is true for all possible inputs.
-  - Traditional notation: ∀x: P(x). Read as "for all x, P(x) holds".
-- _Existential_ quantification:
-  - the predicate holds if there is any input where it is true, i.e., there
-    only has to be a single input.
-  - Traditional notation: ∃x: P(x). Read as "there exists x such that P(x) holds".
+- _全称_量化：
+  - 述語は、すべての可能な入力に対して真である場合に成立します。
+  - 従来の表記：∀x: P(x)。「すべてのxに対して、P(x)が成立する」と読みます。
+- _存在_量化：
+  - 述語は、それが真である任意の入力が存在する場合に成立します。つまり、単一の入力があればよいです。
+  - 従来の表記：∃x: P(x)。「P(x)が成立するようなxが存在する」と読みます。
 
-In Rust, they come up in type checking and trait solving. For example,
+Rustでは、これらは型チェックとトレイト解決で登場します。例えば、
 
 ```rust,ignore
 fn foo<T>()
 ```
-This function claims that the function is well-typed for all types `T`: `∀ T: well_typed(foo)`.
+この関数は、すべての型`T`に対して関数が適格型であると主張します：`∀ T: well_typed(foo)`。
 
-Another example:
+別の例：
 
 ```rust,ignore
 fn foo<'a>(_: &'a usize)
 ```
-This function claims that for any lifetime `'a` (determined by the
-caller), it is well-typed: `∀ 'a: well_typed(foo)`.
+この関数は、任意のライフタイム`'a`（呼び出し元によって決定される）に対して、適格型であると主張します：`∀ 'a: well_typed(foo)`。
 
-Another example:
+別の例：
 
 ```rust,ignore
 fn foo<F>()
 where for<'a> F: Fn(&'a u8)
 ```
-This function claims that it is well-typed for all types `F` such that for all
-lifetimes `'a`, `F: Fn(&'a u8)`: `∀ F: ∀ 'a: (F: Fn(&'a u8)) => well_typed(foo)`.
+この関数は、すべてのライフタイム`'a`に対して`F: Fn(&'a u8)`であるようなすべての型`F`に対して、適格型であると主張します：`∀ F: ∀ 'a: (F: Fn(&'a u8)) => well_typed(foo)`。
 
-One more example:
+もう1つの例：
 
 ```rust,ignore
 fn foo(_: dyn Debug)
 ```
-This function claims that there exists some type `T` that implements `Debug`
-such that the function is well-typed: `∃ T:  (T: Debug) and well_typed(foo)`.
+この関数は、`Debug`を実装する何らかの型`T`が存在し、関数が適格型であると主張します：`∃ T:  (T: Debug) and well_typed(foo)`。
 
 <a id="variance"></a>
 
-## What is a de Bruijn Index?
+## de Bruijnインデックスとは？
 
-[De Bruijn indices][wikideb] are a way of representing, using only integers,
-which variables are bound in which binders. They were originally invented for
-use in lambda calculus evaluation (see [this Wikipedia article][wikideb] for
-more). In `rustc`, we use de Bruijn indices to [represent generic types][sub].
+[De Bruijnインデックス][wikideb]は、整数のみを使用して、どの変数がどのバインダーにバインドされているかを表す方法です。これは元々ラムダ計算の評価で使用するために発明されました（詳細は[このWikipediaの記事][wikideb]を参照）。`rustc`では、de Bruijnインデックスを使用して[ジェネリック型を表現][sub]します。
 
 [wikideb]: https://en.wikipedia.org/wiki/De_Bruijn_index
 [sub]: ../ty_module/generic_arguments.md
 
 
-Here is a basic example of how de Bruijn indices might be used for closures (we
-don't actually do this in `rustc` though!):
+クロージャにde Bruijnインデックスがどのように使用されるかの基本的な例を示します（ただし、`rustc`では実際にはこれを行いません！）：
 
 ```rust,ignore
 |x| {
-    f(x) // de Bruijn index of `x` is 1 because `x` is bound 1 level up
+    f(x) // `x`のde Bruijnインデックスは1、なぜなら`x`は1レベル上でバインドされているから
 
     |y| {
-        g(x, y) // index of `x` is 2 because it is bound 2 levels up
-                // index of `y` is 1 because it is bound 1 level up
+        g(x, y) // `x`のインデックスは2、なぜなら2レベル上でバインドされているから
+                // `y`のインデックスは1、なぜなら1レベル上でバインドされているから
     }
 }
 ```
 
-## What are co- and contra-variance?
+## 共変性と反変性とは？
 
-Check out the subtyping chapter from the
-[Rust Nomicon](https://doc.rust-lang.org/nomicon/subtyping.html).
+[Rust Nomicon](https://doc.rust-lang.org/nomicon/subtyping.html)のサブタイピングの章を確認してください。
 
-See the [variance](../variance.html) chapter of this guide for more info on how
-the type checker handles variance.
+型チェッカーが変性をどのように処理するかについての詳細は、本ガイドの[変性](../variance.html)の章を参照してください。
 
 <a id="free-vs-bound"></a>
 
-## What is a "free region" or a "free variable"? What about "bound region"?
+## 「自由領域」または「自由変数」とは？「束縛領域」は？
 
-Let's describe the concepts of free vs bound in terms of program
-variables, since that's the thing we're most familiar with.
+プログラム変数の観点から、自由対束縛の概念を説明しましょう。これは最も馴染み深いものだからです。
 
-- Consider this expression, which creates a closure: `|a, b| a + b`.
-  Here, the `a` and `b` in `a + b` refer to the arguments that the closure will
-  be given when it is called. We say that the `a` and `b` there are **bound** to
-  the closure, and that the closure signature `|a, b|` is a **binder** for the
-  names `a` and `b` (because any references to `a` or `b` within refer to the
-  variables that it introduces).
-- Consider this expression: `a + b`. In this expression, `a` and `b` refer to
-  local variables that are defined *outside* of the expression. We say that
-  those variables **appear free** in the expression (i.e., they are **free**,
-  not **bound** (tied up)).
+- この式を考えてみましょう。これはクロージャを作成します：`|a, b| a + b`。
+  ここで、`a + b`の`a`と`b`は、クロージャが呼び出されたときに与えられる引数を参照します。`a`と`b`はクロージャに**束縛されている**と言い、クロージャシグネチャ`|a, b|`は名前`a`と`b`の**バインダー**であると言います（なぜなら、内部の`a`や`b`への参照は、それが導入する変数を参照するからです）。
+- この式を考えてみましょう：`a + b`。この式では、`a`と`b`は式の*外部*で定義されたローカル変数を参照します。これらの変数は式に**自由に現れる**と言います（つまり、それらは**自由**であり、**束縛されていない**（縛られていない））。
 
-So there you have it: a variable "appears free" in some
-expression/statement/whatever if it refers to something defined
-outside of that expressions/statement/whatever. Equivalently, we can
-then refer to the "free variables" of an expression – which is just
-the set of variables that "appear free".
+これで理解できました：変数がある式/文/その他に「自由に現れる」とは、その式/文/その他の外部で定義されたものを参照する場合です。同様に、式の「自由変数」を参照することもできます - これは単に「自由に現れる」変数の集合です。
 
-So what does this have to do with regions? Well, we can apply the
-analogous concept to type and regions. For example, in the type `&'a
-u32`, `'a` appears free.  But in the type `for<'a> fn(&'a u32)`, it
-does not.
+では、これは領域とどう関係があるのでしょうか？まあ、類似の概念を型と領域に適用できます。例えば、型`&'a u32`では、`'a`は自由に現れます。しかし、型`for<'a> fn(&'a u32)`では、現れません。
 
-# Further Reading About Compilers
+# コンパイラに関するさらなる読み物
 
-> Thanks to `mem`, `scottmcm`, and `Levi` on the official Discord for the
-> recommendations, and to `tinaun` for posting a link to a [twitter thread from
-> Graydon Hoare](https://web.archive.org/web/20181230012554/https://twitter.com/graydon_pub/status/1039615569132118016)
-> which had some more recommendations!
+> 公式Discordの`mem`、`scottmcm`、`Levi`に推薦を、そして`tinaun`にさらなる推薦があった[Graydon Hoareのツイッタースレッド](https://web.archive.org/web/20181230012554/https://twitter.com/graydon_pub/status/1039615569132118016)へのリンクを投稿してくれたことに感謝します！
 >
-> Other sources: https://gcc.gnu.org/wiki/ListOfCompilerBooks
+> その他の情報源：https://gcc.gnu.org/wiki/ListOfCompilerBooks
 >
-> If you have other suggestions, please feel free to open an issue or PR.
+> 他に提案がある場合は、お気軽にissueまたはPRを開いてください。
 
-## Books
+## 書籍
 - [Types and Programming Languages](https://www.cis.upenn.edu/~bcpierce/tapl/)
 - [Programming Language Pragmatics](https://www.cs.rochester.edu/~scott/pragmatics/)
 - [Practical Foundations for Programming Languages](https://www.cs.cmu.edu/~rwh/pfpl/)
 - [Compilers: Principles, Techniques, and Tools, 2nd Edition](https://www.pearson.com/us/higher-education/program/Aho-Compilers-Principles-Techniques-and-Tools-2nd-Edition/PGM167067.html)
 - [Garbage Collection: Algorithms for Automatic Dynamic Memory Management](https://www.cs.kent.ac.uk/people/staff/rej/gcbook/)
-- [Linkers and Loaders](https://www.amazon.com/Linkers-Kaufmann-Software-Engineering-Programming/dp/1558604960) (There are also free versions of this, but the version we had linked seems to be offline at the moment.)
+- [Linkers and Loaders](https://www.amazon.com/Linkers-Kaufmann-Software-Engineering-Programming/dp/1558604960) （この無料版もありますが、リンクしていたバージョンは現在オフラインのようです。）
 - [Advanced Compiler Design and Implementation](https://www.goodreads.com/book/show/887908.Advanced_Compiler_Design_and_Implementation)
 - [Building an Optimizing Compiler](https://www.goodreads.com/book/show/2063103.Building_an_Optimizing_Compiler)
 - [Crafting Interpreters](http://www.craftinginterpreters.com/)
 
-## Courses
+## コース
 - [University of Oregon Programming Languages Summer School archive](https://www.cs.uoregon.edu/research/summerschool/archives.html)
 
-## Wikis
+## Wiki
 - [Wikipedia](https://en.wikipedia.org/wiki/List_of_programming_languages_by_type)
 - [Esoteric Programming Languages](https://esolangs.org/wiki/Main_Page)
 - [Stanford Encyclopedia of Philosophy](https://plato.stanford.edu/index.html)
 - [nLab](https://ncatlab.org/nlab/show/HomePage)
 
-## Misc Papers and Blog Posts
+## その他の論文とブログ投稿
 - [Programming in Martin-Löf's Type Theory](https://www.cse.chalmers.se/research/group/logic/book/)
 - [Polymorphism, Subtyping, and Type Inference in MLsub](https://dl.acm.org/doi/10.1145/3093333.3009882)

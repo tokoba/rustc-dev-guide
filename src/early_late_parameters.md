@@ -1,13 +1,13 @@
 
-# Early vs Late bound parameters
+# Early vs Late bound パラメータ
 
-> **NOTE**: This chapter largely talks about early/late bound as being solely relevant when discussing function item types/function definitions. This is potentially not completely true, async blocks and closures should likely be discussed somewhat in this chapter.
+> **注意**: この章は主に、early/late bound が関数アイテム型/関数定義に関連する場合についてのみ説明しています。これは完全に正確ではない可能性があり、async ブロックやクロージャについてもこの章で多少議論する必要があるかもしれません。
 
-## What does it mean to be "early" bound or "late" bound
+## "early" bound または "late" bound とはどういう意味か
 
-Every function definition has a corresponding ZST that implements the `Fn*` traits known as a [function item type][function_item_type]. This part of the chapter will talk a little bit about the "desugaring" of function item types as it is useful context for explaining the difference between early bound and late bound generic parameters.
+すべての関数定義には、`Fn*` トレイトを実装する対応するZSTがあり、これは[関数アイテム型][function_item_type]として知られています。この章のこの部分では、関数アイテム型の「デシュガリング」について少し説明します。これは、early bound と late bound のジェネリックパラメータの違いを説明する上で有用なコンテキストとなります。
 
-Let's start with a very trivial example involving no generic parameters:
+まず、ジェネリックパラメータを含まない非常に簡単な例から始めましょう：
 
 ```rust
 fn foo(a: String) -> u8 {
@@ -16,7 +16,7 @@ fn foo(a: String) -> u8 {
 }
 ```
 
-If we explicitly wrote out the definitions for the function item type corresponding to `foo` and its associated `Fn` impl it would look something like this:
+`foo` に対応する関数アイテム型とその関連する `Fn` 実装の定義を明示的に書き出すと、次のようになります：
 ```rust,ignore
 struct FooFnItem;
 
@@ -26,16 +26,16 @@ impl Fn<(String,)> for FooFnItem {
 }
 ```
 
-The builtin impls for the `FnMut`/`FnOnce` traits as well as the impls for `Copy` and `Clone` were omitted for brevity reasons (although these traits *are* implemented for function item types).
+`FnMut`/`FnOnce` トレイトのビルトイン実装、および `Copy` と `Clone` の実装は簡潔のため省略しています（ただし、これらのトレイトは関数アイテム型に対して実装*されています*）。
 
-A slightly more complicated example would involve introducing generic parameters to the function:
+少し複雑な例として、関数にジェネリックパラメータを導入する場合があります：
 ```rust
-fn foo<T: Sized>(a: T) -> T { 
+fn foo<T: Sized>(a: T) -> T {
     # a
     /* snip */
 }
 ```
-Writing out the definitions would look something like this:
+定義を書き出すと次のようになります：
 ```rust,ignore
 struct FooFnItem<T: Sized>(PhantomData<fn(T) -> T>);
 
@@ -45,14 +45,14 @@ impl<T: Sized> Fn<(T,)> for FooFnItem<T> {
 }
 ```
 
-Note that the function item type `FooFnItem` is generic over some type parameter `T` as defined on the function `foo`. However, not all generic parameters defined on functions are also defined on the function item type as demonstrated here:
+関数アイテム型 `FooFnItem` は、関数 `foo` で定義されているように、型パラメータ `T` に対してジェネリックであることに注意してください。しかし、関数で定義されたすべてのジェネリックパラメータが関数アイテム型でも定義されるわけではありません。以下に示すとおりです：
 ```rust
 fn foo<'a, T: Sized>(a: &'a T) -> &'a T {
     # a
     /* snip */
 }
 ```
-With its "desugared" form looking like so:
+その「デシュガリング」形式は次のようになります：
 ```rust,ignore
 struct FooFnItem<T: Sized>(PhantomData<for<'a> fn(&'a T) -> &'a T>);
 
@@ -62,84 +62,85 @@ impl<'a, T: Sized> Fn<(&'a T,)> for FooFnItem<T> {
 }
 ```
 
-The lifetime parameter `'a` from the function `foo` is not present on the function item type `FooFnItem` and is instead introduced on the builtin impl solely for use in representing the argument types.
+関数 `foo` のライフタイムパラメータ `'a` は、関数アイテム型 `FooFnItem` には存在せず、代わりに引数型を表現するためだけにビルトイン実装で導入されています。
 
-Generic parameters not all being defined on the function item type means that there are two steps where generic arguments are provided when calling a function.
-1. Naming the function (e.g. `let a = foo;`) the arguments for `FooFnItem` are provided. 
-2. Calling the function (e.g. `a(&10);`) any parameters defined on the builtin impl are provided.
+ジェネリックパラメータがすべて関数アイテム型で定義されているわけではないということは、関数を呼び出すときにジェネリック引数が提供される段階が2つあることを意味します。
+1. 関数に名前を付けるとき（例：`let a = foo;`）、`FooFnItem` の引数が提供されます。
+2. 関数を呼び出すとき（例：`a(&10);`）、ビルトイン実装で定義されたパラメータが提供されます。
 
-This two-step system is where the early vs late naming scheme comes from, early bound parameters are provided in the *earliest* step (naming the function), whereas late bound parameters are provided in the *latest* step (calling the function). 
+この2段階システムが、early vs late という命名スキームの由来です。early bound パラメータは*最も早い*段階（関数に名前を付けるとき）で提供され、late bound パラメータは*最も遅い*段階（関数を呼び出すとき）で提供されます。
 
-Looking at the desugaring from the previous example we can tell that `T` is an early bound type parameter and `'a` is a late bound lifetime parameter as `T` is present on the function item type but `'a` is not. See this example of calling `foo` annotated with where each generic parameter has an argument provided:
+前の例のデシュガリングを見ると、`T` は early bound 型パラメータであり、`'a` は late bound ライフタイムパラメータであることがわかります。`T` は関数アイテム型に存在しますが、`'a` は存在しないためです。各ジェネリックパラメータに引数が提供される場所を注釈した `foo` の呼び出し例をご覧ください：
 ```rust
 fn foo<'a, T: Sized>(a: &'a T) -> &'a T {
     # a
     /* snip */
 }
 
-// Here we provide a type argument `String` to the
-// type parameter `T` on the function item type
+// ここで、関数アイテム型の型パラメータ `T` に
+// 型引数 `String` を提供します
 let my_func = foo::<String>;
 
-// Here (implicitly) a lifetime argument is provided
-// to the lifetime parameter `'a` on the builtin impl.
+// ここで（暗黙的に）ビルトイン実装の
+// ライフタイムパラメータ `'a` にライフタイム引数が提供されます
 my_func(&String::new());
 ```
 
 [function_item_type]: https://doc.rust-lang.org/reference/types/function-item.html
 
-## Differences between early and late bound parameters
+## early bound と late bound パラメータの違い
 
-### Higher ranked function pointers and trait bounds 
+### 高階関数ポインタとトレイト境界
 
-A generic parameter being late bound allows for more flexible usage of the function item. For example if we have some function `foo` with an early bound lifetime parameter and some function `bar` with a late bound lifetime parameter `'a` we would have the following builtin `Fn` impls:
+ジェネリックパラメータが late bound であることで、関数アイテムのより柔軟な使用が可能になります。例えば、early bound ライフタイムパラメータを持つ関数 `foo` と、late bound ライフタイムパラメータ `'a` を持つ関数 `bar` がある場合、次のようなビルトイン `Fn` 実装が得られます：
 ```rust,ignore
 impl<'a> Fn<(&'a String,)> for FooFnItem<'a> { /* ... */ }
 impl<'a> Fn<(&'a String,)> for BarFnItem { /* ... */ }
 ```
 
-The `bar` function has a strictly more flexible signature as the function item type can be called with a borrow with *any* lifetime, whereas the `foo` function item type would only be callable with a borrow with the same lifetime on the function item type. We can show this by simply trying to call `foo`'s function item type multiple times with different lifetimes:
+`bar` 関数は厳密により柔軟なシグネチャを持っています。関数アイテム型は*任意の*ライフタイムを持つ借用で呼び出すことができますが、`foo` 関数アイテム型は関数アイテム型と同じライフタイムを持つ借用でのみ呼び出すことができます。これは、`foo` の関数アイテム型を異なるライフタイムで複数回呼び出そうとすることで示すことができます：
 
 ```rust
-// The `'a: 'a` bound forces this lifetime to be early bound.
+// `'a: 'a` 境界により、このライフタイムは early bound になります。
 fn foo<'a: 'a>(b: &'a String) -> &'a String { b }
 fn bar<'a>(b: &'a String) -> &'a String { b }
 
-// Early bound generic parameters are instantiated here when naming
-// the function `foo`. As `'a` is early bound an argument is provided.
+// early bound ジェネリックパラメータは、関数 `foo` に
+// 名前を付けるときにここでインスタンス化されます。
+// `'a` は early bound であるため、引数が提供されます。
 let f = foo::<'_>;
 
-// Both function arguments are required to have the same lifetime as
-// the lifetime parameter being early bound means that `f` is only
-// callable for one specific lifetime.
+// 両方の関数引数は、ライフタイムパラメータが early bound であるため
+// 同じライフタイムを持つ必要があります。つまり `f` は
+// 1つの特定のライフタイムに対してのみ呼び出し可能です。
 //
-// As we call this with borrows of different lifetimes, the borrow checker
-// will error here.
+// 異なるライフタイムの借用でこれを呼び出すため、
+// borrow checker はここでエラーを出します。
 f(&String::new());
 f(&String::new());
 ```
 
-In this example we call `foo`'s function item type twice, each time with a borrow of a temporary. These two borrows could not possible have lifetimes that overlap as the temporaries are only alive during the function call, not after. The lifetime parameter on `foo` being early bound requires all callers of `f` to provide a borrow with the same lifetime, as this is not possible the borrow checker errors.
+この例では、`foo` の関数アイテム型を2回呼び出していますが、それぞれ一時変数の借用を使用しています。これら2つの借用は、一時変数が関数呼び出し中にのみ生存し、その後は生存しないため、重複するライフタイムを持つことはできません。`foo` のライフタイムパラメータが early bound であるため、`f` のすべての呼び出し元は同じライフタイムを持つ借用を提供する必要があり、これは不可能であるため borrow checker がエラーを出します。
 
-If the lifetime parameter on `foo` was late bound this would be able to compile as each caller could provide a different lifetime argument for its borrow. See the following example which demonstrates this using the `bar` function defined above:
+`foo` のライフタイムパラメータが late bound であれば、各呼び出し元が借用に対して異なるライフタイム引数を提供できるため、これはコンパイルできます。上記で定義された `bar` 関数を使用してこれを示す次の例をご覧ください：
 
 ```rust
 # fn foo<'a: 'a>(b: &'a String) -> &'a String { b }
 # fn bar<'a>(b: &'a String) -> &'a String { b }
 #
-// Early bound parameters are instantiated here, however as `'a` is
-// late bound it is not provided here.
+// early bound パラメータはここでインスタンス化されますが、
+// `'a` は late bound であるため、ここでは提供されません。
 let b = bar;
 
-// Late bound parameters are instantiated separately at each call site
-// allowing different lifetimes to be used by each caller.
+// late bound パラメータは各呼び出しサイトで個別にインスタンス化されるため、
+// 各呼び出し元は異なるライフタイムを使用できます。
 b(&String::new());
 b(&String::new());
 ```
 
-This is reflected in the ability to coerce function item types to higher ranked function pointers and prove higher ranked `Fn` trait bounds. We can demonstrate this with the following example:
+これは、関数アイテム型を高階関数ポインタに型強制したり、高階 `Fn` トレイト境界を証明したりする能力に反映されています。次の例でこれを示すことができます：
 ```rust
-// The `'a: 'a` bound forces this lifetime to be early bound.
+// `'a: 'a` 境界により、このライフタイムは early bound になります。
 fn foo<'a: 'a>(b: &'a String) -> &'a String { b }
 fn bar<'a>(b: &'a String) -> &'a String { b }
 
@@ -150,50 +151,50 @@ fn higher_ranked_trait_bound() {
     accepts_hr_fn(bar_fn_item);
 
     let foo_fn_item = foo::<'_>;
-    // errors
+    // エラー
     accepts_hr_fn(foo_fn_item);
 }
 
 fn higher_ranked_fn_ptr() {
     let bar_fn_item = bar;
     let fn_ptr: for<'a> fn(&'a String) -> &'a String = bar_fn_item;
-    
+
     let foo_fn_item = foo::<'_>;
-    // errors
+    // エラー
     let fn_ptr: for<'a> fn(&'a String) -> &'a String = foo_fn_item;
 }
 ```
 
-In both of these cases the borrow checker errors as it does not consider `foo_fn_item` to be callable with a borrow of any lifetime. This is due to the fact that the lifetime parameter on `foo` is early bound, causing `foo_fn_item` to have a type of `FooFnItem<'_>` which (as demonstrated by the desugared `Fn` impl) is only callable with a borrow of the same lifetime `'_`.
+両方のケースで、borrow checker は `foo_fn_item` が任意のライフタイムを持つ借用で呼び出し可能であるとは見なさないため、エラーを出します。これは、`foo` のライフタイムパラメータが early bound であるため、`foo_fn_item` が `FooFnItem<'_>` 型を持ち、（デシュガリングされた `Fn` 実装で示されているように）同じライフタイム `'_` を持つ借用でのみ呼び出し可能だからです。
 
-### Turbofishing in the presence of late bound parameters
+### late bound パラメータの存在下でのタービンフィッシング
 
-As mentioned previously, the distinction between early and late bound parameters means that there are two places where generic parameters are instantiated:
-- When naming a function (early)
-- When calling a function (late)
+前述のように、early bound と late bound パラメータの区別は、ジェネリックパラメータがインスタンス化される場所が2つあることを意味します：
+- 関数に名前を付けるとき（early）
+- 関数を呼び出すとき（late）
 
-There is currently no syntax for explicitly specifying generic arguments for late bound parameters during the call step; generic arguments can only be specified for early bound parameters when naming a function.
-The syntax `foo::<'static>();`, despite being part of a function call, behaves as `(foo::<'static>)();` and instantiates the early bound generic parameters on the function item type.
+現在、呼び出しステップ中に late bound パラメータのジェネリック引数を明示的に指定する構文はありません。ジェネリック引数は、関数に名前を付けるときに early bound パラメータに対してのみ指定できます。
+構文 `foo::<'static>();` は、関数呼び出しの一部であるにもかかわらず、`(foo::<'static>)();` のように動作し、関数アイテム型の early bound ジェネリックパラメータをインスタンス化します。
 
-See the following example:
+次の例をご覧ください：
 ```rust
 fn foo<'a>(b: &'a u32) -> &'a u32 { b }
 
 let f /* : FooFnItem<????> */ = foo::<'static>;
 ```
 
-The above example errors as the lifetime parameter `'a` is late bound and so cannot be instantiated as part of the "naming a function" step. If we make the lifetime parameter early bound we will see this code start to compile:
+上記の例は、ライフタイムパラメータ `'a` が late bound であるため、「関数に名前を付ける」ステップの一部としてインスタンス化できないため、エラーになります。ライフタイムパラメータを early bound にすると、このコードはコンパイルされるようになります：
 ```rust
 fn foo<'a: 'a>(b: &'a u32) -> &'a u32 { b }
 
 let f /* : FooFnItem<'static> */ = foo::<'static>;
 ```
 
-What the current implementation of the compiler aims to do is error when specifying lifetime arguments to a function that has both early *and* late bound lifetime parameters. In practice, due to excessive breakage, some cases are actually only future compatibility warnings ([#42868](https://github.com/rust-lang/rust/issues/42868)):
-- When the amount of lifetime arguments is the same as the number of early bound lifetime parameters a FCW is emitted instead of an error
-- An error is always downgraded to a FCW when using method call syntax
+コンパイラの現在の実装が目指していることは、early *および* late bound ライフタイムパラメータの両方を持つ関数にライフタイム引数を指定するときにエラーを出すことです。実際には、過度な破壊のため、一部のケースは実際には将来の互換性警告のみです（[#42868](https://github.com/rust-lang/rust/issues/42868)）：
+- ライフタイム引数の数が early bound ライフタイムパラメータの数と同じ場合、エラーの代わりに FCW が発行されます
+- メソッド呼び出し構文を使用する場合、エラーは常に FCW にダウングレードされます
 
-To demonstrate this we can write out the different kinds of functions and give them both a late and early bound lifetime:
+これを示すために、さまざまな種類の関数を書き出し、それぞれに late と early bound のライフタイムを与えることができます：
 ```rust,ignore
 fn free_function<'a: 'a, 'b>(_: &'a (), _: &'b ()) {}
 
@@ -215,7 +216,7 @@ impl Foo {
 }
 ```
 
-Then, for the first case, we can call each function with a single lifetime argument (corresponding to the one early bound lifetime parameter) and note that it only results in a FCW rather than a hard error.
+次に、最初のケースとして、各関数を単一のライフタイム引数（1つの early bound ライフタイムパラメータに対応）で呼び出し、ハードエラーではなく FCW のみが発生することに注意してください。
 ```rust
 #![deny(late_bound_lifetime_arguments)]
 
@@ -238,8 +239,8 @@ Then, for the first case, we can call each function with a single lifetime argum
 #     fn inherent_function<'a: 'a, 'b>(_: &'a (), _: &'b ()) {}
 # }
 #
-// Specifying as many arguments as there are early
-// bound parameters is always a future compat warning
+// early bound パラメータと同じ数の引数を指定することは
+// 常に将来の互換性警告になります
 Foo.trait_method::<'static>(&(), &());
 Foo::trait_method::<'static>(Foo, &(), &());
 Foo::trait_function::<'static>(&(), &());
@@ -248,7 +249,7 @@ Foo::inherent_function::<'static>(&(), &());
 free_function::<'static>(&(), &());
 ```
 
-For the second case we call each function with more lifetime arguments than there are lifetime parameters (be it early or late bound) and note that method calls result in a FCW as opposed to the free/associated functions which result in a hard error:
+2番目のケースでは、各関数をライフタイムパラメータ（early または late bound）の数よりも多いライフタイム引数で呼び出し、メソッド呼び出しがハードエラーとなる自由/関連関数とは対照的に FCW となることに注意してください：
 ```rust
 # fn free_function<'a: 'a, 'b>(_: &'a (), _: &'b ()) {}
 #
@@ -269,19 +270,18 @@ For the second case we call each function with more lifetime arguments than ther
 #     fn inherent_function<'a: 'a, 'b>(_: &'a (), _: &'b ()) {}
 # }
 #
-// Specifying more arguments than there are early
-// bound parameters is a future compat warning when
-// using method call syntax.
+// early bound パラメータよりも多くの引数を指定することは、
+// メソッド呼び出し構文を使用する場合は将来の互換性警告になります。
 Foo.trait_method::<'static, 'static, 'static>(&(), &());
 Foo.inherent_method::<'static, 'static, 'static>(&(), &());
-// However, it is a hard error when not using method call syntax.
+// しかし、メソッド呼び出し構文を使用しない場合はハードエラーになります。
 Foo::trait_method::<'static, 'static, 'static>(Foo, &(), &());
 Foo::trait_function::<'static, 'static, 'static>(&(), &());
 Foo::inherent_function::<'static, 'static, 'static>(&(), &());
 free_function::<'static, 'static, 'static>(&(), &());
 ```
 
-Even when specifying enough lifetime arguments for both the late and early bound lifetime parameter, these arguments are not actually used to annotate the lifetime provided to late bound parameters. We can demonstrate this by turbofishing `'static` to a function while providing a non-static borrow:
+late と early bound ライフタイムパラメータの両方に対して十分なライフタイム引数を指定した場合でも、これらの引数は late bound パラメータに提供されるライフタイムを注釈するために実際には使用されません。これは、非静的な借用を提供しながら `'static` をタービンフィッシングすることで示すことができます：
 ```rust
 struct Foo;
 
@@ -292,11 +292,11 @@ impl Foo {
 Foo.inherent_method::<'static, 'static>(&(), &String::new());
 ```
 
-This compiles even though the `&String::new()` function argument does not have a `'static` lifetime, this is because "extra" lifetime arguments are discarded rather than taken into account for late bound parameters when actually calling the function.
+これは、`&String::new()` 関数引数が `'static` ライフタイムを持っていないにもかかわらずコンパイルされます。これは、関数を実際に呼び出すときに、「余分な」ライフタイム引数が late bound パラメータに対して考慮されるのではなく、破棄されるためです。
 
-### Liveness of types with late bound parameters
+### late bound パラメータを持つ型の生存性
 
-When checking type outlives bounds involving function item types we take into account early bound parameters. For example:
+関数アイテム型を含む型の生存境界をチェックするとき、early bound パラメータを考慮します。例えば：
 
 ```rust
 fn foo<T>(_: T) {}
@@ -309,11 +309,11 @@ fn bar<T>() {
 }
 ```
 
-As the type parameter `T` is early bound, the desugaring of the function item type for `foo` would look something like `struct FooFnItem<T>`. Then in order for `FooFnItem<T>: 'static` to hold we must also require `T: 'static` to hold as otherwise we would wind up with soundness bugs.
+型パラメータ `T` は early bound であるため、`foo` の関数アイテム型のデシュガリングは `struct FooFnItem<T>` のようになります。次に、`FooFnItem<T>: 'static` が成立するためには、`T: 'static` も成立する必要があります。そうでなければ、健全性バグが発生します。
 
-Unfortunately, due to bugs in the compiler, we do not take into account early bound *lifetimes*, which is the cause of the open soundness bug [#84366](https://github.com/rust-lang/rust/issues/84366). This means that it's impossible to demonstrate a "difference" between early/late bound parameters for liveness/type outlives bounds as the only kind of generic parameters that are able to be late bound are lifetimes which are handled incorrectly.
+残念ながら、コンパイラのバグにより、early bound *ライフタイム*を考慮していません。これは、未解決の健全性バグ [#84366](https://github.com/rust-lang/rust/issues/84366) の原因です。これは、生存性/型生存境界について early/late bound パラメータ間の「違い」を示すことが不可能であることを意味します。late bound になることができる唯一の種類のジェネリックパラメータはライフタイムであり、これは不正確に処理されているためです。
 
-Regardless, in theory the code example below *should* demonstrate such a difference once [#84366](https://github.com/rust-lang/rust/issues/84366) is fixed:
+それにもかかわらず、理論的には、[#84366](https://github.com/rust-lang/rust/issues/84366) が修正されれば、以下のコード例はそのような違いを示す*はず*です：
 ```rust
 fn early_bound<'a: 'a>(_: &'a String) {}
 fn late_bound<'a>(_: &'a String) {}
@@ -322,42 +322,42 @@ fn requires_static<T: 'static>(_: T) {}
 
 fn bar<'b>() {
     let e = early_bound::<'b>;
-    // this *should* error but does not
+    // これはエラーになる*はず*ですが、そうなっていません
     requires_static(e);
 
     let l = late_bound;
-    // this correctly does not error
+    // これは正しくエラーになりません
     requires_static(l);
 }
 ```
 
-## Requirements for a parameter to be late bound
+## パラメータが late bound になるための要件
 
-### Must be a lifetime parameter
+### ライフタイムパラメータである必要がある
 
-Type and Const parameters are not able to be late bound as we do not have a way to support types such as `dyn for<T> Fn(Box<T>)` or `for<T> fn(Box<T>)`. Calling such types requires being able to monomorphize the underlying function which is not possible with indirection through dynamic dispatch.
+型パラメータと const パラメータは、`dyn for<T> Fn(Box<T>)` や `for<T> fn(Box<T>)` のような型をサポートする方法がないため、late bound にすることはできません。このような型を呼び出すには、基礎となる関数を単相化できる必要がありますが、これは動的ディスパッチを介した間接参照では不可能です。
 
-### Must not be used in a where clause
+### where 句で使用してはならない
 
-Currently when a generic parameter is used in a where clause it must be early bound. For example:
+現在、ジェネリックパラメータが where 句で使用されている場合、それは early bound でなければなりません。例えば：
 ```rust
 # trait Trait<'a> {}
 fn foo<'a, T: Trait<'a>>(_: &'a String, _: T) {}
 ```
 
-In this example the lifetime parameter `'a` is considered to be early bound as it appears in the where clause `T: Trait<'a>`. This is true even for "trivial" where clauses such as `'a: 'a` or those implied by wellformedness of function arguments, for example:
+この例では、ライフタイムパラメータ `'a` は where 句 `T: Trait<'a>` に現れるため、early bound と見なされます。これは、`'a: 'a` のような「自明な」where 句や、関数引数の well-formedness によって暗黙的に示されるものであっても当てはまります。例えば：
 ```rust
 fn foo<'a: 'a>(_: &'a String) {}
 fn bar<'a, T: 'a>(_: &'a T) {}
 ```
 
-In both of these functions the lifetime parameter `'a` would be considered to be early bound even though the where clauses they are used in arguably do not actually impose any constraints on the caller.
+これらの関数の両方で、ライフタイムパラメータ `'a` は、使用されている where 句が呼び出し元に実質的に制約を課さない場合でも、early bound と見なされます。
 
-The reason for this restriction is a combination of two things:
-- We cannot prove bounds on late bound parameters until they have been instantiated
-- Function pointers and trait objects do not have a way to represent yet to be proven where clauses from the underlying function
+この制限の理由は、2つのことの組み合わせです：
+- late bound パラメータに対する境界は、インスタンス化されるまで証明できません
+- 関数ポインタとトレイトオブジェクトには、基礎となる関数からのまだ証明されていない where 句を表現する方法がありません
 
-Take the following example:
+次の例を見てみましょう：
 ```rust
 trait Trait<'a> {}
 fn foo<'a, T: Trait<'a>>(_: &'a T) {}
@@ -367,13 +367,13 @@ let f = f as for<'a> fn(&'a String);
 f(&String::new());
 ```
 
-At *some point* during type checking an error should be emitted for this code as `String` does not implement `Trait` for any lifetime.
+型チェック中の*ある時点*で、このコードに対してエラーが発行されるべきです。`String` は任意のライフタイムに対して `Trait` を実装していないためです。
 
-If the lifetime `'a` were late bound then this becomes difficult to check. When naming `foo` we do not know what lifetime should be used as part of the `T: Trait<'a>` trait bound as it has not yet been instantiated. When coercing the function item type to a function pointer we have no way of tracking the `String: Trait<'a>` trait bound that must be proven when calling the function. 
+ライフタイム `'a` が late bound の場合、これはチェックが困難になります。`foo` に名前を付けるとき、まだインスタンス化されていないため、`T: Trait<'a>` トレイト境界の一部として使用するライフタイムがわかりません。関数アイテム型を関数ポインタに型強制するとき、関数を呼び出すときに証明する必要がある `String: Trait<'a>` トレイト境界を追跡する方法がありません。
 
-If the lifetime `'a` is early bound (which it is in the current implementation in rustc), then the trait bound can be checked when naming the function `foo`. Requiring parameters used in where clauses to be early bound gives a natural place to check where clauses defined on the function.
+ライフタイム `'a` が early bound の場合（rustc の現在の実装ではそうです）、トレイト境界は関数 `foo` に名前を付けるときにチェックできます。where 句で使用されるパラメータを early bound にすることを要求することで、関数で定義された where 句をチェックする自然な場所が得られます。
 
-Finally, we do not require lifetimes to be early bound if they are used in *implied bounds*, for example:
+最後に、*暗黙境界*で使用される場合、ライフタイムを early bound にする必要はありません。例えば：
 ```rust
 fn foo<'a, T>(_: &'a T) {}
 
@@ -382,11 +382,11 @@ f(&String::new());
 f(&String::new());
 ```
 
-This code compiles, demonstrating that the lifetime parameter is late bound, even though `'a` is used in the type `&'a T` which implicitly requires `T: 'a` to hold. Implied bounds can be treated specially as any types introducing implied bounds are in the signature of the function pointer type, which means that when calling the function we know to prove `T: 'a`.
+このコードはコンパイルされ、ライフタイムパラメータが late bound であることを示しています。`'a` が型 `&'a T` で使用されており、暗黙的に `T: 'a` が成立することを要求しているにもかかわらずです。暗黙境界は特別に扱うことができます。暗黙境界を導入する型は関数ポインタ型のシグネチャにあるため、関数を呼び出すときに `T: 'a` を証明する必要があることがわかります。
 
-### Must be constrained by argument types
+### 引数型によって制約される必要がある
 
-It is important that builtin impls on function item types do not wind up with unconstrained generic parameters as this can lead to unsoundness. This is the same kind of restriction as applies to user written impls, for example the following code results in an error:
+関数アイテム型のビルトイン実装が制約されていないジェネリックパラメータを持たないようにすることが重要です。これは健全性の問題につながる可能性があるためです。これは、ユーザーが書いた実装に適用されるのと同じ種類の制限です。例えば、次のコードはエラーになります：
 ```rust
 trait Trait {
     type Assoc;
@@ -397,13 +397,13 @@ impl<'a> Trait for u8 {
 }
 ```
 
-The analogous example for builtin impls on function items would be the following:
+関数アイテムのビルトイン実装の類似例は次のようになります：
 ```rust,ignore
 fn foo<'a>() -> &'a String { /* ... */ }
 ```
-If the lifetime parameter `'a` were to be late bound we would wind up with a builtin impl with an unconstrained lifetime, we can manually write out the desugaring for the function item type and its impls with `'a` being late bound to demonstrate this:
+ライフタイムパラメータ `'a` が late bound の場合、制約されていないライフタイムを持つビルトイン実装になります。`'a` が late bound である場合の関数アイテム型とその実装のデシュガリングを手動で書き出すことで、これを示すことができます：
 ```rust,ignore
-// NOTE: this is just for demonstration, in practice `'a` is early bound
+// 注意：これはデモンストレーション用です。実際には `'a` は early bound です
 struct FooFnItem;
 
 impl<'a> Fn<()> for FooFnItem {
@@ -412,7 +412,7 @@ impl<'a> Fn<()> for FooFnItem {
 }
 ```
 
-In order to avoid such a situation we consider `'a` to be early bound which causes the lifetime on the impl to be constrained by the self type:
+このような状況を避けるために、`'a` を early bound と見なします。これにより、実装のライフタイムが self 型によって制約されます：
 ```rust,ignore
 struct FooFnItem<'a>(PhantomData<fn() -> &'a String>);
 

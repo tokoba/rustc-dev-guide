@@ -1,135 +1,135 @@
-# Stabilization report template
+# 安定化レポートテンプレート
 
-## What is this?
+## これは何ですか？
 
-This is a template for [stabilization reports](./stabilization_guide.md) of **language features**. The questions aim to solicit the details most often needed. These details help reviewers to identify potential problems upfront. Not all parts of the template will apply to every stabilization. If a question doesn't apply, explain briefly why.
+これは**言語機能**の[安定化レポート](./stabilization_guide.md)のテンプレートです。質問は、最もよく必要とされる詳細を引き出すことを目的としています。これらの詳細は、レビュアーが潜在的な問題を事前に特定するのに役立ちます。テンプレートのすべての部分がすべての安定化に適用されるわけではありません。質問が適用されない場合は、その理由を簡単に説明してください。
 
-Copy everything after the separator and edit it as Markdown. Replace each *TODO* with your answer.
+区切り線の後のすべてをコピーしてMarkdownとして編集してください。各*TODO*をあなたの回答に置き換えてください。
 
 ---
 
-# Stabilization report
+# 安定化レポート
 
-## Summary
+## 概要
 
-> Remind us what this feature is and what value it provides. Tell the story of what led up to this stabilization.
+> この機能が何であり、どのような価値を提供するかを思い出させてください。この安定化に至った経緯を説明してください。
 >
-> E.g., see:
+> 例：
 >
-> - [Stabilize AFIT/RPITIT](https://web.archive.org/web/20250329190642/https://github.com/rust-lang/rust/pull/115822)
-> - [Stabilize RTN](https://web.archive.org/web/20250321214601/https://github.com/rust-lang/rust/pull/138424)
-> - [Stabilize ATPIT](https://web.archive.org/web/20250124214256/https://github.com/rust-lang/rust/pull/120700)
-> - [Stabilize opaque type precise capturing](https://web.archive.org/web/20250312173538/https://github.com/rust-lang/rust/pull/127672)
+> - [AFIT/RPITITの安定化](https://web.archive.org/web/20250329190642/https://github.com/rust-lang/rust/pull/115822)
+> - [RTNの安定化](https://web.archive.org/web/20250321214601/https://github.com/rust-lang/rust/pull/138424)
+> - [ATPITの安定化](https://web.archive.org/web/20250124214256/https://github.com/rust-lang/rust/pull/120700)
+> - [不透明型の精密キャプチャの安定化](https://web.archive.org/web/20250312173538/https://github.com/rust-lang/rust/pull/127672)
 
 *TODO*
 
-Tracking:
+追跡：
 
-- *TODO* (Link to tracking issue.)
+- *TODO*（追跡issueへのリンク）
 
-Reference PRs:
+ReferenceのPR：
 
-- *TODO* (Link to Reference PRs.)
+- *TODO*（ReferenceのPRへのリンク）
 
 cc @rust-lang/lang @rust-lang/lang-advisors
 
-### What is stabilized
+### 安定化されるもの
 
-> Describe each behavior being stabilized and give a short example of code that will now be accepted.
+> 安定化される各動作を説明し、今受け入れられるコードの短い例を示してください。
 
 ```rust
 todo!()
 ```
 
-### What isn't stabilized
+### 安定化されないもの
 
-> Describe any parts of the feature not being stabilized. Talk about what we might want to do later and what doors are being left open for that. If what we're not stabilizing might lead to surprises for users, talk about that in particular.
+> 安定化されない機能の部分を説明してください。後でやりたいことや、そのために開いているドアについて話してください。安定化していないものがユーザーに驚きをもたらす可能性がある場合は、特にそれについて話してください。
 
-## Design
+## 設計
 
 ### Reference
 
-> What updates are needed to the Reference? Link to each PR. If the Reference is missing content needed for describing this feature, discuss that.
+> Referenceにどのような更新が必要ですか？各PRにリンクしてください。Referenceにこの機能を説明するために必要なコンテンツが欠けている場合は、それについて議論してください。
 
 - *TODO*
 
-### RFC history
+### RFCの歴史
 
-> What RFCs have been accepted for this feature?
+> この機能に対してどのRFCが受け入れられましたか？
 
 - *TODO*
 
-### Answers to unresolved questions
+### 未解決の質問への回答
 
-> What questions were left unresolved by the RFC? How have they been answered? Link to any relevant lang decisions.
-
-*TODO*
-
-### Post-RFC changes
-
-> What other user-visible changes have occurred since the RFC was accepted? Describe both changes that the lang team accepted (and link to those decisions) as well as changes that are being presented to the team for the first time in this stabilization report.
+> RFCによってどのような質問が未解決のまま残されましたか？それらはどのように答えられましたか？関連するlangの決定にリンクしてください。
 
 *TODO*
 
-### Key points
+### RFC後の変更
 
-> What decisions have been most difficult and what behaviors to be stabilized have proved most contentious? Summarize the major arguments on all sides and link to earlier documents and discussions.
-
-*TODO*
-
-### Nightly extensions
-
-> Are there extensions to this feature that remain unstable? How do we know that we are not accidentally committing to those?
+> RFCが受け入れられてから、ユーザーに見えるどのような変更が発生しましたか？langチームが受け入れた変更（およびそれらの決定へのリンク）と、この安定化レポートで初めてチームに提示される変更の両方を説明してください。
 
 *TODO*
 
-### Doors closed
+### 重要なポイント
 
-> What doors does this stabilization close for later changes to the language? E.g., does this stabilization make any other RFCs, lang experiments, or known in-flight proposals more difficult or impossible to do later?
-
-## Feedback
-
-### Call for testing
-
-> Has a "call for testing" been done? If so, what feedback was received?
+> どの決定が最も困難であり、安定化される動作のうちどれが最も論争を呼びましたか？すべての側面の主要な論点を要約し、以前の文書や議論にリンクしてください。
 
 *TODO*
 
-### Nightly use
+### Nightlyの拡張
 
-> Do any known nightly users use this feature? Counting instances of `#![feature(FEATURE_NAME)]` on GitHub with grep might be informative.
+> 不安定のままであるこの機能の拡張はありますか？それらに誤ってコミットしていないことをどのように知っていますか？
 
 *TODO*
 
-## Implementation
+### 閉じられたドア
 
-### Major parts
+> この安定化は、言語への後の変更のためにどのようなドアを閉じますか？例えば、この安定化は、他のRFC、lang実験、または既知の進行中の提案を後で実行することをより困難または不可能にしますか？
 
-> Summarize the major parts of the implementation and provide links into the code and to relevant PRs.
+## フィードバック
+
+### テストの呼びかけ
+
+> 「テストの呼びかけ」は行われましたか？もしそうなら、どのようなフィードバックが受け取られましたか？
+
+*TODO*
+
+### Nightlyの使用
+
+> この機能を使用している既知のnightlyユーザーはいますか？GitHubで`#![feature(FEATURE_NAME)]`のインスタンスをgrepでカウントすることが有益かもしれません。
+
+*TODO*
+
+## 実装
+
+### 主要な部分
+
+> 実装の主要な部分を要約し、コードへのリンクと関連するPRへのリンクを提供してください。
 >
-> See, e.g., this breakdown of the major parts of async closures:
+> 例えば、非同期クロージャの主要な部分のこの分解を参照してください：
 >
 > - <https://rustc-dev-guide.rust-lang.org/coroutine-closures.html>
 
 *TODO*
 
-### Coverage
+### カバレッジ
 
-> Summarize the test coverage of this feature.
+> この機能のテストカバレッジを要約してください。
 >
-> Consider what the "edges" of this feature are. We're particularly interested in seeing tests that assure us about exactly what nearby things we're not stabilizing. Tests should of course comprehensively demonstrate that the feature works. Think too about demonstrating the diagnostics seen when common mistakes are made and the feature is used incorrectly.
+> この機能の「エッジ」が何であるかを考えてください。私たちは特に、安定化していないすぐ近くのものについて私たちを保証するテストを見ることに興味があります。テストはもちろん、機能が動作することを包括的に示す必要があります。一般的なミスが犯されたときや機能が誤って使用されたときに表示される診断を示すことも考えてください。
 >
-> Within each test, include a comment at the top describing the purpose of the test and what set of invariants it intends to demonstrate. This is a great help to our review.
+> 各テスト内で、テストの目的とそれが実証しようとしている一連の不変条件を説明するコメントを上部に含めてください。これはレビューにとって大きな助けになります。
 >
-> Describe any known or intentional gaps in test coverage.
+> テストカバレッジの既知のまたは意図的なギャップを説明してください。
 >
-> Contextualize and link to test folders and individual tests.
+> テストフォルダーと個々のテストをコンテキスト化してリンクしてください。
 
 *TODO*
 
-### Outstanding bugs
+### 未解決のバグ
 
-> What outstanding bugs involve this feature? List them. Should any block the stabilization? Discuss why or why not.
+> この機能に関連する未解決のバグは何ですか？それらをリストしてください。安定化をブロックする必要がありますか？なぜまたはなぜそうでないかを議論してください。
 
 *TODO*
 
@@ -137,21 +137,21 @@ todo!()
 - *TODO*
 - *TODO*
 
-### Outstanding FIXMEs
+### 未解決のFIXME
 
-> What FIXMEs are still in the code for that feature and why is it OK to leave them there?
+> その機能のコードにまだあるFIXMEは何であり、なぜそれらをそこに残しておいても大丈夫ですか？
 
 *TODO*
 
-### Tool changes
+### ツールの変更
 
-> What changes must be made to our other tools to support this feature. Has this work been done? Link to any relevant PRs and issues.
+> この機能をサポートするために他のツールにどのような変更を加える必要がありますか。この作業は完了しましたか？関連するPRやissueにリンクしてください。
 
 - [ ] rustfmt
   - *TODO*
 - [ ] rust-analyzer
   - *TODO*
-- [ ] rustdoc (both JSON and HTML)
+- [ ] rustdoc（JSONとHTMLの両方）
   - *TODO*
 - [ ] cargo
   - *TODO*
@@ -164,33 +164,33 @@ todo!()
 
 *TODO*
 
-### Breaking changes
+### 破壊的変更
 
-> If this stabilization represents a known breaking change, link to the crater report, the analysis of the crater report, and to all PRs we've made to ecosystem projects affected by this breakage. Discuss any limitations of what we're able to know about or to fix.
+> この安定化が既知の破壊的変更を表す場合、craterレポート、craterレポートの分析、およびこの破壊によって影響を受けるエコシステムプロジェクトに対して作成したすべてのPRにリンクしてください。知ることができるものや修正できるものの制限について議論してください。
 
 *TODO*
 
-Crater report:
+Craterレポート：
 
 - *TODO*
 
-Crater analysis:
+Crater分析：
 
 - *TODO*
 
-PRs to affected crates:
+影響を受けるクレートへのPR：
 
 - *TODO*
 - *TODO*
 - *TODO*
 
-## Type system, opsem
+## 型システム、opsem
 
-### Compile-time checks
+### コンパイル時チェック
 
-> What compilation-time checks are done that are needed to prevent undefined behavior?
+> 未定義動作を防ぐために必要なコンパイル時チェックは何ですか？
 >
-> Link to tests demonstrating that these checks are being done.
+> これらのチェックが行われていることを示すテストにリンクしてください。
 
 *TODO*
 
@@ -198,79 +198,79 @@ PRs to affected crates:
 - *TODO*
 - *TODO*
 
-### Type system rules
+### 型システムルール
 
-> What type system rules are enforced for this feature and what is the purpose of each?
-
-*TODO*
-
-### Sound by default?
-
-> Does the feature's implementation need specific checks to prevent UB, or is it sound by default and need specific opt-in to perform the dangerous/unsafe operations? If it is not sound by default, what is the rationale?
+> この機能に対してどのような型システムルールが強制され、それぞれの目的は何ですか？
 
 *TODO*
 
-### Breaks the AM?
+### デフォルトで健全？
 
-> Can users use this feature to introduce undefined behavior, or use this feature to break the abstraction of Rust and expose the underlying assembly-level implementation? Describe this if so.
-
-*TODO*
-
-## Common interactions
-
-### Temporaries
-
-> Does this feature introduce new expressions that can produce temporaries? What are the scopes of those temporaries?
+> 機能の実装はUBを防ぐために特定のチェックが必要ですか、それともデフォルトで健全であり、危険な/unsafe操作を実行するために特定のオプトインが必要ですか？デフォルトで健全でない場合、その理由は何ですか？
 
 *TODO*
 
-### Drop order
+### AMを破壊しますか？
 
-> Does this feature raise questions about the order in which we should drop values? Talk about the decisions made here and how they're consistent with our earlier decisions.
-
-*TODO*
-
-### Pre-expansion / post-expansion
-
-> Does this feature raise questions about what should be accepted pre-expansion (e.g. in code covered by `#[cfg(false)]`) versus what should be accepted post-expansion? What decisions were made about this?
+> ユーザーはこの機能を使用して未定義動作を導入できますか、またはこの機能を使用してRustの抽象化を破り、基礎となるアセンブリレベルの実装を公開できますか？そうである場合は、これを説明してください。
 
 *TODO*
 
-### Edition hygiene
+## 一般的な相互作用
 
-> If this feature is gated on an edition, how do we decide, in the context of the edition hygiene of tokens, whether to accept or reject code. E.g., what token do we use to decide?
+### 一時変数
 
-*TODO*
-
-### SemVer implications
-
-> Does this feature create any new ways in which library authors must take care to prevent breaking downstreams when making minor-version releases? Describe these. Are these new hazards "major" or "minor" according to [RFC 1105](https://rust-lang.github.io/rfcs/1105-api-evolution.html)?
+> この機能は一時変数を生成できる新しい式を導入しますか？それらの一時変数のスコープは何ですか？
 
 *TODO*
 
-### Exposing other features
+### ドロップ順序
 
-> Are there any other unstable features whose behavior may be exposed by this feature in any way? What features present the highest risk of that?
+> この機能は、値をドロップする順序についての質問を提起しますか？ここで行われた決定と、それらが以前の決定とどのように一致しているかについて話してください。
 
 *TODO*
 
-## History
+### 展開前/展開後
 
-> List issues and PRs that are important for understanding how we got here.
+> この機能は、展開前（例：`#[cfg(false)]`でカバーされるコード）で受け入れられるべきものと、展開後で受け入れられるべきものについての質問を提起しますか？これについてどのような決定が下されましたか？
+
+*TODO*
+
+### エディションハイジーン
+
+> この機能がエディションに依存している場合、トークンのエディションハイジーンのコンテキストで、コードを受け入れるか拒否するかをどのように決定しますか。例えば、どのトークンを使用して決定しますか？
+
+*TODO*
+
+### SemVerへの影響
+
+> この機能は、ライブラリ作者がマイナーバージョンリリースを行うときにダウンストリームを壊さないように注意しなければならない新しい方法を作り出しますか？これらを説明してください。これらの新しいハザードは[RFC 1105](https://rust-lang.github.io/rfcs/1105-api-evolution.html)によれば「メジャー」または「マイナー」ですか？
+
+*TODO*
+
+### 他の機能の公開
+
+> この機能によって何らかの形で動作が公開される可能性がある他の不安定な機能はありますか？そのリスクが最も高い機能は何ですか？
+
+*TODO*
+
+## 歴史
+
+> ここに到達するために重要なissueとPRをリストしてください。
 
 - *TODO*
 - *TODO*
 - *TODO*
 
-## Acknowledgments
+## 謝辞
 
-> Summarize contributors to the feature by name for recognition and so that those people are notified about the stabilization. Does anyone who worked on this *not* think it should be stabilized right now? We'd like to hear about that if so.
+> 認識のために名前でコントリビューターを要約し、安定化について通知されるようにします。これに取り組んだ人の中で、今すぐ安定化すべきではないと考えている人はいませんか？もしそうなら、それについて聞きたいです。
 
 *TODO*
 
-## Open items
+## オープンアイテム
 
-> List any known items that have not yet been completed and that should be before this is stabilized.
+> まだ完了していない既知のアイテムをリストし、これが安定化される前に完了すべきものをリストしてください。
 
 - [ ] *TODO*
 - [ ] *TODO*

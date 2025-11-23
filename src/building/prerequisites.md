@@ -1,41 +1,26 @@
-# Prerequisites
+# 前提条件
 
-## Dependencies
+## 依存関係
 
-See [the `rust-lang/rust` INSTALL](https://github.com/rust-lang/rust/blob/HEAD/INSTALL.md#dependencies).
+[`rust-lang/rust` INSTALL](https://github.com/rust-lang/rust/blob/HEAD/INSTALL.md#dependencies) をご覧ください。
 
-## Hardware
+## ハードウェア
 
-You will need an internet connection to build. The bootstrapping process
-involves updating git submodules and downloading a beta compiler. It doesn't
-need to be super fast, but that can help.
+ビルドにはインターネット接続が必要です。ブートストラッププロセスには、git サブモジュールの更新とベータコンパイラのダウンロードが含まれます。超高速である必要はありませんが、それが役立つ場合があります。
 
-There are no strict hardware requirements, but building the compiler is
-computationally expensive, so a beefier machine will help, and I wouldn't
-recommend trying to build on a Raspberry Pi! We recommend the following.
-* 30GB+ of free disk space. Otherwise, you will have to keep
-  clearing incremental caches. More space is better, the compiler is a bit of a
-  hog; it's a problem we are aware of.
-* 8GB+ RAM
-* 2+ cores. Having more cores really helps. 10 or 20 or more is not too many!
+厳格なハードウェア要件はありませんが、コンパイラのビルドは計算量が多いため、より強力なマシンが役立ちます。Raspberry Pi でビルドしようとすることはお勧めしません！以下を推奨します。
+* 30GB 以上の空きディスクスペース。そうでないと、インクリメンタルキャッシュをクリアし続ける必要があります。より多くのスペースがより良いです。コンパイラはかなり大食いです；これは私たちが認識している問題です。
+* 8GB 以上の RAM
+* 2 以上のコア。より多くのコアが本当に役立ちます。10 または 20 以上でも多すぎることはありません！
 
-Beefier machines will lead to much faster builds. If your machine is not very
-powerful, a common strategy is to only use `./x check` on your local machine
-and let the CI build test your changes when you push to a PR branch.
+より強力なマシンは、はるかに高速なビルドにつながります。マシンがあまり強力でない場合、一般的な戦略は、ローカルマシンで `./x check` のみを使用し、PR ブランチにプッシュしたときに CI がテストをビルドするようにすることです。
 
-Building the compiler takes more than half an hour on my moderately powerful
-laptop. We suggest downloading LLVM from CI so you don't have to build it from source
-([see here][config]).
+私のやや強力なラップトップでは、コンパイラのビルドには 30 分以上かかります。CI から LLVM をダウンロードすることをお勧めします。そうすれば、ソースからビルドする必要がありません（[こちらを参照][config]）。
 
-Like `cargo`, the build system will use as many cores as possible. Sometimes
-this can cause you to run low on memory. You can use `-j` to adjust the number
-of concurrent jobs. If a full build takes more than ~45 minutes to an hour, you
-are probably spending most of the time swapping memory in and out; try using
-`-j1`.
+[config]: ./how-to-build-and-run.md#create-a-bootstraptoml
 
-If you don't have too much free disk space, you may want to turn off
-incremental compilation ([see here][config]). This will make compilation take
-longer (especially after a rebase), but will save a ton of space from the
-incremental caches.
+`cargo` のように、ビルドシステムはできるだけ多くのコアを使用します。時々、これによってメモリが不足する可能性があります。`-j` を使用して、同時ジョブの数を調整できます。完全なビルドに約 45 分から 1 時間以上かかる場合、おそらくほとんどの時間をメモリをスワップインおよびスワップアウトするのに費やしています；`-j1` を使用してみてください。
+
+空きディスクスペースがあまりない場合は、インクリメンタルコンパイルをオフにすることをお勧めします（[こちらを参照][config]）。これにより、コンパイルに時間がかかります（特にリベース後）が、インクリメンタルキャッシュから大量のスペースを節約できます。
 
 [config]: ./how-to-build-and-run.md#create-a-bootstraptoml

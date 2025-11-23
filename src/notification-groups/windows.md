@@ -1,30 +1,21 @@
-# Windows notification group
+# Windows通知グループ
 
-**Github Label:** [O-Windows] <br>
-**Ping command:** `@rustbot ping windows`
+**Githubラベル:** [O-Windows] <br>
+**Pingコマンド:** `@rustbot ping windows`
 
 [O-Windows]: https://github.com/rust-lang/rust/labels/O-Windows
 
-This list will be used to ask for help both in diagnosing and testing
-Windows-related issues as well as suggestions on how to resolve
-interesting questions regarding our Windows support.
+このリストは、Windows関連の問題の診断とテストの両方の支援を求めるだけでなく、Windowsサポートに関する興味深い質問の解決方法についての提案を求めるために使用されます。
 
-The group also has an associated Zulip channel ([`#t-compiler/windows`])
-where people can go to pose questions and discuss Windows-specific
-topics.
+グループには関連するZulipチャンネル（[`#t-compiler/windows`]）もあり、そこで質問を投げかけたり、Windows固有のトピックについて議論したりできます。
 
-To get a better idea for what the group will do, here are some
-examples of the kinds of questions where we would have reached out to
-the group for advice in determining the best course of action:
+グループが行うことをよりよく理解するために、最善の行動方針を決定するためにグループのアドバイスを求めたであろう質問の種類の例をいくつか示します：
 
-* Which versions of MinGW should we support?
-* Should we remove the legacy InnoSetup GUI installer? [#72569]
-* What names should we use for static libraries on Windows? [#29520]
+* どのバージョンのMinGWをサポートすべきか？
+* レガシーInnoSetup GUIインストーラーを削除すべきか？[#72569]
+* Windows上の静的ライブラリにどのような名前を使用すべきか？[#29520]
 
-So, if you are interested in participating, please sign up for the
-Windows group! To do so, open a PR against the [rust-lang/team]
-repository. Just [follow this example][eg], but change the username to
-your own!
+参加に興味がある方は、Windowsグループにサインアップしてください！そのためには、[rust-lang/team]リポジトリに対してPRを開いてください。[この例][eg]に従って、ユーザー名を自分のものに変更するだけです！
 
 [`#t-compiler/windows`]: https://rust-lang.zulipchat.com/#streams/242869/t-compiler.2Fwindows
 [rust-lang/team]: https://github.com/rust-lang/team

@@ -1,18 +1,18 @@
-# Candidate preference
+# 候補の優先順位
 
-There are multiple ways to prove `Trait` and `NormalizesTo` goals. Each such option is called a [`Candidate`]. If there are multiple applicable candidates, we prefer some candidates over others. We store the relevant information in their [`CandidateSource`].
+`Trait`および`NormalizesTo`ゴールを証明する方法は複数あります。そのような各オプションは[`Candidate`]と呼ばれます。適用可能な候補が複数ある場合、一部の候補を他の候補よりも優先します。関連情報は[`CandidateSource`]に保存されます。
 
-This preference may result in incorrect inference or region constraints and would therefore be unsound during coherence. Because of this, we simply try to merge all candidates in coherence.
+この優先順位は、不正確な推論や領域制約を引き起こす可能性があり、したがってコヒーレンス中は健全ではありません。このため、コヒーレンス中はすべての候補をマージしようとするだけです。
 
-## `Trait` goals
+## `Trait`ゴール
 
-Trait goals merge their applicable candidates in [`fn merge_trait_candidates`]. This document provides additional details and references to explain *why* we've got the current preference rules.
+トレイトゴールは、[`fn merge_trait_candidates`]で適用可能な候補をマージします。このドキュメントでは、現在の優先順位ルールを*なぜ*設定したのかを説明するための追加の詳細と参照を提供します。
 
 ### `CandidateSource::BuiltinImpl(BuiltinImplSource::Trivial))`
 
-Trivial builtin impls are builtin impls which are known to be always applicable for well-formed types. This means that if one exists, using another candidate should never have fewer constraints. We currently only consider `Sized` - and `MetaSized` - impls to be trivial.
+自明なビルトインimplは、well-formedな型に対して常に適用可能であることが知られているビルトインimplです。これは、存在する場合、別の候補を使用しても制約が少なくなることはないことを意味します。現在、`Sized`および`MetaSized`のimplのみを自明と見なしています。
 
-This is necessary to prevent a lifetime error for the following pattern
+これは、次のパターンのライフタイムエラーを防ぐために必要です
 
 ```rust
 trait Trait<T>: Sized {}
@@ -23,14 +23,14 @@ fn foo<'a, 'b, T>(x: &'b str)
 where
     &'a str: Trait<T>,
 {
-    // Elaborating the `&'a str: Trait<T>` where-bound results in a
-    // `&'a str: Sized` where-bound. We do not want to prefer this
-    // over the builtin impl. 
+    // `&'a str: Trait<T>` where境界を精緻化すると、
+    // `&'a str: Sized` where境界が得られます。これを
+    // ビルトインimplより優先したくありません。
     is_sized(x);
 }
 ```
 
-This preference is incorrect in case the builtin impl has a nested goal which relies on a non-param where-clause
+この優先順位は、ビルトインimplがパラメータ以外のwhere句に依存するネストされたゴールを持つ場合に不正確です
 ```rust
 struct MyType<'a, T: ?Sized>(&'a (), T);
 fn is_sized<T>() {}
@@ -39,9 +39,9 @@ where
     (MyType<'a, T>,): Sized,
     MyType<'static, T>: Sized,
 {
-    // The where-bound is trivial while the builtin `Sized` impl for tuples
-    // requires proving `MyType<'a, T>: Sized` which can only be proven by
-    // using the where-clause, adding an unnecessary `'static` constraint.
+    // where境界は自明ですが、タプルのビルトイン`Sized` implは
+    // `MyType<'a, T>: Sized`を証明することを要求し、これはwhere句を使用することによってのみ
+    // 証明でき、不要な`'static`制約を追加します。
     is_sized::<(MyType<'a, T>,)>();
     //~^ ERROR lifetime may not live long enough
 }
@@ -49,15 +49,14 @@ where
 
 ### `CandidateSource::ParamEnv`
 
-Once there's at least one *non-global* `ParamEnv` candidate, we prefer *all* `ParamEnv` candidates over other candidate kinds.
-A where-bound is global if it is not higher-ranked and doesn't contain any generic parameters. It may contain `'static`.
+少なくとも1つの*非グローバル*な`ParamEnv`候補が存在すると、*すべての*`ParamEnv`候補を他の候補の種類よりも優先します。
+where境界は、高階ランクでなく、ジェネリックパラメータを含まない場合、グローバルです。`'static`を含む場合があります。
 
-We try to apply where-bounds over other candidates as users tends to have the most control over them, so they can most easily
-adjust them in case our candidate preference is incorrect.
+where境界を他の候補よりも適用しようとするのは、ユーザーがwhere境界を最も制御しやすいため、候補の優先順位が不正確な場合に最も簡単に調整できるからです。
 
-#### Preference over `Impl` candidates
+#### `Impl`候補よりも優先
 
-This is necessary to avoid region errors in the following example
+これは、次の例で領域エラーを回避するために必要です
 
 ```rust
 trait Trait<'a> {}
@@ -68,8 +67,7 @@ fn foo<'a, T: Trait<'a>>() {
 }
 ```
 
-We also need this as shadowed impls can result in currently ambiguous solver cycles: [trait-system-refactor-initiative#76]. Without preference we'd be forced to fail with ambiguity
-errors if the where-bound results in region constraints to avoid incompleteness.
+また、シャドウされたimplが現在曖昧なソルバーサイクルを引き起こす可能性があるため、これも必要です: [trait-system-refactor-initiative#76]。優先順位がない場合、where境界が領域制約を引き起こす場合に不完全性を避けるために、曖昧性エラーで失敗する必要があります。
 ```rust
 trait Super {
     type SuperAssoc;
@@ -87,15 +85,15 @@ where
 }
 
 fn overflow<T: Trait>() {
-    // We can use the elaborated `Super<SuperAssoc = Self::TraitAssoc>` where-bound
-    // to prove the where-bound of the `T: Trait` implementation. This currently results in
-    // overflow. 
+    // 精緻化された`Super<SuperAssoc = Self::TraitAssoc>` where境界を使用して、
+    // `T: Trait`実装のwhere境界を証明できます。これは現在
+    // オーバーフローを引き起こします。
     let x: <T as Trait>::TraitAssoc;
 }
 ```
 
-This preference causes a lot of issues. See [#24066]. Most of the
-issues are caused by preferring where-bounds over impls even if the where-bound guides type inference:
+この優先順位は多くの問題を引き起こします。[#24066]を参照してください。問題のほとんどは、
+where境界が型推論をガイドする場合でも、where境界をimplよりも優先することによって引き起こされます：
 ```rust
 trait Trait<T> {
     fn call_me(&self, x: T) {}
@@ -107,8 +105,7 @@ fn bug<T: Trait<U>, U>(x: T) {
     //~^ ERROR mismatched types
 }
 ```
-However, even if we only apply this preference if the where-bound doesn't guide inference, it may still result
-in incorrect lifetime constraints:
+ただし、where境界が推論をガイドしない場合にのみこの優先順位を適用しても、不正確なライフタイム制約が発生する可能性があります：
 ```rust
 trait Trait<'a> {}
 impl<'a> Trait<'a> for &'a str {}
@@ -117,15 +114,15 @@ fn foo<'a, 'b>(x: &'b str)
 where
     &'a str: Trait<'b>
 {
-    // Need to prove `&'x str: Trait<'b>` with `'b: 'x`.
+    // `'b: 'x`で`&'x str: Trait<'b>`を証明する必要があります。
     impls_trait::<'b, _>(x);
     //~^ ERROR lifetime may not live long enough
 }
 ```
 
-#### Preference over `AliasBound` candidates
+#### `AliasBound`候補よりも優先
 
-This is necessary to avoid region errors in the following example
+これは、次の例で領域エラーを回避するために必要です
 ```rust
 trait Bound<'a> {}
 trait Trait<'a> {
@@ -142,7 +139,7 @@ where
     impls_bound::<'c, T::Assoc>();
 }
 ```
-It can also result in unnecessary constraints
+不要な制約を引き起こす可能性もあります
 ```rust
 trait Bound<'a> {}
 trait Trait<'a> {
@@ -155,19 +152,19 @@ where
     T: for<'hr> Trait<'hr>,
     <T as Trait<'b>>::Assoc: Bound<'a>,
 {
-    // Using the where-bound for `<T as Trait<'a>>::Assoc: Bound<'a>`
-    // unnecessarily equates `<T as Trait<'a>>::Assoc` with the
-    // `<T as Trait<'b>>::Assoc` from the env.
+    // `<T as Trait<'a>>::Assoc: Bound<'a>`のwhere境界を使用すると、
+    // `<T as Trait<'a>>::Assoc`と環境からの
+    // `<T as Trait<'b>>::Assoc`を不必要に等しくします。
     impls_bound::<'a, <T as Trait<'a>>::Assoc>();
-    // For a `<T as Trait<'b>>::Assoc: Bound<'b>` the self type of the
-    // where-bound matches, but the arguments of the trait bound don't.
+    // `<T as Trait<'b>>::Assoc: Bound<'b>`の場合、where境界の自己型は
+    // 一致しますが、トレイト境界の引数は一致しません。
     impls_bound::<'b, <T as Trait<'b>>::Assoc>();
 }
 ```
 
-#### Why no preference for global where-bounds
+#### グローバルwhere境界に優先順位を設定しない理由
 
-Global where-bounds are either fully implied by an impl or unsatisfiable. If they are unsatisfiable, we don't really care what happens. If a where-bound is fully implied then using the impl to prove the trait goal cannot result in additional constraints. For trait goals this is only useful for where-bounds which use `'static`:
+グローバルwhere境界は、implによって完全に暗示されるか、満たすことができません。満たすことができない場合、何が起こっても実際には気にしません。where境界が完全に暗示される場合、implを使用してトレイトゴールを証明しても追加の制約は発生しません。トレイトゴールの場合、これは`'static`を使用するwhere境界にのみ有用です：
 
 ```rust
 trait A {
@@ -176,27 +173,27 @@ trait A {
 
 fn foo(x: &dyn A)
 where
-    dyn A + 'static: A, // Using this bound would lead to a lifetime error.
+    dyn A + 'static: A, // この境界を使用するとライフタイムエラーになります。
 {
     x.test();
 }
 ```
-More importantly, by using impls here we prevent global where-bounds from shadowing impls when normalizing associated types. There are no known issues from preferring impls over global where-bounds.
+より重要なことは、ここでimplを使用することで、関連型を正規化する際にグローバルwhere境界がimplをシャドウすることを防ぎます。グローバルwhere境界をimplよりも優先することによる既知の問題はありません。
 
-#### Why still consider global where-bounds
+#### グローバルwhere境界を引き続き考慮する理由
 
-Given that we just use impls even if there exists a global where-bounds, you may ask why we don't just ignore these global where-bounds entirely: we use them to weaken the inference guidance from non-global where-bounds.
+グローバルwhere境界が存在する場合でもimplを使用するだけなので、これらのグローバルwhere境界を完全に無視しない理由を疑問に思うかもしれません：非グローバルwhere境界からの推論ガイダンスを弱めるためにそれらを使用します。
 
-Without a global where-bound, we currently prefer non-global where bounds even though there would be an applicable impl as well. By adding a non-global where-bound, this unnecessary inference guidance is disabled, allowing the following to compile:
+非グローバルwhere境界がなければ、現在、適用可能なimplもあるにもかかわらず非グローバルwhere境界を優先します。非グローバルwhere境界を追加することで、この不必要な推論ガイダンスが無効になり、次のコンパイルが可能になります：
 ```rust
 fn check<Color>(color: Color)
 where
     Vec: Into<Color> + Into<f32>,
 {
     let _: f32 = Vec.into();
-    // Without the global `Vec: Into<f32>`  bound we'd
-    // eagerly use the non-global `Vec: Into<Color>` bound
-    // here, causing this to fail.
+    // グローバルな`Vec: Into<f32>`境界がなければ、
+    // 非グローバルな`Vec: Into<Color>`境界を
+    // 熱心に使用し、これが失敗します。
 }
 
 struct Vec;
@@ -209,15 +206,15 @@ impl From<Vec> for f32 {
 
 ### `CandidateSource::AliasBound`
 
-We prefer alias-bound candidates over impls. We currently use this preference to guide type inference, causing the following to compile. I personally don't think this preference is desirable 🤷
+エイリアス境界候補をimplよりも優先します。現在、この優先順位を使用して型推論をガイドし、次のコンパイルを可能にしています。個人的には、この優先順位が望ましいとは思いません 🤷
 ```rust
 pub trait Dyn {
     type Word: Into<u64>;
     fn d_tag(&self) -> Self::Word;
     fn tag32(&self) -> Option<u32> {
         self.d_tag().into().try_into().ok()
-        // prove `Self::Word: Into<?0>` and then select a method
-        // on `?0`, needs eager inference.
+        // `Self::Word: Into<?0>`を証明してから、
+        // `?0`でメソッドを選択します。熱心な推論が必要です。
     }
 }
 ```
@@ -227,17 +224,17 @@ fn impl_trait() -> impl Into<u32> {
 }
 
 fn main() {
-    // There are two possible types for `x`:
-    // - `u32` by using the "alias bound" of `impl Into<u32>`
-    // - `impl Into<u32>`, i.e. `u16`, by using `impl<T> From<T> for T`
+    // `x`には2つの可能な型があります：
+    // - `impl Into<u32>`の「エイリアス境界」を使用した`u32`
+    // - `impl<T> From<T> for T`を使用した`impl Into<u32>`、つまり`u16`
     //
-    // We infer the type of `x` to be `u32` even though this is not
-    // strictly necessary and can even lead to surprising errors.
+    // 厳密には必要ではなく、驚くべきエラーを引き起こす可能性がある場合でも、
+    // `x`の型を`u32`と推論します。
     let x = impl_trait().into();
     println!("{}", std::mem::size_of_val(&x));
 }
 ```
-This preference also avoids ambiguity due to region constraints, I don't know whether people rely on this in practice.
+この優先順位は、領域制約による曖昧性も回避します。これが実際に依存されているかどうかはわかりません。
 ```rust
 trait Bound<'a> {}
 impl<T> Bound<'static> for T {}
@@ -247,25 +244,25 @@ trait Trait<'a> {
 
 fn impls_bound<'b, T: Bound<'b>>() {}
 fn foo<'a, T: Trait<'a>>() {
-    // Should we infer this to `'a` or `'static`.
+    // これを`'a`または`'static`のどちらに推論すべきか。
     impls_bound::<'_, T::Assoc>();
 }
 ```
 
 ### `CandidateSource::BuiltinImpl(BuiltinImplSource::Object(_))`
 
-We prefer builtin trait object impls over user-written impls. This is **unsound** and should be remoed in the future. See [#57893](https://github.com/rust-lang/rust/issues/57893) and [#141347](https://github.com/rust-lang/rust/pull/141347) for more details.
+ビルトイントレイトオブジェクトimplをユーザー記述のimplよりも優先します。これは**健全ではなく**、将来的に削除されるべきです。詳細については、[#57893](https://github.com/rust-lang/rust/issues/57893)および[#141347](https://github.com/rust-lang/rust/pull/141347)を参照してください。
 
-## `NormalizesTo` goals
+## `NormalizesTo`ゴール
 
-The candidate preference behavior during normalization is implemented in [`fn assemble_and_merge_candidates`].
+正規化中の候補優先順位の動作は、[`fn assemble_and_merge_candidates`]で実装されています。
 
-### Where-bounds shadow impls
+### Where境界はimplをシャドウする
 
-Normalization of associated items does not consider impls if the corresponding trait goal has been proven via a `ParamEnv` or `AliasBound` candidate.
-This means that for where-bounds which do not constrain associated types, the associated types remain *rigid*.
+関連アイテムの正規化は、対応するトレイトゴールが`ParamEnv`または`AliasBound`候補を介して証明されている場合、implを考慮しません。
+これは、関連型を制約しないwhere境界の場合、関連型が*剛体*のままであることを意味します。
 
-This is necessary to avoid unnecessary region constraints from applying impls.
+これは、implの適用による不要な領域制約を回避するために必要です。
 ```rust
 trait Trait<'a> {
     type Assoc;
@@ -279,16 +276,16 @@ fn foo<'a>()
 where
     u32: Trait<'a>,
 {
-    // Normalizing the return type would use the impl, proving
-    // the `T: Trait` where-bound would use the where-bound, resulting
-    // in different region constraints.
+    // 戻り値の型を正規化するとimplが使用され、
+    // `T: Trait` where境界を証明するとwhere境界が使用され、
+    // 異なる領域制約が発生します。
     bar::<'_, u32>();
 }
 ```
 
-### We always consider `AliasBound` candidates
+### 常に`AliasBound`候補を考慮する
 
-In case the where-bound does not specify the associated item, we consider `AliasBound` candidates instead of treating the alias as rigid, even though the trait goal was proven via a `ParamEnv` candidate.
+where境界が関連アイテムを指定しない場合、トレイトゴールが`ParamEnv`候補を介して証明された場合でも、エイリアスを剛体として扱う代わりに`AliasBound`候補を考慮します。
 
 ```rust
 trait Super {
@@ -299,14 +296,14 @@ trait Bound {
 }
 trait Trait: Super {}
 
-// Elaborating the environment results in a `T::Assoc: Super` where-bound.
-// This where-bound must not prevent normalization via the `Super<Assoc = u32>`
-// item bound.
+// 環境を精緻化すると、`T::Assoc: Super` where境界が得られます。
+// このwhere境界は、`Super<Assoc = u32>`
+// アイテム境界を介した正規化を妨げてはなりません。
 fn heck<T: Bound<Assoc: Trait>>(x: <T::Assoc as Super>::Assoc) -> u32 {
     x
 }
 ```
-Using such an alias can result in additional region constraints, cc [#133044].
+このようなエイリアスを使用すると、追加の領域制約が発生する可能性があります。[#133044]を参照してください。
 ```rust
 trait Bound<'a> {
     type Assoc;
@@ -316,20 +313,20 @@ trait Trait {
 }
 
 fn heck<'a, T: Trait<Assoc: Bound<'a>>>(x: <T::Assoc as Bound<'a>>::Assoc) {
-    // Normalizing the associated type requires `T::Assoc: Bound<'static>` as it
-    // uses the `Bound<'static>` alias-bound instead of keeping the alias rigid.
+    // 関連型を正規化するには、`Bound<'static>`エイリアス境界を使用する代わりに
+    // エイリアスを剛体に保つため、`T::Assoc: Bound<'static>`が必要です。
     drop(x);
 }
 ```
 
-### We prefer `ParamEnv` candidates over `AliasBound`
+### `ParamEnv`候補を`AliasBound`よりも優先
 
-While we use `AliasBound` candidates if the where-bound does not specify the associated type, in case it does, we prefer the where-bound.
-This is necessary for the following example:
+where境界が関連型を指定しない場合は`AliasBound`候補を使用しますが、指定する場合はwhere境界を優先します。
+これは次の例で必要です：
 ```rust
-// Make sure we prefer the `I::IntoIterator: Iterator<Item = ()>`
-// where-bound over the `I::Intoiterator: Iterator<Item = I::Item>`
-// alias-bound.
+// `I::IntoIterator: Iterator<Item = ()>`
+// where境界を`I::Intoiterator: Iterator<Item = I::Item>`
+// エイリアス境界よりも優先することを確認します。
 
 trait Iterator {
     type Item;
@@ -347,27 +344,27 @@ where
     I: IntoIterator,
     I::IntoIter: Iterator<Item = ()>,
 {
-    // We need to prefer the `I::IntoIterator: Iterator<Item = ()>`
-    // where-bound over the `I::Intoiterator: Iterator<Item = I::Item>`
-    // alias-bound.
+    // `I::IntoIterator: Iterator<Item = ()>`
+    // where境界を`I::Intoiterator: Iterator<Item = I::Item>`
+    // エイリアス境界よりも優先する必要があります。
     normalize::<I::IntoIter>();
 }
 ```
 
-### We always consider where-bounds
+### 常にwhere境界を考慮
 
-Even if the trait goal was proven via an impl, we still prefer `ParamEnv` candidates, if any exist.
+トレイトゴールがimplを介して証明された場合でも、存在する場合は`ParamEnv`候補を優先します。
 
-#### We prefer "orphaned" where-bounds
+#### 「孤立した」where境界を優先
 
-We add "orphaned" `Projection` clauses into the `ParamEnv` when normalizing item bounds of GATs and RPITIT in `fn check_type_bounds`.
-We need to prefer these `ParamEnv` candidates over impls and other where-bounds. 
+`fn check_type_bounds`でGATおよびRPITITのアイテム境界を正規化する際に、「孤立した」`Projection`句を`ParamEnv`に追加します。
+これらの`ParamEnv`候補をimplおよび他のwhere境界よりも優先する必要があります。
 ```rust
 #![feature(associated_type_defaults)]
 trait Foo {
-    // We should be able to prove that `i32: Baz<Self>` because of
-    // the impl below, which requires that `Self::Bar<()>: Eq<i32>`
-    // which is true, because we assume `for<T> Self::Bar<T> = i32`.
+    // 以下のimplのために`i32: Baz<Self>`を証明できるはずです。
+    // これには`Self::Bar<()>: Eq<i32>`が必要ですが、
+    // `for<T> Self::Bar<T> = i32`を仮定するため、これは真です。
     type Bar<T>: Baz<Self> = i32;
 }
 trait Baz<T: ?Sized> {}
@@ -376,11 +373,11 @@ trait Eq<T> {}
 impl<T> Eq<T> for T {}
 ```
 
-I don't fully understand the cases where this preference is actually necessary and haven't been able to exploit this in fun ways yet, but 🤷
+この優先順位が実際に必要なケースを完全には理解しておらず、楽しい方法でこれを悪用することもできていませんが 🤷
 
-#### We prefer global where-bounds over impls
+#### グローバルwhere境界をimplよりも優先
 
-This is necessary for the following to compile. I don't know whether anything relies on it in practice 🤷
+これは次のコンパイルに必要です。実際にこれに依存しているかどうかはわかりません 🤷
 ```rust
 trait Id {
     type This;
@@ -396,7 +393,7 @@ where
     x
 }
 ```
-This means normalization can result in additional region constraints, cc [#133044].
+これは、正規化が追加の領域制約を引き起こす可能性があることを意味します。[#133044]を参照してください。
 ```rust
 trait Trait {
     type Assoc;
@@ -413,8 +410,8 @@ fn foo<'a>()
 where
     &'static u32: Trait<Assoc = u32>,
 {
-    trait_bound::<&'a u32>(); // ok, proven via impl
-    normalize::<&'a u32>(); // error, proven via where-bound
+    trait_bound::<&'a u32>(); // ok、implを介して証明
+    normalize::<&'a u32>(); // error、where境界を介して証明
 }
 ```
 

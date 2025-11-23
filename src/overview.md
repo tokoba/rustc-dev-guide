@@ -1,133 +1,131 @@
-# Overview of the compiler
+# コンパイラの概要
 
-This chapter is about the overall process of compiling a program -- how
-everything fits together.
+この章は、プログラムのコンパイルの全体的なプロセス、つまり
+すべてがどのように組み合わさるかについてです。
 
-The Rust compiler is special in two ways: it does things to your code that
-other compilers don't do (e.g. borrow-checking) and it has a lot of
-unconventional implementation choices (e.g. queries). We will talk about these
-in turn in this chapter, and in the rest of the guide, we will look at the
-individual pieces in more detail.
+Rustコンパイラは2つの点で特別です：他のコンパイラがしないことをコードに対して行い
+（例：借用チェック）、多くの型破りな実装の選択をしています
+（例：クエリ）。この章では、これらについて順番に説明します。
+そして、ガイドの残りの部分では、個々の部分をより詳細に見ていきます。
 
-## What the compiler does to your code
+## コンパイラがコードに対して行うこと
 
-So first, let's look at what the compiler does to your code. For now, we will
-avoid mentioning how the compiler implements these steps except as needed.
+まず、コンパイラがコードに対して何を行うかを見てみましょう。今のところ、
+これらのステップをコンパイラがどのように実装しているかについては、
+必要な場合を除いて言及しません。
 
-### Invocation
+### 呼び出し
 
-Compilation begins when a user writes a Rust source program in text and invokes
-the `rustc` compiler on it. The work that the compiler needs to perform is
-defined by command-line options. For example, it is possible to enable nightly
-features (`-Z` flags), perform `check`-only builds, or emit the LLVM
-Intermediate Representation (`LLVM-IR`) rather than executable machine code.
-The `rustc` executable call may be indirect through the use of `cargo`.
+コンパイルは、ユーザーがRustソースプログラムをテキストで書き、
+`rustc`コンパイラを呼び出すときに始まります。コンパイラが実行する必要がある作業は
+コマンドラインオプションによって定義されます。例えば、nightly機能を有効にする
+（`-Z`フラグ）、`check`のみのビルドを実行する、またはLLVM
+中間表現（`LLVM-IR`）を実行可能な機械語の代わりに出力することが可能です。
+`rustc`実行可能ファイルの呼び出しは、`cargo`の使用を通じて間接的に行われる場合があります。
 
-Command line argument parsing occurs in the [`rustc_driver`]. This crate
-defines the compile configuration that is requested by the user and passes it
-to the rest of the compilation process as a [`rustc_interface::Config`].
+コマンドライン引数の解析は[`rustc_driver`]で行われます。このクレートは、
+ユーザーが要求するコンパイル設定を定義し、それを
+[`rustc_interface::Config`]としてコンパイルプロセスの残りの部分に渡します。
 
-### Lexing and parsing
+### 字句解析と構文解析
 
-The raw Rust source text is analyzed by a low-level *lexer* located in
-[`rustc_lexer`]. At this stage, the source text is turned into a stream of
-atomic source code units known as _tokens_.  The `lexer` supports the
-Unicode character encoding.
+生のRustソーステキストは、[`rustc_lexer`]にある低レベルの*字句解析器*によって分析されます。
+この段階では、ソーステキストは*トークン*として知られる原子的なソースコード単位のストリームに変換されます。
+`字句解析器`はUnicode文字エンコーディングをサポートしています。
 
-The token stream passes through a higher-level lexer located in
-[`rustc_parse`] to prepare for the next stage of the compile process. The
-[`Lexer`] `struct` is used at this stage to perform a set of validations
-and turn strings into interned symbols (_interning_ is discussed later).
-[String interning] is a way of storing only one immutable
-copy of each distinct string value.
+トークンストリームは、コンパイルプロセスの次の段階の準備のために
+[`rustc_parse`]にある高レベルの字句解析器を通過します。
+この段階で[`Lexer`]構造体が使用され、一連の検証を実行し、
+文字列をインターン化されたシンボルに変換します（*インターン化*については後で説明します）。
+[文字列インターン化]は、各異なる文字列値の不変コピーを1つだけ格納する方法です。
 
-The lexer has a small interface and doesn't depend directly on the diagnostic
-infrastructure in `rustc`. Instead it provides diagnostics as plain data which
-are emitted in [`rustc_parse::lexer`] as real diagnostics. The `lexer`
-preserves full fidelity information for both IDEs and procedural macros
-(sometimes referred to as "proc-macros").
+字句解析器は小さなインターフェースを持ち、`rustc`の診断インフラストラクチャに
+直接依存していません。代わりに、診断をプレーンデータとして提供し、
+[`rustc_parse::lexer`]で実際の診断として発行されます。`字句解析器`は、
+IDE や手続きマクロ（「proc-macros」と呼ばれることもあります）の両方のために
+完全な忠実度情報を保持します。
 
-The *parser* [translates the token stream from the `lexer` into an Abstract Syntax
-Tree (AST)][parser]. It uses a recursive descent (top-down) approach to syntax
-analysis. The crate entry points for the `parser` are the
-[`Parser::parse_crate_mod()`][parse_crate_mod] and [`Parser::parse_mod()`][parse_mod]
-methods found in [`rustc_parse::parser::Parser`]. The external module parsing
-entry point is [`rustc_expand::module::parse_external_mod`][parse_external_mod].
-And the macro-`parser` entry point is [`Parser::parse_nonterminal()`][parse_nonterminal].
+*パーサー*は、[`字句解析器`からのトークンストリームを抽象構文木（AST）に変換します][parser]。
+再帰降下（トップダウン）アプローチを使用して構文解析を行います。
+`パーサー`のクレートエントリーポイントは、
+[`rustc_parse::parser::Parser`]にある
+[`Parser::parse_crate_mod()`][parse_crate_mod]と[`Parser::parse_mod()`][parse_mod]
+メソッドです。外部モジュール解析のエントリーポイントは
+[`rustc_expand::module::parse_external_mod`][parse_external_mod]です。
+そして、マクロ`パーサー`のエントリーポイントは[`Parser::parse_nonterminal()`][parse_nonterminal]です。
 
-Parsing is performed with a set of [`parser`] utility methods including [`bump`],
-[`check`], [`eat`], [`expect`], [`look_ahead`].
+構文解析は、[`bump`]、[`check`]、[`eat`]、[`expect`]、[`look_ahead`]を含む
+[`parser`]ユーティリティメソッドのセットで実行されます。
 
-Parsing is organized by semantic construct. Separate
-`parse_*` methods can be found in the [`rustc_parse`][rustc_parse_parser_dir]
-directory. The source file name follows the construct name. For example, the
-following files are found in the `parser`:
+構文解析は意味的な構成要素によって整理されています。
+[`rustc_parse`][rustc_parse_parser_dir]ディレクトリには、
+個別の`parse_*`メソッドがあります。ソースファイル名は構成要素名に従います。
+例えば、`parser`には次のファイルがあります：
 
 - [`expr.rs`](https://github.com/rust-lang/rust/blob/HEAD/compiler/rustc_parse/src/parser/expr.rs)
 - [`pat.rs`](https://github.com/rust-lang/rust/blob/HEAD/compiler/rustc_parse/src/parser/pat.rs)
 - [`ty.rs`](https://github.com/rust-lang/rust/blob/HEAD/compiler/rustc_parse/src/parser/ty.rs)
 - [`stmt.rs`](https://github.com/rust-lang/rust/blob/HEAD/compiler/rustc_parse/src/parser/stmt.rs)
 
-This naming scheme is used across many compiler stages. You will find either a
-file or directory with the same name across the parsing, lowering, type
-checking, [Typed High-level Intermediate Representation (`THIR`)][thir] lowering, and
-[Mid-level Intermediate Representation (`MIR`)][mir] building sources.
+この命名スキームは、コンパイラの多くの段階で使用されています。
+構文解析、lowering、型チェック、[型付き高レベル中間表現（`THIR`）][thir] lowering、
+および[中レベル中間表現（`MIR`）][mir]構築のソース全体で、
+同じ名前のファイルまたはディレクトリが見つかります。
 
-Macro-expansion, `AST`-validation, name-resolution, and early linting also take
-place during the lexing and parsing stage.
+マクロ展開、`AST`検証、名前解決、および早期リントも、
+字句解析と構文解析の段階で行われます。
 
-The [`rustc_ast::ast`]::{[`Crate`], [`Expr`], [`Pat`], ...} `AST` nodes are
-returned from the parser while the standard [`Diag`] API is used
-for error handling. Generally Rust's compiler will try to recover from errors
-by parsing a superset of Rust's grammar, while also emitting an error type.
+[`rustc_ast::ast`]::{[`Crate`], [`Expr`], [`Pat`], ...} `AST`ノードは
+パーサーから返され、エラー処理には標準の[`Diag`] APIが使用されます。
+一般的に、Rustのコンパイラはエラーから回復しようとし、
+Rust文法のスーパーセットを解析しながら、エラー型も発行します。
 
 ### `AST` lowering
 
-Next the `AST` is converted into [High-Level Intermediate Representation
-(`HIR`)][hir], a more compiler-friendly representation of the `AST`. This process
-is called "lowering" and involves a lot of desugaring (the expansion and
-formalizing of shortened or abbreviated syntax constructs) of things like loops
-and `async fn`.
+次に、`AST`は[高レベル中間表現（`HIR`）][hir]に変換されます。
+これはコンパイラにとってよりフレンドリーな`AST`の表現です。
+このプロセスは「lowering」と呼ばれ、ループや`async fn`などの
+短縮または省略された構文構成要素の展開と形式化である多くの脱糖を伴います。
 
-We then use the `HIR` to do [*type inference*] (the process of automatic
-detection of the type of an expression), [*trait solving*] (the process of
-pairing up an impl with each reference to a `trait`), and [*type checking*]. Type
-checking is the process of converting the types found in the `HIR` ([`hir::Ty`]),
-which represent what the user wrote, into the internal representation used by
-the compiler ([`Ty<'tcx>`]). It's called type checking because the information
-is used to verify the type safety, correctness and coherence of the types used
-in the program.
+次に、`HIR`を使用して[*型推論*]（式の型の自動検出プロセス）、
+[*トレイト解決*]（`trait`への参照と各implをペアリングするプロセス）、
+および[*型チェック*]を行います。型チェックは、
+`HIR`（[`hir::Ty`]）で見つかった型（ユーザーが書いたものを表す）を、
+コンパイラが使用する内部表現（[`Ty<'tcx>`]）に変換するプロセスです。
+情報は型の安全性、正確性、およびプログラムで使用される型の整合性を
+検証するために使用されるため、型チェックと呼ばれます。
 
 ### `MIR` lowering
 
-The `HIR` is further lowered to `MIR`
-(used for [borrow checking]) by constructing the `THIR`  (an even more desugared `HIR` used for
-pattern and exhaustiveness checking) to convert into `MIR`.
+`HIR`はさらに`MIR`にloweringされます
+（[借用チェック]に使用されます）。これは、`THIR`（パターンと網羅性チェックに使用される、
+さらに脱糖された`HIR`）を構築して`MIR`に変換することによって行われます。
 
-We do [many optimizations on the MIR][mir-opt] because it is generic and that
-improves later code generation and compilation speed. It is easier to do some
-optimizations at `MIR` level than at `LLVM-IR` level. For example LLVM doesn't seem
-to be able to optimize the pattern the [`simplify_try`] `MIR`-opt looks for.
+`MIR`は汎用であるため、[MIRで多くの最適化][mir-opt]を行います。これにより、
+後のコード生成とコンパイル速度が向上します。`MIR`レベルでいくつかの
+最適化を行う方が、`LLVM-IR`レベルで行うよりも簡単です。
+例えば、LLVMは[`simplify_try`] `MIR`-optが探すパターンを
+最適化できないようです。
 
-Rust code is also [_monomorphized_] during code generation, which means making
-copies of all the generic code with the type parameters replaced by concrete
-types. To do this, we need to collect a list of what concrete types to generate
-code for. This is called _monomorphization collection_ and it happens at the
-`MIR` level.
+Rustコードも、コード生成中に[_monomorphization_]されます。
+これは、すべてのジェネリックコードのコピーを作成し、
+型パラメータを具体的な型に置き換えることを意味します。
+これを行うには、どの具体的な型のコードを生成するかのリストを収集する必要があります。
+これは_monomorphizationコレクション_と呼ばれ、`MIR`レベルで行われます。
 
 [_monomorphized_]: https://en.wikipedia.org/wiki/Monomorphization
 
-### Code generation
+### コード生成
 
-We then begin what is simply called _code generation_ or _codegen_. The [code
-generation stage][codegen] is when higher-level representations of source are
-turned into an executable binary. Since `rustc` uses LLVM for code generation,
-the first step is to convert the `MIR` to `LLVM-IR`. This is where the `MIR` is
-actually monomorphized. The `LLVM-IR` is passed to LLVM, which does a lot more
-optimizations on it, emitting machine code which is basically assembly code
-with additional low-level types and annotations added (e.g. an ELF object or
-`WASM`). The different libraries/binaries are then linked together to produce
-the final binary.
+次に、単に_コード生成_または_codegen_と呼ばれるものを開始します。
+[コード生成段階][codegen]は、ソースの高レベル表現が
+実行可能バイナリに変換されるときです。`rustc`はコード生成にLLVMを使用するため、
+最初のステップは`MIR`を`LLVM-IR`に変換することです。
+ここで`MIR`が実際にmonomorphizationされます。`LLVM-IR`はLLVMに渡され、
+LLVMはそれに対して多くの最適化を行い、基本的にアセンブリコードに
+追加の低レベル型と注釈を追加した機械語を発行します
+（例：ELFオブジェクトまたは`WASM`）。次に、異なるライブラリ/バイナリが
+リンクされて最終的なバイナリが生成されます。
 
 [*trait solving*]: traits/resolution.md
 [*type checking*]: type-checking.md
@@ -168,277 +166,277 @@ the final binary.
 [String interning]: https://en.wikipedia.org/wiki/String_interning
 [thir]: ./thir.md
 
-## How it does it
+## どのように行うか
 
-Now that we have a high-level view of what the compiler does to your code,
-let's take a high-level view of _how_ it does all that stuff. There are a lot
-of constraints and conflicting goals that the compiler needs to
-satisfy/optimize for. For example,
+ここまで、コンパイラがコードに対して何を行うかの高レベルビューを見てきました。
+次に、それをすべてどのように行うかの高レベルビューを見てみましょう。
+コンパイラが満たす/最適化する必要がある多くの制約と
+競合する目標があります。例えば：
 
-- Compilation speed: how fast is it to compile a program? More/better
-  compile-time analyses often means compilation is slower.
-  - Also, we want to support incremental compilation, so we need to take that
-    into account. How can we keep track of what work needs to be redone and
-    what can be reused if the user modifies their program?
-    - Also we can't store too much stuff in the incremental cache because
-      it would take a long time to load from disk and it could take a lot
-      of space on the user's system...
-- Compiler memory usage: while compiling a program, we don't want to use more
-  memory than we need.
-- Program speed: how fast is your compiled program? More/better compile-time
-  analyses often means the compiler can do better optimizations.
-- Program size: how large is the compiled binary? Similar to the previous
-  point.
-- Compiler compilation speed: how long does it take to compile the compiler?
-  This impacts contributors and compiler maintenance.
-- Implementation complexity: building a compiler is one of the hardest
-  things a person/group can do, and Rust is not a very simple language, so how
-  do we make the compiler's code base manageable?
-- Compiler correctness: the binaries produced by the compiler should do what
-  the input programs says they do, and should continue to do so despite the
-  tremendous amount of change constantly going on.
-- Integration: a number of other tools need to use the compiler in
-  various ways (e.g. `cargo`, `clippy`, `MIRI`) that must be supported.
-- Compiler stability: the compiler should not crash or fail ungracefully on the
-  stable channel.
-- Rust stability: the compiler must respect Rust's stability guarantees by not
-  breaking programs that previously compiled despite the many changes that are
-  always going on to its implementation.
-- Limitations of other tools: `rustc` uses LLVM in its backend, and LLVM has some
-  strengths we leverage and some aspects we need to work around.
+- コンパイル速度：プログラムのコンパイルにどのくらいの速さか？より多く/より良い
+  コンパイル時解析は、多くの場合コンパイルが遅くなることを意味します。
+  - また、インクリメンタルコンパイルをサポートしたいので、それを
+    考慮に入れる必要があります。ユーザーがプログラムを変更した場合、
+    やり直す必要がある作業と再利用できる作業を追跡するにはどうすればよいでしょうか？
+    - また、インクリメンタルキャッシュにあまり多くのものを保存することはできません。
+      ディスクからロードするのに長い時間がかかり、
+      ユーザーのシステムで多くのスペースを取る可能性があるためです...
+- コンパイラメモリ使用量：プログラムをコンパイルしている間、
+  必要以上のメモリを使用したくありません。
+- プログラム速度：コンパイルされたプログラムはどのくらい速いか？より多く/より良い
+  コンパイル時解析は、多くの場合、コンパイラがより良い最適化を行えることを意味します。
+- プログラムサイズ：コンパイルされたバイナリはどのくらい大きいか？前のポイントと同様です。
+- コンパイラコンパイル速度：コンパイラのコンパイルにどのくらい時間がかかるか？
+  これは貢献者とコンパイラのメンテナンスに影響します。
+- 実装の複雑さ：コンパイラの構築は、人/グループができる最も難しいことの1つであり、
+  Rustは非常に単純な言語ではないため、
+  コンパイラのコードベースをどのように管理可能にするか？
+- コンパイラの正確性：コンパイラが生成するバイナリは、
+  入力プログラムが言うことを行うべきであり、
+  絶えず進行中の膨大な変更にもかかわらず、それを続けるべきです。
+- 統合：他の多くのツールがコンパイラをさまざまな方法で使用する必要があります
+  （例：`cargo`、`clippy`、`MIRI`）。これはサポートする必要があります。
+- コンパイラの安定性：コンパイラは、stableチャネルでクラッシュしたり、
+  不適切に失敗したりしてはなりません。
+- Rustの安定性：コンパイラは、実装に対して常に行われている多くの変更にもかかわらず、
+  以前にコンパイルされたプログラムを壊さないことによって、
+  Rustの安定性保証を尊重する必要があります。
+- 他のツールの制限：`rustc`はバックエンドでLLVMを使用し、LLVMには
+  活用するいくつかの強みと、回避する必要があるいくつかの側面があります。
 
-So, as you continue your journey through the rest of the guide, keep these
-things in mind. They will often inform decisions that we make.
+したがって、ガイドの残りの部分を続けるときは、これらのことを念頭に置いてください。
+これらは、多くの場合、私たちが行う決定に情報を与えます。
 
-### Intermediate representations
+### 中間表現
 
-As with most compilers, `rustc` uses some intermediate representations (IRs) to
-facilitate computations. In general, working directly with the source code is
-extremely inconvenient and error-prone. Source code is designed to be human-friendly while at
-the same time being unambiguous, but it's less convenient for doing something
-like, say, type checking.
+ほとんどのコンパイラと同様に、`rustc`は計算を容易にするために
+いくつかの中間表現（IR）を使用します。一般的に、ソースコードで直接作業することは
+非常に不便でエラーが発生しやすいです。ソースコードは人間にとってフレンドリーである
+ように設計されていますが、同時に曖昧性がないようにもなっていますが、
+型チェックのようなことをするにはあまり便利ではありません。
 
-Instead most compilers, including `rustc`, build some sort of IR out of the
-source code which is easier to analyze. `rustc` has a few IRs, each optimized
-for different purposes:
+代わりに、`rustc`を含むほとんどのコンパイラは、
+分析しやすいソースコードからある種のIRを構築します。
+`rustc`にはいくつかのIRがあり、それぞれ異なる目的に最適化されています：
 
-- Token stream: the lexer produces a stream of tokens directly from the source
-  code. This stream of tokens is easier for the parser to deal with than raw
-  text.
-- Abstract Syntax Tree (`AST`): the abstract syntax tree is built from the stream
-  of tokens produced by the lexer. It represents
-  pretty much exactly what the user wrote. It helps to do some syntactic sanity
-  checking (e.g. checking that a type is expected where the user wrote one).
-- High-level IR (HIR): This is a sort of desugared `AST`. It's still close
-  to what the user wrote syntactically, but it includes some implicit things
-  such as some elided lifetimes, etc. This IR is amenable to type checking.
-- Typed `HIR` (THIR) _formerly High-level Abstract IR (HAIR)_: This is an
-  intermediate between `HIR` and MIR. It is like the `HIR` but it is fully typed
-  and a bit more desugared (e.g. method calls and implicit dereferences are
-  made fully explicit). As a result, it is easier to lower to `MIR` from `THIR`  than
-  from HIR.
-- Middle-level IR (`MIR`): This IR is basically a Control-Flow Graph (CFG). A CFG
-  is a type of diagram that shows the basic blocks of a program and how control
-  flow can go between them. Likewise, `MIR` also has a bunch of basic blocks with
-  simple typed statements inside them (e.g. assignment, simple computations,
-  etc) and control flow edges to other basic blocks (e.g., calls, dropping
-  values). `MIR` is used for borrow checking and other
-  important dataflow-based checks, such as checking for uninitialized values.
-  It is also used for a series of optimizations and for constant evaluation (via
-  `MIRI`). Because `MIR` is still generic, we can do a lot of analyses here more
-  efficiently than after monomorphization.
-- `LLVM-IR`: This is the standard form of all input to the LLVM compiler. `LLVM-IR`
-  is a sort of typed assembly language with lots of annotations. It's
-  a standard format that is used by all compilers that use LLVM (e.g. the clang
-  C compiler also outputs `LLVM-IR`). `LLVM-IR` is designed to be easy for other
-  compilers to emit and also rich enough for LLVM to run a bunch of
-  optimizations on it.
+- トークンストリーム：字句解析器は、ソースコードから直接トークンのストリームを生成します。
+  このトークンストリームは、パーサーが生のテキストよりも扱いやすいです。
+- 抽象構文木（`AST`）：抽象構文木は、字句解析器によって生成された
+  トークンストリームから構築されます。これは、
+  ユーザーが書いたものをほぼ正確に表します。構文の健全性チェック
+  （例：ユーザーが型を書いた場所に型が期待されていることを確認する）を
+  行うのに役立ちます。
+- 高レベルIR（HIR）：これは、脱糖された`AST`の一種です。まだユーザーが
+  構文的に書いたものに近いですが、いくつかの暗黙的なものを含みます。
+  例えば、いくつかの省略されたライフタイムなど。このIRは型チェックに適しています。
+- 型付き`HIR`（THIR）_以前は高レベル抽象IR（HAIR）_：これは
+  `HIR`とMIRの間の中間です。`HIR`に似ていますが、完全に型付けされており、
+  もう少し脱糖されています（例：メソッド呼び出しと暗黙的な逆参照は
+  完全に明示的になります）。その結果、`HIR`からよりも`THIR`から`MIR`に
+  loweringする方が簡単です。
+- 中レベルIR（`MIR`）：このIRは基本的にコントロールフローグラフ（CFG）です。CFGは、
+  プログラムの基本ブロックと、それらの間でコントロールフローがどのように
+  移動できるかを示す図の一種です。同様に、`MIR`には、
+  その中に単純な型付きステートメント（例：割り当て、単純な計算など）と、
+  他の基本ブロックへのコントロールフローエッジ（例：呼び出し、値の削除など）を
+  持つ基本ブロックの束があります。`MIR`は、借用チェックと
+  他の重要なデータフローベースのチェック（例：未初期化値のチェック）に使用されます。
+  また、一連の最適化と定数評価（`MIRI`を介して）にも使用されます。
+  `MIR`はまだ汎用であるため、monomorphization後よりも
+  効率的に多くの解析をここで行うことができます。
+- `LLVM-IR`：これは、LLVMコンパイラへのすべての入力の標準形式です。`LLVM-IR`は、
+  多くの注釈を持つ型付きアセンブリ言語の一種です。
+  LLVMを使用するすべてのコンパイラ（例：clang Cコンパイラも`LLVM-IR`を出力します）が
+  使用する標準形式です。`LLVM-IR`は、他のコンパイラが発行しやすく、
+  LLVMがその上で多くの最適化を実行するのに十分なリッチさを持つように設計されています。
 
-One other thing to note is that many values in the compiler are _interned_.
-This is a performance and memory optimization in which we allocate the values in
-a special allocator called an
-_[arena]_. Then, we pass
-around references to the values allocated in the arena. This allows us to make
-sure that identical values (e.g. types in your program) are only allocated once
-and can be compared cheaply by comparing pointers. Many of the intermediate
-representations are interned.
+もう1つ注意すべきことは、コンパイラ内の多くの値が_interned_されていることです。
+これは、値を_[arena]_と呼ばれる特別なアロケータに割り当てる
+パフォーマンスとメモリの最適化です。次に、arenaに割り当てられた値への
+参照を渡します。これにより、同一の値（例：プログラム内の型）が
+一度だけ割り当てられ、ポインタを比較することで安価に比較できるようになります。
+多くの中間表現がインターン化されています。
 
 [arena]: https://en.wikipedia.org/wiki/Region-based_memory_management
 
-### Queries
+### クエリ
 
-The first big implementation choice is Rust's use of the _query_ system in its
-compiler. The Rust compiler _is not_ organized as a series of passes over the
-code which execute sequentially. The Rust compiler does this to make
-incremental compilation possible -- that is, if the user makes a change to
-their program and recompiles, we want to do as little redundant work as
-possible to output the new binary.
+最初の大きな実装の選択は、コンパイラでの_クエリ_システムの使用です。
+Rustコンパイラは、順次実行されるコードに対する一連のパスとして
+整理されて_いません_。Rustコンパイラはこれを行って、
+インクリメンタルコンパイルを可能にします。つまり、ユーザーがプログラムに
+変更を加えて再コンパイルする場合、新しいバイナリを出力するために
+可能な限り冗長な作業を少なくしたいのです。
 
-In `rustc`, all the major steps above are organized as a bunch of queries that
-call each other. For example, there is a query to ask for the type of something
-and another to ask for the optimized `MIR` of a function. These queries can call
-each other and are all tracked through the query system. The results of the
-queries are cached on disk so that the compiler can tell which queries' results
-changed from the last compilation and only redo those. This is how incremental
-compilation works.
+`rustc`では、上記のすべての主要なステップは、互いに呼び出す一連のクエリとして
+整理されています。例えば、何かの型を尋ねるクエリと、
+関数の最適化された`MIR`を尋ねる別のクエリがあります。
+これらのクエリは互いに呼び出すことができ、すべてがクエリシステムを通じて
+追跡されます。クエリの結果はディスクにキャッシュされるため、
+コンパイラは最後のコンパイルからどのクエリの結果が変更されたかを判断し、
+それらのみをやり直すことができます。これがインクリメンタルコンパイルの
+仕組みです。
 
-In principle, for the query-fied steps, we do each of the above for each item
-individually. For example, we will take the `HIR` for a function and use queries
-to ask for the `LLVM-IR` for that HIR. This drives the generation of optimized
-`MIR`, which drives the borrow checker, which drives the generation of `MIR`, and
-so on.
+原則として、クエリ化されたステップでは、各アイテムに対して上記の各作業を行います。
+例えば、関数の`HIR`を取得し、クエリを使用してその`HIR`の`LLVM-IR`を要求します。
+これにより、最適化された`MIR`の生成が駆動され、それが借用チェッカーを駆動し、
+それが`MIR`の生成を駆動します。
 
-... except that this is very over-simplified. In fact, some queries are not
-cached on disk, and some parts of the compiler have to run for all code anyway
-for correctness even if the code is dead code (e.g. the borrow checker). For
-example, [currently the `mir_borrowck` query is first executed on all functions
-of a crate.][passes] Then the codegen backend invokes the
-`collect_and_partition_mono_items` query, which first recursively requests the
-`optimized_mir` for all reachable functions, which in turn runs `mir_borrowck`
-for that function and then creates codegen units. This kind of split will need
-to remain to ensure that unreachable functions still have their errors emitted.
+...ただし、これは非常に単純化しすぎています。実際には、一部のクエリは
+ディスクにキャッシュされず、コンパイラの一部の部分は、デッドコードであっても
+正確性のためにすべてのコードに対して実行する必要があります（例：借用チェッカー）。
+例えば、[現在、`mir_borrowck`クエリは最初にクレートのすべての関数で実行されます][passes]。
+次に、codegenバックエンドが`collect_and_partition_mono_items`クエリを呼び出します。
+このクエリは、すべての到達可能な関数に対して`optimized_mir`を再帰的に要求し、
+その関数に対して`mir_borrowck`を実行してからcodegenユニットを作成します。
+この種の分割は、到達不可能な関数がまだエラーを発行するようにするために
+残る必要があります。
 
 [passes]: https://github.com/rust-lang/rust/blob/e69c7306e2be08939d95f14229e3f96566fb206c/compiler/rustc_interface/src/passes.rs#L791
 
-Moreover, the compiler wasn't originally built to use a query system; the query
-system has been retrofitted into the compiler, so parts of it are not query-fied
-yet. Also, LLVM isn't our code, so that isn't querified either. The plan is to
-eventually query-fy all of the steps listed in the previous section,
-but as of <!-- date-check --> November 2022, only the steps between `HIR` and
-`LLVM-IR` are query-fied. That is, lexing, parsing, name resolution, and macro
-expansion are done all at once for the whole program.
+さらに、コンパイラはもともとクエリシステムを使用するように構築されていませんでした。
+クエリシステムはコンパイラに後付けされたため、
+その部分の一部はまだクエリ化されていません。また、LLVMは私たちのコードではないため、
+それもクエリ化されていません。計画は、最終的に
+前のセクションでリストされているすべてのステップをクエリ化することですが、
+<!-- date-check --> 2022年11月現在、`HIR`と`LLVM-IR`の間のステップのみが
+クエリ化されています。つまり、字句解析、構文解析、名前解決、および
+マクロ展開は、プログラム全体に対して一度に行われます。
 
-One other thing to mention here is the all-important "typing context",
-[`TyCtxt`], which is a giant struct that is at the center of all things.
-(Note that the name is mostly historic. This is _not_ a "typing context" in the
-sense of `Γ` or `Δ` from type theory. The name is retained because that's what
-the name of the struct is in the source code.) All
-queries are defined as methods on the [`TyCtxt`] type, and the in-memory query
-cache is stored there too. In the code, there is usually a variable called
-`tcx` which is a handle on the typing context. You will also see lifetimes with
-the name `'tcx`, which means that something is tied to the lifetime of the
-[`TyCtxt`] (usually it is stored or interned there).
+ここでもう1つ言及すべきことは、非常に重要な「型付けコンテキスト」、
+[`TyCtxt`]です。これは、すべてのものの中心にある巨大な構造体です。
+（名前はほとんど歴史的なものです。これは型理論の`Γ`や`Δ`の意味での
+「型付けコンテキスト」では_ありません_。ソースコードの構造体の名前がそうであるため、
+名前は保持されています。）すべてのクエリは[`TyCtxt`]型のメソッドとして定義されており、
+メモリ内クエリキャッシュもそこに格納されています。コードでは、通常、
+型付けコンテキストのハンドルである`tcx`という変数があります。
+また、`'tcx`という名前のライフタイムも見られます。これは、何かが
+[`TyCtxt`]のライフタイムに結び付けられていることを意味します
+（通常はそこに格納またはインターン化されています）。
 
 [`TyCtxt`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html
 
-For more information about queries in the compiler, see [the queries chapter][queries].
+コンパイラのクエリの詳細については、[クエリの章][queries]を参照してください。
 
 [queries]: ./query.md
 
 ### `ty::Ty`
 
-Types are really important in Rust, and they form the core of a lot of compiler
-analyses. The main type (in the compiler) that represents types (in the user's
-program) is [`rustc_middle::ty::Ty`][ty]. This is so important that we have a whole chapter
-on [`ty::Ty`][ty], but for now, we just want to mention that it exists and is the way
-`rustc` represents types!
+型はRustで非常に重要であり、多くのコンパイラ解析の中核を形成しています。
+（ユーザーのプログラムの）型を表す（コンパイラ内の）主要な型は
+[`rustc_middle::ty::Ty`][ty]です。これは非常に重要なので、
+[`ty::Ty`][ty]に関する章全体がありますが、今のところ、
+それが存在し、`rustc`が型を表す方法であることだけを言及したいと思います！
 
-Also note that the [`rustc_middle::ty`] module defines the [`TyCtxt`] struct we mentioned before.
+また、[`rustc_middle::ty`]モジュールが前に述べた[`TyCtxt`]構造体を定義していることに
+注意してください。
 
 [ty]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.Ty.html
 [`rustc_middle::ty`]: https://doc.rust-lang.org/beta/nightly-rustc/rustc_middle/ty/index.html
 
-### Parallelism
+### 並列処理
 
-Compiler performance is a problem that we would like to improve on
-(and are always working on). One aspect of that is parallelizing
-`rustc` itself.
+コンパイラのパフォーマンスは、改善したい問題です
+（そして常に取り組んでいます）。その1つの側面は、
+`rustc`自体を並列化することです。
 
-Currently, there is only one part of rustc that is parallel by default: 
-[code generation](./parallel-rustc.md#Codegen).
+現在、rustcでデフォルトで並列になっているのは1つの部分だけです：
+[コード生成](./parallel-rustc.md#Codegen)。
 
-However, the rest of the compiler is still not yet parallel. There have been
-lots of efforts spent on this, but it is generally a hard problem. The current
-approach is to turn [`RefCell`]s into [`Mutex`]s -- that is, we
-switch to thread-safe internal mutability. However, there are ongoing
-challenges with lock contention, maintaining query-system invariants under
-concurrency, and the complexity of the code base. One can try out the current
-work by enabling parallel compilation in `bootstrap.toml`. It's still early days,
-but there are already some promising performance improvements.
+ただし、コンパイラの残りの部分はまだ並列ではありません。
+これには多くの努力が費やされてきましたが、一般的に難しい問題です。
+現在のアプローチは、[`RefCell`]を[`Mutex`]に変える、つまり、
+スレッドセーフな内部可変性に切り替えることです。ただし、
+ロックの競合、並行性下でのクエリシステムの不変性の維持、
+およびコードベースの複雑さには継続的な課題があります。
+`bootstrap.toml`で並列コンパイルを有効にすることで、
+現在の作業を試すことができます。まだ初期段階ですが、
+すでにいくつかの有望なパフォーマンス改善があります。
 
 [`RefCell`]: https://doc.rust-lang.org/std/cell/struct.RefCell.html
 [`Mutex`]: https://doc.rust-lang.org/std/sync/struct.Mutex.html
 
-### Bootstrapping
+### ブートストラップ
 
-`rustc` itself is written in Rust. So how do we compile the compiler? We use an
-older compiler to compile the newer compiler. This is called [_bootstrapping_].
+`rustc`自体はRustで書かれています。では、コンパイラをどのようにコンパイルするのでしょうか？
+古いコンパイラを使用して新しいコンパイラをコンパイルします。
+これは[_bootstrapping_]と呼ばれます。
 
-Bootstrapping has a lot of interesting implications. For example, it means
-that one of the major users of Rust is the Rust compiler, so we are
-constantly testing our own software ("eating our own dogfood").
+ブートストラップには多くの興味深い意味があります。例えば、
+Rustの主要なユーザーの1つがRustコンパイラ自体であることを意味するため、
+常に自分たちのソフトウェアをテストしています（「自分たちのドッグフードを食べる」）。
 
-For more details on bootstrapping, see
-[the bootstrapping section of the guide][rustc-bootstrap].
+ブートストラップの詳細については、
+[ガイドのブートストラップセクション][rustc-bootstrap]を参照してください。
 
 [_bootstrapping_]: https://en.wikipedia.org/wiki/Bootstrapping_(compilers)
 [rustc-bootstrap]: building/bootstrapping/intro.md
 
 <!--
-# Unresolved Questions
+# 未解決の質問
 
-- Does LLVM ever do optimizations in debug builds?
-- How do I explore phases of the compile process in my own sources (lexer,
-  parser, HIR, etc)? - e.g., `cargo rustc -- -Z unpretty=hir-tree` allows you to
-  view `HIR` representation
-- What is the main source entry point for `X`?
-- Where do phases diverge for cross-compilation to machine code across
-  different platforms?
+- LLVMはデバッグビルドで最適化を行うことがありますか？
+- コンパイルプロセスの各フェーズを自分のソースで探索するにはどうすればよいですか
+  （字句解析器、パーサー、HIRなど）？- 例えば、`cargo rustc -- -Z unpretty=hir-tree`を使用すると、
+  `HIR`表現を表示できます
+- `X`の主要なソースエントリーポイントは何ですか？
+- フェーズは、異なるプラットフォーム間で機械語へのクロスコンパイルに対してどこで分岐しますか？
 -->
 
-# References
+# 参考文献
 
-- Command line parsing
-  - Guide: [The Rustc Driver and Interface](rustc-driver/intro.md)
-  - Driver definition: [`rustc_driver`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_driver/)
-  - Main entry point: [`rustc_session::config::build_session_options`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_session/config/fn.build_session_options.html)
-- Lexical Analysis: Lex the user program to a stream of tokens
-  - Guide: [Lexing and Parsing](the-parser.md)
-  - Lexer definition: [`rustc_lexer`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_lexer/index.html)
-  - Main entry point: [`rustc_lexer::cursor::Cursor::advance_token`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_lexer/cursor/struct.Cursor.html#method.advance_token)
-- Parsing: Parse the stream of tokens to an Abstract Syntax Tree (AST)
-  - Guide: [Lexing and Parsing](the-parser.md)
-  - Guide: [Macro Expansion](macro-expansion.md)
-  - Guide: [Name Resolution](name-resolution.md)
-  - Parser definition: [`rustc_parse`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_parse/index.html)
-  - Main entry points:
-    - [Entry point for first file in crate](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_interface/passes/fn.parse.html)
-    - [Entry point for outline module parsing](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/module/fn.parse_external_mod.html)
-    - [Entry point for macro fragments][parse_nonterminal]
-  - `AST` definition: [`rustc_ast`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast/ast/index.html)
-  - Feature gating: **TODO**
-  - Early linting: **TODO**
-- The High Level Intermediate Representation (HIR)
-  - Guide: [The HIR](hir.md)
-  - Guide: [Identifiers in the HIR](hir.md#identifiers-in-the-hir)
-  - Guide: [The `HIR` Map](hir.md#the-hir-map)
-  - Guide: [Lowering `AST` to `HIR`](./hir/lowering.md)
-  - How to view `HIR` representation for your code `cargo rustc -- -Z unpretty=hir-tree`
-  - Rustc `HIR` definition: [`rustc_hir`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/index.html)
-  - Main entry point: **TODO**
-  - Late linting: **TODO**
-- Type Inference
-  - Guide: [Type Inference](type-inference.md)
-  - Guide: [The ty Module: Representing Types](ty.md) (semantics)
-  - Main entry point (type inference): [`InferCtxtBuilder::enter`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_infer/infer/struct.InferCtxtBuilder.html#method.enter)
-  - Main entry point (type checking bodies): [the `typeck` query](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html#method.typeck)
-    - These two functions can't be decoupled.
-- The Mid Level Intermediate Representation (MIR)
-  - Guide: [The `MIR` (Mid level IR)](mir/index.md)
-  - Definition: [`rustc_middle/src/mir`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/mir/index.html)
-  - Definition of sources that manipulates the MIR: [`rustc_mir_build`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_build/index.html), [`rustc_mir_dataflow`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_dataflow/index.html), [`rustc_mir_transform`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_transform/index.html)
-- The Borrow Checker
-  - Guide: [MIR Borrow Check](borrow_check.md)
-  - Definition: [`rustc_borrowck`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/index.html)
-  - Main entry point: [`mir_borrowck` query](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/fn.mir_borrowck.html)
-- `MIR` Optimizations
-  - Guide: [MIR Optimizations](mir/optimizations.md)
-  - Definition: [`rustc_mir_transform`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_transform/index.html)
-  - Main entry point: [`optimized_mir` query](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_transform/fn.optimized_mir.html)
-- Code Generation
-  - Guide: [Code Generation](backend/codegen.md)
-  - Generating Machine Code from `LLVM-IR` with LLVM - **TODO: reference?**
-  - Main entry point: [`rustc_codegen_ssa::base::codegen_crate`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/base/fn.codegen_crate.html)
-    - This monomorphizes and produces `LLVM-IR` for one codegen unit. It then
-      starts a background thread to run LLVM, which must be joined later.
-    - Monomorphization happens lazily via [`FunctionCx::monomorphize`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/mir/struct.FunctionCx.html#method.monomorphize) and [`rustc_codegen_ssa::base::codegen_instance `](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/base/fn.codegen_instance.html)
+- コマンドライン解析
+  - ガイド：[Rustcドライバーとインターフェース](rustc-driver/intro.md)
+  - ドライバー定義：[`rustc_driver`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_driver/)
+  - メインエントリーポイント：[`rustc_session::config::build_session_options`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_session/config/fn.build_session_options.html)
+- 字句解析：ユーザープログラムをトークンのストリームにレックスする
+  - ガイド：[字句解析と構文解析](the-parser.md)
+  - 字句解析器定義：[`rustc_lexer`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_lexer/index.html)
+  - メインエントリーポイント：[`rustc_lexer::cursor::Cursor::advance_token`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_lexer/cursor/struct.Cursor.html#method.advance_token)
+- 構文解析：トークンのストリームを抽象構文木（AST）に解析する
+  - ガイド：[字句解析と構文解析](the-parser.md)
+  - ガイド：[マクロ展開](macro-expansion.md)
+  - ガイド：[名前解決](name-resolution.md)
+  - パーサー定義：[`rustc_parse`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_parse/index.html)
+  - メインエントリーポイント：
+    - [クレート内の最初のファイルのエントリーポイント](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_interface/passes/fn.parse.html)
+    - [アウトラインモジュール解析のエントリーポイント](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_expand/module/fn.parse_external_mod.html)
+    - [マクロフラグメントのエントリーポイント][parse_nonterminal]
+  - `AST`定義：[`rustc_ast`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast/ast/index.html)
+  - 機能ゲート：**TODO**
+  - 早期リント：**TODO**
+- 高レベル中間表現（HIR）
+  - ガイド：[HIR](hir.md)
+  - ガイド：[HIRの識別子](hir.md#identifiers-in-the-hir)
+  - ガイド：[`HIR`マップ](hir.md#the-hir-map)
+  - ガイド：[`AST`から`HIR`へのlowering](./hir/lowering.md)
+  - コードの`HIR`表現を表示する方法`cargo rustc -- -Z unpretty=hir-tree`
+  - Rustc `HIR`定義：[`rustc_hir`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/index.html)
+  - メインエントリーポイント：**TODO**
+  - 後期リント：**TODO**
+- 型推論
+  - ガイド：[型推論](type-inference.md)
+  - ガイド：[tyモジュール：型の表現](ty.md)（意味論）
+  - メインエントリーポイント（型推論）：[`InferCtxtBuilder::enter`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_infer/infer/struct.InferCtxtBuilder.html#method.enter)
+  - メインエントリーポイント（本体の型チェック）：[`typeck`クエリ](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html#method.typeck)
+    - これら2つの関数は分離できません。
+- 中レベル中間表現（MIR）
+  - ガイド：[`MIR`（中レベルIR）](mir/index.md)
+  - 定義：[`rustc_middle/src/mir`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/mir/index.html)
+  - MIRを操作するソースの定義：[`rustc_mir_build`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_build/index.html)、[`rustc_mir_dataflow`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_dataflow/index.html)、[`rustc_mir_transform`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_transform/index.html)
+- 借用チェッカー
+  - ガイド：[MIR借用チェック](borrow_check.md)
+  - 定義：[`rustc_borrowck`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/index.html)
+  - メインエントリーポイント：[`mir_borrowck`クエリ](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/fn.mir_borrowck.html)
+- `MIR`最適化
+  - ガイド：[MIR最適化](mir/optimizations.md)
+  - 定義：[`rustc_mir_transform`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_transform/index.html)
+  - メインエントリーポイント：[`optimized_mir`クエリ](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_transform/fn.optimized_mir.html)
+- コード生成
+  - ガイド：[コード生成](backend/codegen.md)
+  - LLVMで`LLVM-IR`から機械語を生成する - **TODO: 参照？**
+  - メインエントリーポイント：[`rustc_codegen_ssa::base::codegen_crate`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/base/fn.codegen_crate.html)
+    - これはmonomorphizationを行い、1つのcodegenユニットの`LLVM-IR`を生成します。
+      次に、LLVMを実行するバックグラウンドスレッドを開始します。
+      これは後で結合する必要があります。
+    - Monomorphizationは[`FunctionCx::monomorphize`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/mir/struct.FunctionCx.html#method.monomorphize)と[`rustc_codegen_ssa::base::codegen_instance`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/base/fn.codegen_instance.html)を介して遅延的に発生します

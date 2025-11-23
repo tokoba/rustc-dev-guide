@@ -1,69 +1,43 @@
-# Backend Agnostic Codegen
+# バックエンド非依存のコードジェネレーション
 
 [`rustc_codegen_ssa`]
-provides an abstract interface for all backends to implement,
-namely LLVM, [Cranelift], and [GCC].
+は、すべてのバックエンド（LLVM、[Cranelift]、[GCC]）が実装すべき抽象的なインターフェースを提供します。
 
 [Cranelift]: https://github.com/rust-lang/rustc_codegen_cranelift
 [GCC]: https://github.com/rust-lang/rustc_codegen_gcc
 [`rustc_codegen_ssa`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/index.html
 
-Below is some background information on the refactoring that created this
-abstract interface.
+以下は、この抽象的なインターフェースを作成したリファクタリングに関する背景情報です。
 
-## Refactoring of `rustc_codegen_llvm`
-by Denis Merigoux, October 23rd 2018
+## `rustc_codegen_llvm` のリファクタリング
+Denis Merigoux 著、2018年10月23日
 
-### State of the code before the refactoring
+### リファクタリング前のコードの状態
 
-All the code related to the compilation of MIR into LLVM IR was contained
-inside the `rustc_codegen_llvm` crate. Here is the breakdown of the most
-important elements:
-* the `back` folder (7,800 LOC) implements the mechanisms for creating the
-  different object files and archive through LLVM, but also the communication
-  mechanisms for parallel code generation;
-* the `debuginfo` (3,200 LOC) folder contains all code that passes debug
-  information down to LLVM;
-* the `llvm` (2,200 LOC) folder defines the FFI necessary to communicate with
-  LLVM using the C++ API;
-* the `mir` (4,300 LOC) folder implements the actual lowering from MIR to LLVM
-  IR;
-* the `base.rs` (1,300 LOC) file contains some helper functions but also the
-  high-level code that launches the code generation and distributes the work.
-* the `builder.rs` (1,200 LOC) file contains all the functions generating
-  individual LLVM IR instructions inside a basic block;
-* the `common.rs` (450 LOC) contains various helper functions and all the
-  functions generating LLVM static values;
-* the `type_.rs` (300 LOC) defines most of the type translations to LLVM IR.
+MIRからLLVM IRへのコンパイルに関連するすべてのコードは、`rustc_codegen_llvm` クレート内に含まれていました。最も重要な要素の内訳は以下の通りです：
+* `back` フォルダ（7,800行）は、LLVMを通じて異なるオブジェクトファイルとアーカイブを作成するメカニズムを実装していますが、並列コード生成のための通信メカニズムも実装しています。
+* `debuginfo` フォルダ（3,200行）には、デバッグ情報をLLVMに渡すためのすべてのコードが含まれています。
+* `llvm` フォルダ（2,200行）は、C++ APIを使用してLLVMと通信するために必要なFFIを定義しています。
+* `mir` フォルダ（4,300行）は、MIRからLLVM IRへの実際の低レベル化を実装しています。
+* `base.rs` ファイル（1,300行）には、いくつかのヘルパー関数が含まれていますが、コード生成を起動して作業を分散する高レベルのコードも含まれています。
+* `builder.rs` ファイル（1,200行）には、基本ブロック内で個々のLLVM IR命令を生成するすべての関数が含まれています。
+* `common.rs`（450行）には、さまざまなヘルパー関数と、LLVM静的値を生成するすべての関数が含まれています。
+* `type_.rs`（300行）は、LLVM IRへのほとんどの型変換を定義しています。
 
-The goal of this refactoring is to separate inside this crate code that is
-specific to the LLVM from code that can be reused for other rustc backends. For
-instance, the `mir` folder is almost entirely backend-specific but it relies
-heavily on other parts of the crate. The separation of the code must not affect
-the logic of the code nor its performance.
+このリファクタリングの目標は、このクレート内でLLVMに固有のコードと、他のrustcバックエンドで再利用できるコードを分離することです。例えば、`mir` フォルダはほぼ完全にバックエンド固有ですが、クレートの他の部分に大きく依存しています。コードの分離は、コードのロジックやパフォーマンスに影響を与えてはいけません。
 
-For these reasons, the separation process involves two transformations that
-have to be done at the same time for the resulting code to compile:
+これらの理由から、分離プロセスには、結果のコードがコンパイルされるために同時に行う必要がある2つの変換が含まれます：
 
-1. replace all the LLVM-specific types by generics inside function signatures
-   and structure definitions;
-2. encapsulate all functions calling the LLVM FFI inside a set of traits that
-   will define the interface between backend-agnostic code and the backend.
+1. 関数シグネチャと構造体定義内のすべてのLLVM固有の型をジェネリックに置き換える。
+2. LLVM FFIを呼び出すすべての関数を、バックエンド非依存のコードとバックエンドの間のインターフェースを定義する一連のトレイト内にカプセル化する。
 
-While the LLVM-specific code will be left in `rustc_codegen_llvm`, all the new
-traits and backend-agnostic code will be moved in `rustc_codegen_ssa` (name
-suggestion by @eddyb).
+LLVM固有のコードは `rustc_codegen_llvm` に残されますが、すべての新しいトレイトとバックエンド非依存のコードは `rustc_codegen_ssa` に移動されます（@eddybによる名前の提案）。
 
-### Generic types and structures
+### ジェネリック型と構造体
 
-@irinagpopa started to parametrize the types of `rustc_codegen_llvm` by a
-generic `Value` type, implemented in LLVM by a reference `&'ll Value`. This
-work has been extended to all structures inside the `mir` folder and elsewhere,
-as well as for LLVM's `BasicBlock` and `Type` types.
+@irinagpopaは、`rustc_codegen_llvm` の型をジェネリック `Value` 型でパラメータ化し始めました。これはLLVMでは参照 `&'ll Value` として実装されています。この作業は、`mir` フォルダ内およびその他の場所のすべての構造体、ならびにLLVMの `BasicBlock` と `Type` 型に拡張されました。
 
-The two most important structures for the LLVM codegen are `CodegenCx` and
-`Builder`. They are parametrized by multiple lifetime parameters and the type
-for `Value`.
+LLVMコードジェネレーションの2つの最も重要な構造体は、`CodegenCx` と `Builder` です。これらは、複数のライフタイムパラメータと `Value` の型によってパラメータ化されています。
 
 ```rust,ignore
 struct CodegenCx<'ll, 'tcx> {
@@ -76,23 +50,14 @@ struct Builder<'a, 'll, 'tcx> {
 }
 ```
 
-`CodegenCx` is used to compile one codegen-unit that can contain multiple
-functions, whereas `Builder` is created to compile one basic block.
+`CodegenCx` は、複数の関数を含む1つのコードジェネレーション単位をコンパイルするために使用されますが、`Builder` は1つの基本ブロックをコンパイルするために作成されます。
 
-The code in `rustc_codegen_llvm` has to deal with multiple explicit lifetime
-parameters, that correspond to the following:
-* `'tcx` is the longest lifetime, that corresponds to the original `TyCtxt`
-  containing the program's information;
-* `'a` is a short-lived reference of a `CodegenCx` or another object inside a
-  struct;
-* `'ll` is the lifetime of references to LLVM objects such as `Value` or
-  `Type`.
+`rustc_codegen_llvm` のコードは、以下に対応する複数の明示的なライフタイムパラメータを処理する必要があります：
+* `'tcx` は最も長いライフタイムで、プログラムの情報を含む元の `TyCtxt` に対応します。
+* `'a` は、構造体内の `CodegenCx` または別のオブジェクトの短命な参照です。
+* `'ll` は、`Value` や `Type` などのLLVMオブジェクトへの参照のライフタイムです。
 
-Although there are already many lifetime parameters in the code, making it
-generic uncovered situations where the borrow-checker was passing only due to
-the special nature of the LLVM objects manipulated (they are extern pointers).
-For instance, an additional lifetime parameter had to be added to
-`LocalAnalyser` in `analyse.rs`, leading to the definition:
+コードにはすでに多くのライフタイムパラメータがありますが、ジェネリックにすることで、操作されるLLVMオブジェクトの特殊な性質（それらは外部ポインタです）のためだけに借用チェッカーが通過していた状況が明らかになりました。例えば、`analyse.rs` の `LocalAnalyser` に追加のライフタイムパラメータを追加する必要があり、次の定義になりました：
 
 ```rust,ignore
 struct LocalAnalyzer<'mir, 'a, 'tcx> {
@@ -100,19 +65,11 @@ struct LocalAnalyzer<'mir, 'a, 'tcx> {
 }
 ```
 
-However, the two most important structures `CodegenCx` and `Builder` are not
-defined in the backend-agnostic code. Indeed, their content is highly specific
-of the backend and it makes more sense to leave their definition to the backend
-implementor than to allow just a narrow spot via a generic field for the
-backend's context.
+しかし、最も重要な2つの構造体 `CodegenCx` と `Builder` は、バックエンド非依存のコードでは定義されていません。実際、それらの内容はバックエンドに非常に固有であり、バックエンドのコンテキスト用のジェネリックフィールドを介して狭いスポットだけを許可するよりも、その定義をバックエンド実装者に任せる方が理にかなっています。
 
-### Traits and interface
+### トレイトとインターフェース
 
-Because they have to be defined by the backend, `CodegenCx` and `Builder` will
-be the structures implementing all the traits defining the backend's interface.
-These traits are defined in the folder `rustc_codegen_ssa/traits` and all the
-backend-agnostic code is parametrized by them. For instance, let us explain how
-a function in `base.rs` is parametrized:
+バックエンドによって定義される必要があるため、`CodegenCx` と `Builder` は、バックエンドのインターフェースを定義するすべてのトレイトを実装する構造体になります。これらのトレイトは `rustc_codegen_ssa/traits` フォルダで定義され、すべてのバックエンド非依存のコードはそれらによってパラメータ化されます。例えば、`base.rs` の関数がどのようにパラメータ化されているかを説明しましょう：
 
 ```rust,ignore
 pub fn codegen_instance<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>>(
@@ -123,14 +80,9 @@ pub fn codegen_instance<'a, 'tcx, Bx: BuilderMethods<'a, 'tcx>>(
 }
 ```
 
-In this signature, we have the two lifetime parameters explained earlier and
-the master type `Bx` which satisfies the trait `BuilderMethods` corresponding
-to the interface satisfied by the `Builder` struct. The `BuilderMethods`
-defines an associated type `Bx::CodegenCx` that itself satisfies the
-`CodegenMethods` traits implemented by the struct `CodegenCx`.
+このシグネチャでは、前述の2つのライフタイムパラメータと、`Builder` 構造体が満たすインターフェースに対応する `BuilderMethods` トレイトを満たすマスター型 `Bx` があります。`BuilderMethods` は、構造体 `CodegenCx` によって実装される `CodegenMethods` トレイトを満たす関連型 `Bx::CodegenCx` を定義します。
 
-On the trait side, here is an example with part of the definition of
-`BuilderMethods` in `traits/builder.rs`:
+トレイト側では、`traits/builder.rs` の `BuilderMethods` の定義の一部を示す例を示します：
 
 ```rust,ignore
 pub trait BuilderMethods<'a, 'tcx>:
@@ -157,51 +109,24 @@ pub trait BuilderMethods<'a, 'tcx>:
 }
 ```
 
-Finally, a master structure implementing the `ExtraBackendMethods` trait is
-used for high-level codegen-driving functions like `codegen_crate` in
-`base.rs`. For LLVM, it is the empty `LlvmCodegenBackend`.
-`ExtraBackendMethods` should be implemented by the same structure that
-implements the `CodegenBackend` defined in
-`rustc_codegen_utils/codegen_backend.rs`.
+最後に、`ExtraBackendMethods` トレイトを実装するマスター構造体は、`base.rs` の `codegen_crate` のような高レベルのコードジェネレーション駆動関数に使用されます。LLVMの場合、それは空の `LlvmCodegenBackend` です。`ExtraBackendMethods` は、`rustc_codegen_utils/codegen_backend.rs` で定義されている `CodegenBackend` を実装する同じ構造体によって実装される必要があります。
 
-During the traitification process, certain functions have been converted from
-methods of a local structure to methods of `CodegenCx` or `Builder` and a
-corresponding `self` parameter has been added. Indeed, LLVM stores information
-internally that it can access when called through its API. This information
-does not show up in a Rust data structure carried around when these methods are
-called. However, when implementing a Rust backend for `rustc`, these methods
-will need information from `CodegenCx`, hence the additional parameter (unused
-in the LLVM implementation of the trait).
+トレイト化プロセス中に、特定の関数がローカル構造体のメソッドから `CodegenCx` または `Builder` のメソッドに変換され、対応する `self` パラメータが追加されました。実際、LLVMは内部的に情報を保存しており、そのAPIを通じて呼び出されたときにアクセスできます。この情報は、これらのメソッドが呼び出されたときに持ち運ばれるRustのデータ構造には現れません。しかし、`rustc` のRustバックエンドを実装するとき、これらのメソッドには `CodegenCx` からの情報が必要になるため、追加のパラメータ（トレイトのLLVM実装では未使用）が必要です。
 
-### State of the code after the refactoring
+### リファクタリング後のコードの状態
 
-The traits offer an API which is very similar to the API of LLVM. This is not
-the best solution since LLVM has a very special way of doing things: when
-adding another backend, the traits definition might be changed in order to
-offer more flexibility.
+トレイトは、LLVMのAPIに非常に似たAPIを提供します。これは最良のソリューションではありません。LLVMには非常に特殊なやり方があるためです：別のバックエンドを追加する際、より柔軟性を提供するためにトレイトの定義が変更される可能性があります。
 
-However, the current separation between backend-agnostic and LLVM-specific code
-has allowed the reuse of a significant part of the old `rustc_codegen_llvm`.
-Here is the new LOC breakdown between backend-agnostic (BA) and LLVM for the
-most important elements:
+しかし、バックエンド非依存のコードとLLVM固有のコードの現在の分離により、古い `rustc_codegen_llvm` のかなりの部分を再利用できるようになりました。最も重要な要素について、バックエンド非依存（BA）とLLVMの間の新しいLOC内訳は次のとおりです：
 
-* `back` folder: 3,800 (BA) vs 4,100 (LLVM);
-* `mir` folder: 4,400 (BA) vs 0 (LLVM);
-* `base.rs`: 1,100 (BA) vs 250 (LLVM);
-* `builder.rs`: 1,400 (BA) vs 0 (LLVM);
-* `common.rs`: 350 (BA) vs 350 (LLVM);
+* `back` フォルダ：3,800（BA）対 4,100（LLVM）
+* `mir` フォルダ：4,400（BA）対 0（LLVM）
+* `base.rs`：1,100（BA）対 250（LLVM）
+* `builder.rs`：1,400（BA）対 0（LLVM）
+* `common.rs`：350（BA）対 350（LLVM）
 
-The `debuginfo` folder has been left almost untouched by the splitting and is
-specific to LLVM. Only its high-level features have been traitified.
+`debuginfo` フォルダは、分割によってほとんど手つかずのままで、LLVMに固有です。その高レベルの機能のみがトレイト化されています。
 
-The new `traits` folder has 1500 LOC only for trait definitions. Overall, the
-27,000 LOC-sized old `rustc_codegen_llvm` code has been split into the new
-18,500 LOC-sized new `rustc_codegen_llvm` and the 12,000 LOC-sized
-`rustc_codegen_ssa`. We can say that this refactoring allowed the reuse of
-approximately 10,000 LOC that would otherwise have had to be duplicated between
-the multiple backends of `rustc`.
+新しい `traits` フォルダは、トレイト定義だけで1500行です。全体として、27,000行の古い `rustc_codegen_llvm` コードは、新しい18,500行の `rustc_codegen_llvm` と12,000行の `rustc_codegen_ssa` に分割されました。このリファクタリングにより、複数の `rustc` バックエンド間で重複する必要があった約10,000行を再利用できるようになったと言えます。
 
-The refactored version of `rustc`'s backend introduced no regression over the
-test suite nor in performance benchmark, which is in coherence with the nature
-of the refactoring that used only compile-time parametricity (no trait
-objects).
+リファクタリングされたバージョンの `rustc` バックエンドは、テストスイートやパフォーマンスベンチマークで回帰を引き起こしませんでした。これは、コンパイル時のパラメトリシティのみを使用した（トレイトオブジェクトなし）リファクタリングの性質と一致しています。

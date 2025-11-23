@@ -1,13 +1,13 @@
-# The `rustdoc-gui` test suite
+# `rustdoc-gui`テストスイート
 
-> **FIXME**: This section is a stub. Please help us flesh it out!
+> **FIXME**: このセクションはスタブです。充実させるのを手伝ってください！
 
-This page is about the test suite named `rustdoc-gui` used to test the "GUI" of `rustdoc` (i.e., the HTML/JS/CSS as rendered in a browser).
-For other rustdoc-specific test suites, see [Rustdoc test suites].
+このページは、`rustdoc`の「GUI」（つまり、ブラウザでレンダリングされるHTML/JS/CSS）をテストするために使用される`rustdoc-gui`という名前のテストスイートについて説明します。
+他のrustdoc固有のテストスイートについては、[Rustdocテストスイート]を参照してください。
 
-These use a NodeJS-based tool called [`browser-UI-test`] that uses [puppeteer] to run tests in a headless browser and check rendering and interactivity. For information on how to write this form of test, see [`tests/rustdoc-gui/README.md`][rustdoc-gui-readme] as well as [the description of the `.goml` format][goml-script]
+これらは、[puppeteer]を使用してヘッドレスブラウザでテストを実行し、レンダリングとインタラクティビティをチェックする[`browser-UI-test`]と呼ばれるNodeJSベースのツールを使用します。この形式のテストを書く方法については、[`tests/rustdoc-gui/README.md`][rustdoc-gui-readme]と[`.goml`形式の説明][goml-script]を参照してください。
 
-[Rustdoc test suites]: ../tests/compiletest.md#rustdoc-test-suites
+[Rustdocテストスイート]: ../tests/compiletest.md#rustdoc-test-suites
 [`browser-UI-test`]: https://github.com/GuillaumeGomez/browser-UI-test/
 [puppeteer]: https://pptr.dev/
 [rustdoc-gui-readme]: https://github.com/rust-lang/rust/blob/HEAD/tests/rustdoc-gui/README.md

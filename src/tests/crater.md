@@ -1,45 +1,23 @@
 # Crater
 
-[Crater](https://github.com/rust-lang/crater) is a tool for compiling and
-running tests for _every_ crate on [crates.io](https://crates.io) (and a few on
-GitHub). It is mainly used for checking the extent of breakage when implementing
-potentially breaking changes and ensuring lack of breakage by running beta vs
-stable compiler versions.
+[Crater](https://github.com/rust-lang/crater)は、[crates.io](https://crates.io)上の_すべての_クレート（およびGitHub上のいくつか）のテストをコンパイルして実行するためのツールです。主に、潜在的に破壊的な変更を実装するときの破壊の範囲をチェックしたり、ベータコンパイラバージョンと安定コンパイラバージョンを実行して破壊がないことを確認したりするために使用されます。
 
-## When to run Crater
+## Craterを実行するタイミング
 
-You should request a Crater run if your PR makes large changes to the compiler
-or could cause breakage. If you are unsure, feel free to ask your PR's reviewer.
+PRがコンパイラに大きな変更を加える場合、または破壊を引き起こす可能性がある場合は、Crater実行をリクエストする必要があります。確信が持てない場合は、PRのレビュアーに気軽に尋ねてください。
 
-## Requesting Crater Runs
+## Crater実行のリクエスト
 
-The Rust team maintains a few machines that can be used for Crater runs
-on the changes introduced by a PR. If your PR needs a Crater run, leave a
-comment for the triage team in the PR thread. Please inform the team whether you
-require a "check-only" Crater run, a "build only" Crater run, or a
-"build-and-test" Crater run. The difference is primarily in time;
-if you're not sure, go for the build-and-test run. If
-making changes that will only have an effect at compile-time (e.g., implementing
-a new trait), then you only need a check run.
+Rustチームは、PRによって導入された変更に対してCrater実行に使用できるいくつかのマシンを維持しています。PRにCrater実行が必要な場合は、PRスレッドでトリアージチームにコメントを残してください。「チェックのみ」のCrater実行、「ビルドのみ」のCrater実行、または「ビルドとテスト」のCrater実行が必要かどうかをチームに知らせてください。違いは主に時間です。確信が持てない場合は、ビルドとテストの実行を選択してください。コンパイル時にのみ効果がある変更を加える場合（例：新しいトレイトの実装）、チェック実行のみが必要です。
 
-Your PR will be enqueued by the triage team and the results will be posted when
-they are ready. Check runs will take around ~3-4 days, and the other two taking
-5-6 days on average.
+PRはトリアージチームによってキューに入れられ、準備ができたら結果が投稿されます。チェック実行には約3〜4日かかり、他の2つは平均5〜6日かかります。
 
-While Crater is really useful, it is also important to be aware of a few
-caveats:
+Craterは非常に役立ちますが、いくつかの注意点に注意することも重要です：
 
-- Not all code is on crates.io! There is a lot of code in repos on GitHub and
-  elsewhere. Also, companies may not wish to publish their code. Thus, a
-  successful Crater run does not mean there will be no
-  breakage; you still need to be careful.
+- すべてのコードがcrates.io上にあるわけではありません！GitHubや他の場所にあるリポジトリにはたくさんのコードがあります。また、企業はコードを公開したくない場合があります。したがって、Crater実行が成功しても破壊がないという意味ではありません。それでも注意する必要があります。
 
-- Crater only runs Linux builds on x86_64. Thus, other architectures and
-  platforms are not tested. Critically, this includes Windows.
+- Craterはx86_64上のLinuxビルドのみを実行します。したがって、他のアーキテクチャとプラットフォームはテストされません。重要なことに、これにはWindowsが含まれます。
 
-- Many crates are not tested. This could be for a lot of reasons, including that
-  the crate doesn't compile any more (e.g. used old nightly features), has
-  broken or flaky tests, requires network access, or other reasons.
+- 多くのクレートはテストされていません。これには、クレートがもはやコンパイルされない（例：古いnightly機能を使用した）、テストが壊れているまたは不安定である、ネットワークアクセスが必要である、その他の理由など、多くの理由が考えられます。
 
-- Before Crater can be run, `@bors try` needs to succeed in building artifacts.
-  This means that if your code doesn't compile, you cannot run Crater.
+- Craterを実行する前に、`@bors try`がアーティファクトのビルドに成功する必要があります。これは、コードがコンパイルされない場合、Craterを実行できないことを意味します。

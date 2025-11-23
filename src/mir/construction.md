@@ -1,36 +1,24 @@
-# MIR construction
+# MIRの構築
 
-The lowering of [HIR] to [MIR] occurs for the following (probably incomplete)
-list of items:
+[HIR]から[MIR]への変換は、以下の（おそらく不完全な）項目に対して行われます：
 
-* Function and closure bodies
-* Initializers of `static` and `const` items
-* Initializers of enum discriminants
-* Glue and shims of any kind
-    * Tuple struct initializer functions
-    * Drop code (the `Drop::drop` function is not called directly)
-    * Drop implementations of types without an explicit `Drop` implementation
+* 関数とクロージャの本体
+* `static`と`const`アイテムの初期化子
+* 列挙型の判別値の初期化子
+* あらゆる種類の糊コードとshim
+    * タプル構造体の初期化関数
+    * ドロップコード（`Drop::drop`関数は直接呼び出されません）
+    * 明示的な`Drop`実装を持たない型のドロップ実装
 
-The lowering is triggered by calling the [`mir_built`] query. The MIR builder does
-not actually use the HIR but operates on the [THIR] instead, processing THIR
-expressions recursively.
+変換は[`mir_built`]クエリを呼び出すことでトリガーされます。MIRビルダーは実際にはHIRを使用せず、代わりに[THIR]を操作し、THIR式を再帰的に処理します。
 
-The lowering creates local variables for every argument as specified in the signature.
-Next, it creates local variables for every binding specified (e.g. `(a, b): (i32, String)`)
-produces 3 bindings, one for the argument, and two for the bindings. Next, it generates
-field accesses that read the fields from the argument and writes the value to the binding
-variable.
+変換は、シグネチャで指定されたすべての引数に対してローカル変数を作成します。次に、指定されたすべてのバインディングに対してローカル変数を作成します（例：`(a, b): (i32, String)`）は3つのバインディングを生成します。1つは引数用、2つはバインディング用です。次に、引数からフィールドを読み取り、その値をバインディング変数に書き込むフィールドアクセスを生成します。
 
-With this initialization out of the way, the lowering triggers a recursive call
-to a function that generates the MIR for the body (a `Block` expression) and
-writes the result into the `RETURN_PLACE`.
+この初期化が完了すると、変換は本体（`Block`式）のMIRを生成する関数への再帰呼び出しをトリガーし、その結果を`RETURN_PLACE`に書き込みます。
 
-## `unpack!` all the things
+## `unpack!`ですべてを展開
 
-Functions that generate MIR tend to fall into one of two patterns.
-First, if the function generates only statements, then it will take a
-basic block as argument onto which those statements should be appended.
-It can then return a result as normal:
+MIRを生成する関数は、2つのパターンのいずれかに分類される傾向があります。まず、関数がステートメントのみを生成する場合、それらのステートメントを追加すべき基本ブロックを引数として受け取ります。そして、通常通り結果を返すことができます：
 
 ```rust,ignore
 fn generate_some_mir(&mut self, block: BasicBlock) -> ResultType {
@@ -38,12 +26,7 @@ fn generate_some_mir(&mut self, block: BasicBlock) -> ResultType {
 }
 ```
 
-But there are other functions that may generate new basic blocks as well.
-For example, lowering an expression like `if foo { 22 } else { 44 }`
-requires generating a small "diamond-shaped graph".
-In this case, the functions take a basic block where their code starts
-and return a (potentially) new basic block where the code generation ends.
-The `BlockAnd` type is used to represent this:
+しかし、新しい基本ブロックも生成する可能性のある他の関数もあります。例えば、`if foo { 22 } else { 44 }`のような式を変換するには、小さな「ダイヤモンド形のグラフ」を生成する必要があります。この場合、関数はコードが開始される基本ブロックを受け取り、コード生成が終了する（潜在的に）新しい基本ブロックを返します。`BlockAnd`型は、これを表すために使用されます：
 
 ```rust,ignore
 fn generate_more_mir(&mut self, block: BasicBlock) -> BlockAnd<ResultType> {
@@ -51,10 +34,7 @@ fn generate_more_mir(&mut self, block: BasicBlock) -> BlockAnd<ResultType> {
 }
 ```
 
-When you invoke these functions, it is common to have a local variable `block`
-that is effectively a "cursor". It represents the point at which we are adding new MIR.
-When you invoke `generate_more_mir`, you want to update this cursor.
-You can do this manually, but it's tedious:
+これらの関数を呼び出すときは、実質的に「カーソル」であるローカル変数`block`を持つのが一般的です。これは、新しいMIRを追加している地点を表します。`generate_more_mir`を呼び出すときは、このカーソルを更新したいと思うでしょう。これは手動で行うこともできますが、面倒です：
 
 ```rust,ignore
 let mut block;
@@ -66,77 +46,48 @@ let v = match self.generate_more_mir(..) {
 };
 ```
 
-For this reason, we offer a macro that lets you write
-`let v = unpack!(block = self.generate_more_mir(...))`.
-It simply extracts the new block and overwrites the
-variable `block` that you named in the `unpack!`.
+このため、`let v = unpack!(block = self.generate_more_mir(...))`と書けるマクロを提供しています。これは単に新しいブロックを抽出し、`unpack!`で指定した変数`block`を上書きします。
 
-## Lowering expressions into the desired MIR
+## 式を望ましいMIRに変換
 
-There are essentially four kinds of representations one might want of an expression:
+式の表現には、基本的に4つの種類があります：
 
-* `Place` refers to a (or part of a) preexisting memory location (local, static, promoted)
-* `Rvalue` is something that can be assigned to a `Place`
-* `Operand` is an argument to e.g. a `+` operation or a function call
-* a temporary variable containing a copy of the value
+* `Place`は、既存のメモリ位置（ローカル、スタティック、昇格）の（または一部の）参照です
+* `Rvalue`は`Place`に割り当てることができるものです
+* `Operand`は、例えば`+`演算や関数呼び出しの引数です
+* 値のコピーを含む一時変数
 
-The following image depicts a general overview of the interactions between the
-representations:
+次の画像は、表現間の相互作用の一般的な概要を示しています：
 
 <img src="mir_overview.svg">
 
-[Click here for a more detailed view](mir_detailed.svg)
+[より詳細なビューはこちらをクリック](mir_detailed.svg)
 
-We start out with lowering the function body to an `Rvalue` so we can create an
-assignment to `RETURN_PLACE`, This `Rvalue` lowering will in turn trigger lowering to
-`Operand` for its arguments (if any). `Operand` lowering either produces a `const`
-operand, or moves/copies out of a `Place`, thus triggering a `Place` lowering. An
-expression being lowered to a `Place` can in turn trigger a temporary to be created
-if the expression being lowered contains operations. This is where the snake bites its
-own tail and we need to trigger an `Rvalue` lowering for the expression to be written
-into the local.
+まず、関数本体を`Rvalue`に変換して、`RETURN_PLACE`への割り当てを作成できるようにします。この`Rvalue`の変換は、その引数（もしあれば）に対して`Operand`への変換をトリガーします。`Operand`の変換は、`const`オペランドを生成するか、`Place`から移動/コピーするため、`Place`の変換をトリガーします。`Place`に変換される式は、変換される式に演算が含まれている場合、一時変数を作成するようトリガーすることができます。ここで蛇が自分の尾を噛み、ローカルに書き込まれる式に対して`Rvalue`の変換をトリガーする必要があります。
 
-## Operator lowering
+## 演算子の変換
 
-Operators on builtin types are not lowered to function calls (which would end up being
-infinite recursion calls, because the trait impls just contain the operation itself
-again). Instead there are `Rvalue`s for binary and unary operators and index operations.
-These `Rvalue`s later get codegened to llvm primitive operations or llvm intrinsics.
+組み込み型の演算子は、関数呼び出しに変換されません（それは無限再帰呼び出しになってしまいます。なぜなら、トレイト実装は演算自体を再び含んでいるからです）。代わりに、二項演算子、単項演算子、インデックス演算用の`Rvalue`があります。これらの`Rvalue`は後でllvmのプリミティブ演算またはllvmイントリンシックにコード生成されます。
 
-Operators on all other types get lowered to a function call to their `impl` of the
-operator's corresponding trait.
+他のすべての型の演算子は、演算子の対応するトレイトの`impl`への関数呼び出しに変換されます。
 
-Regardless of the lowering kind, the arguments to the operator are lowered to `Operand`s.
-This means all arguments are either constants, or refer to an already existing value
-somewhere in a local or static.
+変換の種類に関係なく、演算子への引数は`Operand`に変換されます。これは、すべての引数が定数であるか、すでにローカルまたはスタティックのどこかに存在する値を参照していることを意味します。
 
-## Method call lowering
+## メソッド呼び出しの変換
 
-Method calls are lowered to the same `TerminatorKind` that function calls are.
-In [MIR] there is no difference between method calls and function calls anymore.
+メソッド呼び出しは、関数呼び出しと同じ`TerminatorKind`に変換されます。[MIR]では、メソッド呼び出しと関数呼び出しの違いはもうありません。
 
-## Conditions
+## 条件
 
-`if` conditions and `match` statements for `enum`s with variants that have no fields are
-lowered to `TerminatorKind::SwitchInt`. Each possible value (so `0` and `1` for `if`
-conditions) has a corresponding `BasicBlock` to which the code continues.
-The argument being branched on is (again) an `Operand` representing the value of
-the if condition.
+`if`条件とフィールドを持たないバリアントを持つ`enum`の`match`ステートメントは、`TerminatorKind::SwitchInt`に変換されます。各可能な値（`if`条件の場合は`0`と`1`）には、コードが続く対応する`BasicBlock`があります。分岐される引数は（再び）if条件の値を表す`Operand`です。
 
-### Pattern matching
+### パターンマッチング
 
-`match` statements for `enum`s with variants that have fields are lowered to
-`TerminatorKind::SwitchInt`, too, but the `Operand` refers to a `Place` where the
-discriminant of the value can be found. This often involves reading the discriminant
-to a new temporary variable.
+フィールドを持つバリアントを持つ`enum`の`match`ステートメントも`TerminatorKind::SwitchInt`に変換されますが、`Operand`は、値の判別値が見つかる`Place`を参照します。これは多くの場合、判別値を新しい一時変数に読み込むことを伴います。
 
-## Aggregate construction
+## 集約の構築
 
-Aggregate values of any kind (e.g. structs or tuples) are built via `Rvalue::Aggregate`.
-All fields are
-lowered to `Operator`s. This is essentially equivalent to one assignment
-statement per aggregate field plus an assignment to the discriminant in the
-case of `enum`s.
+あらゆる種類の集約値（例：構造体やタプル）は、`Rvalue::Aggregate`を介して構築されます。すべてのフィールドは`Operator`に変換されます。これは基本的に、集約フィールドごとに1つの割り当てステートメント、および`enum`の場合は判別値への割り当てと同等です。
 
 [MIR]: ./index.html
 [HIR]: ../hir.html

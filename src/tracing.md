@@ -1,229 +1,153 @@
-# Using tracing to debug the compiler
+# tracingを使用したコンパイラのデバッグ
 
-The compiler has a lot of [`debug!`] (or `trace!`) calls, which print out logging information
-at many points. These are very useful to at least narrow down the location of
-a bug if not to find it entirely, or just to orient yourself as to why the
-compiler is doing a particular thing.
+コンパイラには多くの[`debug!`]（または`trace!`）呼び出しがあり、多くのポイントでロギング情報を出力します。これらは、バグの場所を絞り込むだけでなく、完全に見つけるためにも非常に便利です。また、コンパイラが特定のことを行っている理由を理解するのにも役立ちます。
 
 [`debug!`]: https://docs.rs/tracing/0.1/tracing/macro.debug.html
 
-To see the logs, you need to set the `RUSTC_LOG` environment variable to your
-log filter. The full syntax of the log filters can be found in the [rustdoc
-of `tracing-subscriber`](https://docs.rs/tracing-subscriber/0.2.24/tracing_subscriber/filter/struct.EnvFilter.html#directives).
+ログを表示するには、`RUSTC_LOG`環境変数をログフィルターに設定する必要があります。ログフィルターの完全な構文は、[`tracing-subscriber`のrustdoc](https://docs.rs/tracing-subscriber/0.2.24/tracing_subscriber/filter/struct.EnvFilter.html#directives)で見つけることができます。
 
-## Function level filters
+## 関数レベルフィルター
 
-Lots of functions in rustc are annotated with
+rustcの多くの関数には、次のような注釈が付けられています
 
 ```
 #[instrument(level = "debug", skip(self))]
 fn foo(&self, bar: Type) {}
 ```
 
-which allows you to use
+これにより、次のことができます
 
 ```
 RUSTC_LOG=[foo]
 ```
 
-to do the following all at once
+これにより、次のことがすべて一度に行われます
 
-* log all function calls to `foo`
-* log the arguments (except for those in the `skip` list)
-* log everything (from anywhere else in the compiler) until the function returns
+* `foo`へのすべての関数呼び出しをログに記録する
+* 引数をログに記録する（`skip`リストにあるものを除く）
+* 関数が戻るまで（コンパイラのどこからでも）すべてをログに記録する
 
-### I don't want everything
+### すべてはいらない
 
-Depending on the scope of the function, you may not want to log everything in its body.
-As an example: the `do_mir_borrowck` function will dump hundreds of lines even for trivial
-code being borrowchecked.
+関数のスコープによっては、その本体のすべてをログに記録したくない場合があります。例として、`do_mir_borrowck`関数は、些細なコードの借用チェックでも数百行をダンプします。
 
-Since you can combine all filters, you can add a crate/module path, e.g.
+すべてのフィルターを組み合わせることができるので、クレート/モジュールパスを追加できます。例：
 
 ```
 RUSTC_LOG=rustc_borrowck[do_mir_borrowck]
 ```
 
-### I don't want all calls
+### すべての呼び出しはいらない
 
-If you are compiling libcore, you likely don't want *all* borrowck dumps, but only one
-for a specific function. You can filter function calls by their arguments by regexing them.
+libcoreをコンパイルしている場合、*すべての*borrowckダンプが欲しいわけではなく、特定の関数に対してのみ欲しい場合があります。関数呼び出しをその引数で正規表現フィルタリングできます。
 
 ```
 RUSTC_LOG=[do_mir_borrowck{id=\.\*from_utf8_unchecked\.\*}]
 ```
 
-will only give you the logs of borrowchecking `from_utf8_unchecked`. Note that you will
-still get a short message per ignored `do_mir_borrowck`, but none of the things inside those
-calls. This helps you in looking through the calls that are happening and helps you adjust
-your regex if you mistyped it.
+これにより、`from_utf8_unchecked`の借用チェックのログのみが表示されます。無視された`do_mir_borrowck`ごとに短いメッセージが表示されますが、それらの呼び出し内のものは表示されません。これは、発生している呼び出しを確認し、タイプミスがあった場合に正規表現を調整するのに役立ちます。
 
-## Query level filters
+## クエリレベルフィルター
 
-Every [query](query.md) is automatically tagged with a logging span so that
-you can display all log messages during the execution of the query. For
-example, if you want to log everything during type checking:
+すべての[クエリ](query.md)は、クエリの実行中にすべてのログメッセージを表示できるように、ロギングスパンで自動的にタグ付けされます。たとえば、型チェック中にすべてをログに記録したい場合：
 
 ```
 RUSTC_LOG=[typeck]
 ```
 
-The query arguments are included as a tracing field which means that you can
-filter on the debug display of the arguments. For example, the `typeck` query
-has an argument `key: LocalDefId` of what is being checked. You can use a
-regex to match on that `LocalDefId` to log type checking for a specific
-function:
+クエリ引数はトレーシングフィールドとして含まれているため、引数のデバッグ表示でフィルタリングできます。たとえば、`typeck`クエリには、チェックされているものの`key: LocalDefId`引数があります。正規表現を使用して、その`LocalDefId`と一致させて、特定の関数の型チェックをログに記録できます：
 
 ```
 RUSTC_LOG=[typeck{key=.*name_of_item.*}]
 ```
 
-Different queries have different arguments. You can find a list of queries and
-their arguments in
-[`rustc_middle/src/query/mod.rs`](https://github.com/rust-lang/rust/blob/HEAD/compiler/rustc_middle/src/query/mod.rs#L18).
+異なるクエリには異なる引数があります。クエリとその引数のリストは、[`rustc_middle/src/query/mod.rs`](https://github.com/rust-lang/rust/blob/HEAD/compiler/rustc_middle/src/query/mod.rs#L18)で見つけることができます。
 
-## Broad module level filters
+## 広範なモジュールレベルフィルター
 
-You can also use filters similar to the `log` crate's filters, which will enable
-everything within a specific module. This is often too verbose and too unstructured,
-so it is recommended to use function level filters.
+`log`クレートのフィルターに似たフィルターを使用することもできます。これにより、特定のモジュール内のすべてが有効になります。これはしばしば冗長すぎて構造化されていないため、関数レベルフィルターを使用することをお勧めします。
 
-Your log filter can be just `debug` to get all `debug!` output and
-higher (e.g., it will also include `info!`), or `path::to::module` to get *all*
-output (which will include `trace!`) from a particular module, or
-`path::to::module=debug` to get `debug!` output and higher from a particular
-module.
+ログフィルターは単に`debug`にしてすべての`debug!`出力とそれ以上（たとえば、`info!`も含まれます）を取得するか、`path::to::module`にして特定のモジュールから*すべて*の出力（`trace!`を含む）を取得するか、`path::to::module=debug`にして特定のモジュールから`debug!`出力とそれ以上を取得できます。
 
-For example, to get the `debug!` output and higher for a specific module, you
-can run the compiler with `RUSTC_LOG=path::to::module=debug rustc my-file.rs`.
-All `debug!` output will then appear in standard error.
+たとえば、特定のモジュールの`debug!`出力とそれ以上を取得するには、`RUSTC_LOG=path::to::module=debug rustc my-file.rs`でコンパイラを実行できます。すべての`debug!`出力が標準エラーに表示されます。
 
-Note that you can use a partial path and the filter will still work. For
-example, if you want to see `info!` output from only
-`rustdoc::passes::collect_intra_doc_links`, you could use
-`RUSTDOC_LOG=rustdoc::passes::collect_intra_doc_links=info` *or* you could use
-`RUSTDOC_LOG=rustdoc::passes::collect_intra=info`.
+部分的なパスを使用しても、フィルターは機能することに注意してください。たとえば、`rustdoc::passes::collect_intra_doc_links`からの`info!`出力のみを表示したい場合、`RUSTDOC_LOG=rustdoc::passes::collect_intra_doc_links=info`を使用*できます*、または`RUSTDOC_LOG=rustdoc::passes::collect_intra=info`を使用できます。
 
-If you are developing rustdoc, use `RUSTDOC_LOG` instead. If you are developing
-Miri, use `MIRI_LOG` instead. You get the idea :)
+rustdocを開発している場合は、代わりに`RUSTDOC_LOG`を使用してください。Miriを開発している場合は、代わりに`MIRI_LOG`を使用してください。わかるでしょう :)
 
-See the [`tracing`] crate's docs, and specifically the docs for [`debug!`] to
-see the full syntax you can use. (Note: unlike the compiler, the [`tracing`]
-crate and its examples use the `RUSTC_LOG` environment variable. rustc, rustdoc,
-and other tools set custom environment variables.)
+使用できる完全な構文については、[`tracing`]クレートのドキュメント、特に[`debug!`]のドキュメントを参照してください。（注意：[`tracing`]クレートとその例とは異なり、`RUSTC_LOG`環境変数を使用します。rustc、rustdoc、およびその他のツールはカスタム環境変数を設定します。）
 
-**Note that unless you use a very strict filter, the logger will emit a lot of
-output, so use the most specific module(s) you can (comma-separated if
-multiple)**. It's typically a good idea to pipe standard error to a file and
-look at the log output with a text editor.
+**非常に厳格なフィルターを使用しない限り、ロガーは大量の出力を出力するため、可能な限り具体的なモジュールを使用してください（複数の場合はカンマ区切り）**。標準エラーをファイルにパイプし、テキストエディターでログ出力を確認することが一般的には良いアイデアです。
 
-So, to put it together:
+それで、まとめると：
 
 ```bash
-# This puts the output of all debug calls in `rustc_middle/src/traits` into
-# standard error, which might fill your console backscroll.
+# これは、`rustc_middle/src/traits`内のすべてのデバッグ呼び出しの出力を
+# 標準エラーに出力し、コンソールのバックスクロールがいっぱいになる可能性があります。
 $ RUSTC_LOG=rustc_middle::traits=debug rustc +stage1 my-file.rs
 
-# This puts the output of all debug calls in `rustc_middle/src/traits` in
-# `traits-log`, so you can then see it with a text editor.
+# これは、`rustc_middle/src/traits`内のすべてのデバッグ呼び出しの出力を
+# `traits-log`に出力するので、テキストエディターで確認できます。
 $ RUSTC_LOG=rustc_middle::traits=debug rustc +stage1 my-file.rs 2>traits-log
 
-# Not recommended! This will show the output of all `debug!` calls
-# in the Rust compiler, and there are a *lot* of them, so it will be
-# hard to find anything.
+# 推奨されません！これは、Rustコンパイラ内のすべての`debug!`呼び出しの出力を表示し、
+# *非常に多く*あるため、何かを見つけるのが難しくなります。
 $ RUSTC_LOG=debug rustc +stage1 my-file.rs 2>all-log
 
-# This will show the output of all `info!` calls in `rustc_codegen_ssa`.
+# これは、`rustc_codegen_ssa`内のすべての`info!`呼び出しの出力を表示します。
 #
-# There's an `info!` statement in `codegen_instance` that outputs
-# every function that is codegen'd. This is useful to find out
-# which function triggers an LLVM assertion, and this is an `info!`
-# log rather than a `debug!` log so it will work on the official
-# compilers.
+# `codegen_instance`には、コードジェン化されるすべての関数を出力する`info!`文があります。
+# これは、どの関数がLLVMアサーションをトリガーするかを見つけるのに便利で、
+# これは`debug!`ログではなく`info!`ログなので、公式のコンパイラで動作します。
 $ RUSTC_LOG=rustc_codegen_ssa=info rustc +stage1 my-file.rs
 
-# This will show all logs in `rustc_codegen_ssa` and `rustc_resolve`.
+# これは、`rustc_codegen_ssa`と`rustc_resolve`のすべてのログを表示します。
 $ RUSTC_LOG=rustc_codegen_ssa,rustc_resolve rustc +stage1 my-file.rs
 
-# This will show the output of all `info!` calls made by rustdoc
-# or any rustc library it calls.
+# これは、rustdocまたはそれが呼び出すrustcライブラリによって行われたすべての`info!`呼び出しの出力を表示します。
 $ RUSTDOC_LOG=info rustdoc +stage1 my-file.rs
 
-# This will only show `debug!` calls made by rustdoc directly,
-# not any `rustc*` crate.
+# これは、rustdocが直接行った`debug!`呼び出しのみを表示し、`rustc*`クレートは表示しません。
 $ RUSTDOC_LOG=rustdoc=debug rustdoc +stage1 my-file.rs
 ```
 
-## Log colors
+## ログの色
 
-By default, rustc (and other tools, like rustdoc and Miri) will be smart about
-when to use ANSI colors in the log output. If they are outputting to a terminal,
-they will use colors, and if they are outputting to a file or being piped
-somewhere else, they will not. However, it's hard to read log output in your
-terminal unless you have a very strict filter, so you may want to pipe the
-output to a pager like `less`. But then there won't be any colors, which makes
-it hard to pick out what you're looking for!
+デフォルトでは、rustc（およびrustdocやMiriなどの他のツール）は、ログ出力でANSI色を使用するタイミングについて賢くなります。ターミナルに出力している場合は色を使用し、ファイルに出力したり他の場所にパイプしたりしている場合は使用しません。ただし、非常に厳格なフィルターを使用しない限り、ターミナルでログ出力を読むのは難しいため、出力を`less`のようなページャーにパイプしたい場合があります。しかし、その場合、色がなくなり、探しているものを選び出すのが難しくなります！
 
-You can override whether to have colors in log output with the `RUSTC_LOG_COLOR`
-environment variable (or `RUSTDOC_LOG_COLOR` for rustdoc, or `MIRI_LOG_COLOR`
-for Miri, etc.). There are three options: `auto` (the default), `always`, and
-`never`. So, if you want to enable colors when piping to `less`, use something
-similar to this command:
+`RUSTC_LOG_COLOR`環境変数（またはrustdocの場合は`RUSTDOC_LOG_COLOR`、Miriの場合は`MIRI_LOG_COLOR`など）を使用して、ログ出力に色を含めるかどうかをオーバーライドできます。3つのオプションがあります：`auto`（デフォルト）、`always`、`never`。したがって、`less`にパイプするときに色を有効にしたい場合は、次のようなコマンドを使用します：
 
 ```bash
-# The `-R` switch tells less to print ANSI colors without escaping them.
+# `-R`スイッチは、lessにANSI色をエスケープせずに出力するように指示します。
 $ RUSTC_LOG=debug RUSTC_LOG_COLOR=always rustc +stage1 ... | less -R
 ```
 
-Note that `MIRI_LOG_COLOR` will only color logs that come from Miri, not logs
-from rustc functions that Miri calls. Use `RUSTC_LOG_COLOR` to color logs from
-rustc.
+`MIRI_LOG_COLOR`は、Miriからのログのみを色付けし、MiriがLLVM が呼び出すrustc関数からのログは色付けしないことに注意してください。rustcからのログを色付けするには、`RUSTC_LOG_COLOR`を使用してください。
 
-## How to keep or remove `debug!` and `trace!` calls from the resulting binary
+## 結果のバイナリから`debug!`と`trace!`呼び出しを保持または削除する方法
 
-While calls to `error!`, `warn!` and `info!` are included in every build of the compiler,
-calls to `debug!` and `trace!` are only included in the program if
-`debug-logging=true` is turned on in bootstrap.toml (it is
-turned off by default), so if you don't see `DEBUG` logs, especially
-if you run the compiler with `RUSTC_LOG=rustc rustc some.rs` and only see
-`INFO` logs, make sure that `debug-logging=true` is turned on in your
-bootstrap.toml.
+`error!`、`warn!`、`info!`への呼び出しはコンパイラのすべてのビルドに含まれますが、`debug!`と`trace!`への呼び出しは、bootstrap.tomlで`debug-logging=true`がオンになっている場合にのみプログラムに含まれます（デフォルトではオフになっています）。したがって、`DEBUG`ログが表示されない場合、特にコンパイラを`RUSTC_LOG=rustc rustc some.rs`で実行して`INFO`ログしか表示されない場合は、bootstrap.tomlで`debug-logging=true`がオンになっていることを確認してください。
 
-## Logging etiquette and conventions
+## ロギングのエチケットと規約
 
-Because calls to `debug!` are removed by default, in most cases, don't worry
-about the performance of adding "unnecessary" calls to `debug!` and leaving them in code you
-commit - they won't slow down the performance of what we ship.
+`debug!`への呼び出しはデフォルトで削除されるため、ほとんどの場合、「不要な」`debug!`呼び出しを追加してコミットするコードに残しておくことのパフォーマンスを心配する必要はありません。それらは出荷するもののパフォーマンスを低下させません。
 
-That said, there can also be excessive tracing calls, especially
-when they are redundant with other calls nearby or in functions called from
-here. There is no perfect balance to hit here, and is left to the reviewer's
-discretion to decide whether to let you leave `debug!` statements in or whether to ask
-you to remove them before merging.
+とはいえ、過度のトレーシング呼び出しもあり得ます。特に、近くの他の呼び出しやここから呼び出される関数内の呼び出しと冗長である場合です。ここで完璧なバランスを取ることはできず、レビュアーの裁量に委ねられます。マージ前に`debug!`文を残すか削除するかを決定します。
 
-It may be preferable to use `trace!` over `debug!` for very noisy logs.
+非常にノイズの多いログの場合は、`debug!`よりも`trace!`を使用することが望ましい場合があります。
 
-A loosely followed convention is to use `#[instrument(level = "debug")]`
-([also see the attribute's documentation](https://docs.rs/tracing-attributes/0.1.17/tracing_attributes/attr.instrument.html))
-in favour of `debug!("foo(...)")` at the start of a function `foo`.
-Within functions, prefer `debug!(?variable.field)` over `debug!("xyz = {:?}", variable.field)`
-and `debug!(bar = ?var.method(arg))` over `debug!("bar = {:?}", var.method(arg))`.
-The documentation for this syntax can be found [here](https://docs.rs/tracing/0.1.28/tracing/#recording-fields).
+ゆるく従われている規約は、関数`foo`の先頭で`debug!("foo(...)")`よりも`#[instrument(level = "debug")]`を使用することです（[属性のドキュメントも参照してください](https://docs.rs/tracing-attributes/0.1.17/tracing_attributes/attr.instrument.html)）。関数内では、`debug!("xyz = {:?}", variable.field)`よりも`debug!(?variable.field)`を、`debug!("bar = {:?}", var.method(arg))`よりも`debug!(bar = ?var.method(arg))`を優先してください。この構文のドキュメントは[ここ](https://docs.rs/tracing/0.1.28/tracing/#recording-fields)で見つけることができます。
 
-One thing to be **careful** of is **expensive** operations in logs.
+注意すべき点の1つは、ログ内の**高価な**操作です。
 
-If in the module `rustc::foo` you have a statement
+モジュール`rustc::foo`内に次のような文がある場合
 
 ```Rust
 debug!(x = ?random_operation(tcx));
 ```
 
-Then if someone runs a debug `rustc` with `RUSTC_LOG=rustc::foo`, then
-`random_operation()` will run. `RUSTC_LOG` filters that do not enable this
-debug statement will not execute `random_operation`.
+誰かがデバッグ`rustc`を`RUSTC_LOG=rustc::foo`で実行すると、`random_operation()`が実行されます。このデバッグ文を有効にしない`RUSTC_LOG`フィルターは、`random_operation`を実行しません。
 
-This means that you should not put anything too expensive or likely to crash
-there - that would annoy anyone who wants to use logging for that module.
-No-one will know it until someone tries to use logging to find *another* bug.
+これは、そこにあまりにも高価なものやクラッシュしやすいものを配置すべきではないことを意味します。そのモジュールのロギングを使用したい人を悩ませることになります。誰かが*別の*バグを見つけるためにロギングを使用しようとするまで、誰もそれを知りません。
 
 [`tracing`]: https://docs.rs/tracing

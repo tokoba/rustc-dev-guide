@@ -1,59 +1,50 @@
-# MIR borrow check
+# MIR 借用チェック
 
-The borrow check is Rust's "secret sauce" – it is tasked with
-enforcing a number of properties:
+借用チェックは Rust の「秘密のソース」です。次のような多くのプロパティを強制する役割があります：
 
-- That all variables are initialized before they are used.
-- That you can't move the same value twice.
-- That you can't move a value while it is borrowed.
-- That you can't access a place while it is mutably borrowed (except through
-  the reference).
-- That you can't mutate a place while it is immutably borrowed.
-- etc
+- すべての変数は使用される前に初期化される。
+- 同じ値を 2 回移動できない。
+- 借用されている間は値を移動できない。
+- 可変に借用されている間は場所にアクセスできない（参照を通じて除く）。
+- 不変に借用されている間は場所を変更できない。
+- など
 
-The borrow checker operates on the MIR. An older implementation operated on the
-HIR. Doing borrow checking on MIR has several advantages:
+借用チェッカーは MIR 上で動作します。古い実装は HIR 上で動作していました。MIR 上で借用チェックを行うことにはいくつかの利点があります：
 
-- The MIR is *far* less complex than the HIR; the radical desugaring
-  helps prevent bugs in the borrow checker. (If you're curious, you
-  can see
-  [a list of bugs that the MIR-based borrow checker fixes here][47366].)
-- Even more importantly, using the MIR enables ["non-lexical lifetimes"][nll],
-  which are regions derived from the control-flow graph.
+- MIR は HIR よりも*はるかに*単純です。徹底的な脱糖により、
+  借用チェッカーのバグを防ぐのに役立ちます。（興味があれば、
+  MIR ベースの借用チェッカーが修正するバグのリストを[ここ][47366]で見ることができます。）
+- さらに重要なことに、MIR を使用することで[「非字句的ライフタイム」][nll]が可能になります。
+  これは制御フローグラフから導出される領域です。
 
 [47366]: https://github.com/rust-lang/rust/issues/47366
 [nll]: https://rust-lang.github.io/rfcs/2094-nll.html
 
-### Major phases of the borrow checker
+### 借用チェッカーの主要なフェーズ
 
-The borrow checker source is found in
-[the `rustc_borrowck` crate][b_c]. The main entry point is
-the [`mir_borrowck`] query.
+借用チェッカーのソースは
+[`rustc_borrowck` クレート][b_c]にあります。主なエントリポイントは
+[`mir_borrowck`] クエリです。
 
 [b_c]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/index.html
 [`mir_borrowck`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/fn.mir_borrowck.html
 
-- We first create a **local copy** of the MIR. In the coming steps,
-  we will modify this copy in place to modify the types and things to
-  include references to the new regions that we are computing.
-- We then invoke [`replace_regions_in_mir`] to modify our local MIR.
-  Among other things, this function will replace all of the [regions](./appendix/glossary.md#region)
-  in the MIR with fresh [inference variables](./appendix/glossary.md#inf-var).
-- Next, we perform a number of
-  [dataflow analyses](./appendix/background.md#dataflow) that
-  compute what data is moved and when.
-- We then do a [second type check](borrow_check/type_check.md) across the MIR:
-  the purpose of this type check is to determine all of the constraints between
-  different regions.
-- Next, we do [region inference](borrow_check/region_inference.md), which computes
-  the values of each region — basically, the points in the control-flow graph where
-  each lifetime must be valid according to the constraints we collected.
-- At this point, we can compute the "borrows in scope" at each point.
-- Finally, we do a second walk over the MIR, looking at the actions it
-  does and reporting errors. For example, if we see a statement like
-  `*a + 1`, then we would check that the variable `a` is initialized
-  and that it is not mutably borrowed, as either of those would
-  require an error to be reported. Doing this check requires the results of all
-  the previous analyses.
+- まず、MIR の**ローカルコピー**を作成します。次のステップでは、
+  計算している新しい領域への参照を含むように型などを変更するため、
+  このコピーをその場で変更します。
+- 次に、[`replace_regions_in_mir`] を呼び出してローカル MIR を変更します。
+  とりわけ、この関数は MIR 内のすべての[領域](./appendix/glossary.md#region)を
+  新しい[推論変数](./appendix/glossary.md#inf-var)に置き換えます。
+- 次に、データが移動されるタイミングを計算する多数の
+  [データフロー解析](./appendix/background.md#dataflow)を実行します。
+- 次に、MIR 全体で[2 回目の型チェック](borrow_check/type_check.md)を行います：
+  この型チェックの目的は、異なる領域間のすべての制約を決定することです。
+- 次に、[領域推論](borrow_check/region_inference.md)を行います。これは各領域の値、
+  つまり、収集した制約に従って各ライフタイムが有効でなければならない制御フローグラフ内のポイントを計算します。
+- この時点で、各ポイントで「スコープ内の借用」を計算できます。
+- 最後に、MIR 上で 2 回目のウォークを行い、それが行うアクションを見てエラーを報告します。たとえば、
+  `*a + 1` のようなステートメントがある場合、変数 `a` が初期化されていて、
+  可変に借用されていないことをチェックします。これらのいずれかがある場合は
+  エラーを報告する必要があるためです。このチェックを行うには、以前のすべての解析の結果が必要です。
 
 [`replace_regions_in_mir`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/nll/fn.replace_regions_in_mir.html

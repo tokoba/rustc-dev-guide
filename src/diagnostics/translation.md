@@ -1,224 +1,206 @@
-# Translation
+# 翻訳
 
 <div class="warning">
-rustc's current diagnostics translation infrastructure (as of
-<!-- date-check --> October 2024
-) unfortunately causes some friction for compiler contributors, and the current
-infrastructure is mostly pending a redesign that better addresses needs of both
-compiler contributors and translation teams. Note that there is no current
-active redesign proposals (as of
-<!-- date-check --> October 2024
-)!
+rustcの現在の診断翻訳インフラストラクチャ（
+<!-- date-check --> 2024年10月現在）は、残念ながらコンパイラ貢献者に
+いくつかの摩擦を引き起こしており、現在のインフラストラクチャは、コンパイラ貢献者と
+翻訳チームの両方のニーズによりよく対応する再設計を主に待っています。現在アクティブな
+再設計提案はありません（
+<!-- date-check --> 2024年10月現在）！
 
-Please see the tracking issue <https://github.com/rust-lang/rust/issues/132181>
-for status updates.
+ステータスアップデートについては、追跡issue <https://github.com/rust-lang/rust/issues/132181>
+を参照してください。
 
-We have downgraded the internal lints `untranslatable_diagnostic` and
-`diagnostic_outside_of_impl`. Those internal lints previously required new code
-to use the current translation infrastructure. However, because the translation
-infra is waiting for a yet-to-be-proposed redesign and thus rework, we are not
-mandating usage of current translation infra. Use the infra if you *want to* or
-otherwise makes the code cleaner, but otherwise sidestep the translation infra
-if you need more flexibility.
+内部リント`untranslatable_diagnostic`と`diagnostic_outside_of_impl`をダウングレードしました。
+これらの内部リントは以前、新しいコードが現在の翻訳インフラストラクチャを使用することを
+要求していました。ただし、翻訳インフラは、まだ提案されていない再設計を待っているため、
+再作業が必要です。そのため、現在の翻訳インフラの使用を義務付けていません。
+*したい*場合、またはコードがよりクリーンになる場合はインフラを使用してください。
+ただし、より多くの柔軟性が必要な場合は、翻訳インフラをバイパスしてください。
 </div>
 
-rustc's diagnostic infrastructure supports translatable diagnostics using
-[Fluent].
+rustcの診断インフラストラクチャは、[Fluent]を使用して翻訳可能な診断を
+サポートしています。
 
-## Writing translatable diagnostics
+## 翻訳可能な診断の書き方
 
-There are two ways of writing translatable diagnostics:
+翻訳可能な診断を書く方法は2つあります：
 
-1. For simple diagnostics, using a diagnostic (or subdiagnostic) derive.
-   ("Simple" diagnostics being those that don't require a lot of logic in
-   deciding to emit subdiagnostics and can therefore be represented as
-   diagnostic structs). See [the diagnostic and subdiagnostic structs
-   documentation](./diagnostic-structs.md).
-2. Using typed identifiers with `Diag` APIs (in
-   `Diagnostic` or `Subdiagnostic` or `LintDiagnostic` implementations).
+1. シンプルな診断の場合、診断（またはサブ診断）派生を使用します。
+   （「シンプル」診断とは、サブ診断を出力するかどうかを決定するのに多くのロジックを
+   必要としないため、診断構造体として表現できるものです。）[診断およびサブ診断構造体
+   ドキュメント](./diagnostic-structs.md)を参照してください。
+2. 型付き識別子を`Diag` APIと一緒に使用します（`Diagnostic`、`Subdiagnostic`、
+   または`LintDiagnostic`実装内で）。
 
-When adding or changing a translatable diagnostic,
-you don't need to worry about the translations.
-Only updating the original English message is required.
-Currently,
-each crate which defines translatable diagnostics has its own Fluent resource,
-which is a file named `messages.ftl`,
-located in the root of the crate
-(such as`compiler/rustc_expand/messages.ftl`).
+翻訳可能な診断を追加または変更する場合、
+翻訳について心配する必要はありません。
+元の英語メッセージを更新するだけで十分です。
+現在、
+翻訳可能な診断を定義する各クレートには、独自のFluentリソースがあります。
+これは、`messages.ftl`という名前のファイルで、
+クレートのルートにあります
+（例：`compiler/rustc_expand/messages.ftl`）。
 
 ## Fluent
 
-Fluent is built around the idea of "asymmetric localization", which aims to
-decouple the expressiveness of translations from the grammar of the source
-language (English in rustc's case). Prior to translation, rustc's diagnostics
-relied heavily on interpolation to build the messages shown to the users.
-Interpolated strings are hard to translate because writing a natural-sounding
-translation might require more, less, or just different interpolation than the
-English string, all of which would require changes to the compiler's source
-code to support.
+Fluentは「非対称ローカライゼーション」のアイデアを中心に構築されており、
+翻訳の表現力をソース言語（rustcの場合は英語）の文法から切り離すことを目指しています。
+翻訳前、rustcの診断は、ユーザーに表示されるメッセージを構築するために
+補間に大きく依存していました。補間された文字列は、自然に聞こえる翻訳を書くために、
+英語の文字列よりも多い、少ない、または単に異なる補間が必要になる可能性があるため、
+翻訳が困難です。これらすべてが、サポートするためにコンパイラのソースコードの
+変更を必要とします。
 
-Diagnostic messages are defined in Fluent resources. A combined set of Fluent
-resources for a given locale (e.g. `en-US`) is known as Fluent bundle.
+診断メッセージはFluentリソースで定義されます。与えられたロケール（例：`en-US`）の
+Fluentリソースの結合セットは、Fluentバンドルとして知られています。
 
 ```fluent
 typeck_address_of_temporary_taken = cannot take address of a temporary
 ```
 
-In the above example, `typeck_address_of_temporary_taken` is the identifier for
-a Fluent message and corresponds to the diagnostic message in English. Other
-Fluent resources can be written which would correspond to a message in another
-language. Each diagnostic therefore has at least one Fluent message.
+上記の例では、`typeck_address_of_temporary_taken`はFluentメッセージの識別子であり、
+英語の診断メッセージに対応します。他のFluentリソースを書くことができ、
+これは別の言語のメッセージに対応します。したがって、各診断には少なくとも1つの
+Fluentメッセージがあります。
 
 ```fluent
 typeck_address_of_temporary_taken = cannot take address of a temporary
     .label = temporary value
 ```
 
-By convention, diagnostic messages for subdiagnostics are specified as
-"attributes" on Fluent messages (additional related messages, denoted by the
-`.<attribute-name>` syntax). In the above example, `label` is an attribute of
-`typeck_address_of_temporary_taken` which corresponds to the message for the
-label added to this diagnostic.
+慣例により、サブ診断の診断メッセージは、Fluentメッセージの「属性」として
+指定されます（`.<attribute-name>`構文で示される追加の関連メッセージ）。
+上記の例では、`label`は`typeck_address_of_temporary_taken`の属性であり、
+この診断に追加されたラベルのメッセージに対応します。
 
-Diagnostic messages often interpolate additional context into the message shown
-to the user, such as the name of a type or of a variable. Additional context to
-Fluent messages is provided as an "argument" to the diagnostic.
+診断メッセージは、多くの場合、ユーザーに表示されるメッセージに追加のコンテキストを
+補間します。例えば、型や変数の名前など。Fluentメッセージへの追加コンテキストは、
+診断への「引数」として提供されます。
 
 ```fluent
 typeck_struct_expr_non_exhaustive =
     cannot create non-exhaustive {$what} using struct expression
 ```
 
-In the above example, the Fluent message refers to an argument named `what`
-which is expected to exist (how arguments are provided to diagnostics is
-discussed in detail later).
+上記の例では、Fluentメッセージは、存在することが期待される`what`という
+引数を参照しています（引数が診断にどのように提供されるかについては、後で詳しく
+説明します）。
 
-You can consult the [Fluent] documentation for other usage examples of Fluent
-and its syntax.
+Fluentとその構文の他の使用例については、[Fluent]ドキュメントを参照してください。
 
-### Guideline for message naming
+### メッセージ命名のガイドライン
 
-Usually, fluent uses `-` for separating words inside a message name. However,
-`_` is accepted by fluent as well. As `_` fits Rust's use cases better, due to
-the identifiers on the Rust side using `_` as well, inside rustc, `-` is not
-allowed for separating words, and instead `_` is recommended. The only exception
-is for leading `-`s, for message names like `-passes_see_issue`.
+通常、fluentはメッセージ名内の単語を区切るために`-`を使用します。ただし、
+`_`もfluentによって受け入れられます。`_`はRustのユースケースによりよく適合するため、
+Rust側の識別子も`_`を使用しているため、rustc内では、単語を区切るために`-`は
+許可されず、代わりに`_`が推奨されます。唯一の例外は、
+`-passes_see_issue`のようなメッセージ名の先頭の`-`です。
 
-### Guidelines for writing translatable messages
+### 翻訳可能なメッセージを書くためのガイドライン
 
-For a message to be translatable into different languages, all of the
-information required by any language must be provided to the diagnostic as an
-argument (not just the information required in the English message).
+メッセージが異なる言語に翻訳可能であるためには、どの言語でも必要なすべての
+情報を診断への引数として提供する必要があります（英語メッセージで必要な情報だけでなく）。
 
-As the compiler team gain more experience writing diagnostics that have all of
-the information necessary to be translated into different languages, this page
-will be updated with more guidance. For now, the [Fluent] documentation has
-excellent examples of translating messages into different locales and the
-information that needs to be provided by the code to do so.
+コンパイラチームが、異なる言語に翻訳するのに必要なすべての情報を持つ診断を
+書く経験を積むにつれて、このページはより多くのガイダンスで更新されます。
+今のところ、[Fluent]ドキュメントには、メッセージを異なるロケールに翻訳する
+優れた例と、そのためにコードから提供する必要がある情報があります。
 
-### Compile-time validation and typed identifiers
+### コンパイル時検証と型付き識別子
 
-rustc's `fluent_messages` macro performs compile-time validation of Fluent
-resources and generates code to make it easier to refer to Fluent messages in
-diagnostics.
+rustcの`fluent_messages`マクロは、Fluentリソースのコンパイル時検証を実行し、
+診断でFluentメッセージを参照しやすくするコードを生成します。
 
-Compile-time validation of Fluent resources will emit any parsing errors
-from Fluent resources while building the compiler, preventing invalid Fluent
-resources from causing panics in the compiler. Compile-time validation also
-emits an error if multiple Fluent messages have the same identifier.
+Fluentリソースのコンパイル時検証は、コンパイラをビルドする際に、
+Fluentリソースからの解析エラーを出力し、無効なFluentリソースが
+コンパイラでパニックを引き起こすのを防ぎます。コンパイル時検証は、
+複数のFluentメッセージが同じ識別子を持つ場合にもエラーを出力します。
 
-## Internals
+## 内部
 
-Various parts of rustc's diagnostic internals are modified in order to support
-translation.
+rustcの診断内部のさまざまな部分は、翻訳をサポートするために変更されています。
 
-### Messages
+### メッセージ
 
-All of rustc's traditional diagnostic APIs (e.g. `struct_span_err` or `note`)
-take any message that can be converted into a `DiagMessage` (or
-`SubdiagMessage`).
+rustcの従来の診断API（例：`struct_span_err`または`note`）はすべて、
+`DiagMessage`（または`SubdiagMessage`）に変換できる任意のメッセージを受け取ります。
 
-[`rustc_error_messages::DiagMessage`] can represent legacy non-translatable
-diagnostic messages and translatable messages. Non-translatable messages are
-just `String`s. Translatable messages are just a `&'static str` with the
-identifier of the Fluent message (sometimes with an additional `&'static str`
-with an attribute).
+[`rustc_error_messages::DiagMessage`]は、レガシーの翻訳不可能な
+診断メッセージと翻訳可能なメッセージを表すことができます。翻訳不可能なメッセージは
+単なる`String`です。翻訳可能なメッセージは、Fluentメッセージの識別子を持つ
+`&'static str`です（時には属性名を持つ追加の`&'static str`と一緒に）。
 
-`DiagMessage` never needs to be interacted with directly:
-`DiagMessage` constants are created for each diagnostic message in a
-Fluent resource (described in more detail below), or `DiagMessage`s will
-either be created in the macro-generated code of a diagnostic derive.
+`DiagMessage`は直接対話する必要はありません：
+Fluentリソース内の各診断メッセージに対して`DiagMessage`定数が作成されるか、
+または診断派生のマクロ生成コードで`DiagMessage`が作成されます。
 
-`rustc_error_messages::SubdiagMessage` is similar, it can correspond to a
-legacy non-translatable diagnostic message or the name of an attribute to a
-Fluent message. Translatable `SubdiagMessage`s must be combined with a
-`DiagMessage` (using `DiagMessage::with_subdiagnostic_message`) to
-be emitted (an attribute name on its own is meaningless without a corresponding
-message identifier, which is what `DiagMessage` provides).
+`rustc_error_messages::SubdiagMessage`も同様で、レガシーの翻訳不可能な
+診断メッセージまたはFluentメッセージへの属性の名前に対応できます。翻訳可能な
+`SubdiagMessage`は、出力されるために`DiagMessage`（`DiagMessage::with_subdiagnostic_message`を
+使用）と結合する必要があります（属性名だけでは、対応するメッセージ識別子がないため、
+意味がありません。これが`DiagMessage`が提供するものです）。
 
-Both `DiagMessage` and `SubdiagMessage` implement `Into` for any
-type that can be converted into a string, and converts these into
-non-translatable diagnostics - this keeps all existing diagnostic calls
-working.
+`DiagMessage`と`SubdiagMessage`の両方は、文字列に変換できる任意の型に対して
+`Into`を実装しており、これらを翻訳不可能な診断に変換します - これにより、
+既存のすべての診断呼び出しが機能し続けます。
 
-### Arguments
+### 引数
 
-Additional context for Fluent messages which are interpolated into message
-contents needs to be provided to translatable diagnostics.
+メッセージコンテンツに補間されるFluentメッセージへの追加コンテキストは、
+翻訳可能な診断に提供する必要があります。
 
-Diagnostics have a `set_arg` function that can be used to provide this
-additional context to a diagnostic.
+診断には、この追加のコンテキストを診断に提供するために使用できる`set_arg`関数が
+あります。
 
-Arguments have both a name (e.g. "what" in the earlier example) and a value.
-Argument values are represented using the `DiagArgValue` type, which is
-just a string or a number. rustc types can implement `IntoDiagArg` with
-conversion into a string or a number, and common types like `Ty<'tcx>` already
-have such implementations.
+引数には、名前（例：前の例の「what」）と値の両方があります。
+引数の値は、`DiagArgValue`型を使用して表されます。これは単なる文字列または数値です。
+rustcの型は、文字列または数値への変換で`IntoDiagArg`を実装でき、
+`Ty<'tcx>`のような一般的な型には既にそのような実装があります。
 
-`set_arg` calls are handled transparently by diagnostic derives but need to be
-added manually when using diagnostic builder APIs.
+`set_arg`呼び出しは、診断派生によって透過的に処理されますが、
+診断ビルダーAPIを使用する場合は手動で追加する必要があります。
 
-### Loading
+### ロード
 
-rustc makes a distinction between the "fallback bundle" for `en-US` that is used
-by default and when another locale is missing a message; and the primary fluent
-bundle which is requested by the user.
+rustcは、デフォルトで使用され、別のロケールがメッセージを欠いている場合に使用される
+`en-US`の「フォールバックバンドル」と、ユーザーが要求したプライマリfluentバンドルを
+区別します。
 
-Diagnostic emitters implement the `Emitter` trait which has two functions for
-accessing the fallback and primary fluent bundles (`fallback_fluent_bundle` and
-`fluent_bundle` respectively).
+診断エミッターは、フォールバックおよびプライマリfluentバンドルにアクセスするための
+2つの関数を持つ`Emitter`トレイトを実装します（それぞれ`fallback_fluent_bundle`と
+`fluent_bundle`）。
 
-`Emitter` also has member functions with default implementations for performing
-translation of a `DiagMessage` using the results of
-`fallback_fluent_bundle` and `fluent_bundle`.
+`Emitter`には、`fallback_fluent_bundle`と`fluent_bundle`の結果を使用して
+`DiagMessage`の翻訳を実行するためのデフォルト実装を持つメンバー関数もあります。
 
-All of the emitters in rustc load the fallback Fluent bundle lazily, only
-reading Fluent resources and parsing them when an error message is first being
-translated (for performance reasons - it doesn't make sense to do this if no
-error is being emitted). `rustc_error_messages::fallback_fluent_bundle` returns
-a `std::lazy::Lazy<FluentBundle>` which is provided to emitters and evaluated
-in the first call to `Emitter::fallback_fluent_bundle`.
+rustc内のすべてのエミッターは、フォールバックFluentバンドルを遅延的にロードします。
+エラーメッセージが最初に翻訳されるときにのみFluentリソースを読み取り、解析します
+（パフォーマンス上の理由 - エラーが出力されない場合、これを行うのは意味がありません）。
+`rustc_error_messages::fallback_fluent_bundle`は、エミッターに提供され、
+`Emitter::fallback_fluent_bundle`への最初の呼び出しで評価される
+`std::lazy::Lazy<FluentBundle>`を返します。
 
-The primary Fluent bundle (for the user's desired locale) is expected to be
-returned by `Emitter::fluent_bundle`. This bundle is used preferentially when
-translating messages, the fallback bundle is only used if the primary bundle is
-missing a message or not provided.
+プライマリFluentバンドル（ユーザーが希望するロケール用）は、
+`Emitter::fluent_bundle`によって返されることが期待されます。このバンドルは、
+メッセージを翻訳する際に優先的に使用されます。プライマリバンドルがメッセージを
+欠いているか、提供されていない場合にのみ、フォールバックバンドルが使用されます。
 
-There are no locale bundles distributed with the compiler,
-but mechanisms are implemented for loading them.
+コンパイラと一緒に配布されるロケールバンドルはありませんが、
+それらをロードするメカニズムが実装されています。
 
-- `-Ztranslate-additional-ftl` can be used to load a specific resource as the
-  primary bundle for testing purposes.
-- `-Ztranslate-lang` can be provided a language identifier (something like
-  `en-US`) and will load any Fluent resources found in
-  `$sysroot/share/locale/$locale/` directory (both the user provided
-  sysroot and any sysroot candidates).
+- `-Ztranslate-additional-ftl`を使用して、テスト目的で特定のリソースを
+  プライマリバンドルとしてロードできます。
+- `-Ztranslate-lang`には、言語識別子（`en-US`のようなもの）を提供でき、
+  `$sysroot/share/locale/$locale/`ディレクトリで見つかったFluentリソースを
+  ロードします（ユーザーが提供したsysrootと任意のsysroot候補の両方）。
 
-Primary bundles are not currently loaded lazily and if requested will be loaded
-at the start of compilation regardless of whether an error occurs. Lazily
-loading primary bundles is possible if it can be assumed that loading a bundle
-won't fail. Bundle loading can fail if a requested locale is missing, Fluent
-files are malformed, or a message is duplicated in multiple resources.
+プライマリバンドルは現在、遅延的にロードされておらず、要求された場合は、
+エラーが発生するかどうかに関係なく、コンパイルの開始時にロードされます。
+プライマリバンドルを遅延的にロードすることは、バンドルのロードが失敗しないと
+仮定できれば可能です。要求されたロケールが欠けている場合、Fluentファイルが
+不正な形式である場合、またはメッセージが複数のリソースで重複している場合、
+バンドルのロードは失敗する可能性があります。
 
 [Fluent]: https://projectfluent.org
 [`compiler/rustc_borrowck/messages.ftl`]: https://github.com/rust-lang/rust/blob/HEAD/compiler/rustc_borrowck/messages.ftl

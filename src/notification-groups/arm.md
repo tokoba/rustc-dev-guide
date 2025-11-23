@@ -1,22 +1,15 @@
-# ARM notification group
+# ARM通知グループ
 
-**Github Label:** [O-ARM] <br>
-**Ping command:** `@rustbot ping arm`
+**Githubラベル:** [O-ARM] <br>
+**Pingコマンド:** `@rustbot ping arm`
 
 [O-ARM]: https://github.com/rust-lang/rust/labels/O-ARM
 
-This list will be used to ask for help both in diagnosing and testing
-ARM-related issues as well as suggestions on how to resolve
-interesting questions regarding our ARM support.
+このリストは、ARM関連の問題の診断とテストの両方の支援を求めるだけでなく、ARMサポートに関する興味深い質問の解決方法についての提案を求めるために使用されます。
 
-The group also has an associated Zulip channel ([`#t-compiler/arm`])
-where people can go to pose questions and discuss ARM-specific
-topics.
+グループには関連するZulipチャンネル（[`#t-compiler/arm`]）もあり、そこで質問を投げかけたり、ARM固有のトピックについて議論したりできます。
 
-So, if you are interested in participating, please sign up for the
-ARM group! To do so, open a PR against the [rust-lang/team]
-repository. Just [follow this example][eg], but change the username to
-your own!
+参加に興味がある方は、ARMグループにサインアップしてください！そのためには、[rust-lang/team]リポジトリに対してPRを開いてください。[この例][eg]に従って、ユーザー名を自分のものに変更するだけです！
 
 [`#t-compiler/arm`]: https://rust-lang.zulipchat.com/#narrow/stream/242906-t-compiler.2Farm
 [rust-lang/team]: https://github.com/rust-lang/team

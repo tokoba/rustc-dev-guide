@@ -1,24 +1,18 @@
-# Serialization in rustc
+# rustcでのシリアライゼーション
 
-rustc has to [serialize] and deserialize various data during compilation.
-Specifically:
+rustcはコンパイル中にさまざまなデータを[シリアライズ]およびデシリアライズする必要があります。具体的には：
 
-- "Crate metadata", consisting mainly of query outputs, are serialized
-  from a binary format into `rlib` and `rmeta` files that are output when
-  compiling a library crate. These `rlib` and `rmeta` files are then
-  deserialized by the crates which depend on that library.
-- Certain query outputs are serialized in a binary format to
-  [persist incremental compilation results].
-- [`CrateInfo`] is serialized to `JSON` when the `-Z no-link` flag is used, and
-  deserialized from `JSON` when the `-Z link-only` flag is used.
+- 主にクエリ出力で構成される「クレートメタデータ」は、バイナリ形式からライブラリクレートをコンパイルするときに出力される`rlib`ファイルと`rmeta`ファイルにシリアライズされます。これらの`rlib`ファイルと`rmeta`ファイルは、そのライブラリに依存するクレートによってデシリアライズされます。
+- 特定のクエリ出力は、[インクリメンタルコンパイルの結果を永続化する][persist incremental compilation results]ためにバイナリ形式でシリアライズされます。
+- [`CrateInfo`]は、`-Z no-link`フラグが使用されたときに`JSON`にシリアライズされ、`-Z link-only`フラグが使用されたときに`JSON`からデシリアライズされます。
 
 [`CrateInfo`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/struct.CrateInfo.html
 [persist incremental compilation results]: queries/incremental-compilation-in-detail.md#the-real-world-how-persistence-makes-everything-complicated
-[serialize]: https://en.wikipedia.org/wiki/Serialization
+[シリアライズ]: https://en.wikipedia.org/wiki/Serialization
 
-## The `Encodable` and `Decodable` traits
+## `Encodable`トレイトと`Decodable`トレイト
 
-The [`rustc_serialize`] crate defines two traits for types which can be serialized:
+[`rustc_serialize`]クレートは、シリアライズ可能な型のための2つのトレイトを定義しています：
 
 ```rust,ignore
 pub trait Encodable<S: Encoder> {
@@ -30,14 +24,9 @@ pub trait Decodable<D: Decoder>: Sized {
 }
 ```
 
-It also defines implementations of these for various common standard library
-[primitive types](https://doc.rust-lang.org/std/#primitives) such as integer
-types, floating point types, `bool`, `char`, `str`, etc.
+また、整数型、浮動小数点型、`bool`、`char`、`str`など、さまざまな標準ライブラリの一般的な[プリミティブ型](https://doc.rust-lang.org/std/#primitives)に対する実装も定義しています。
 
-For types that are constructed from those types, `Encodable` and `Decodable`
-are usually implemented by [derives]. These generate implementations that
-forward deserialization to the fields of the struct or enum. For a
-struct those impls look something like this:
+これらの型から構築される型の場合、`Encodable`と`Decodable`は通常[derives]によって実装されます。これらは、デシリアライゼーションを構造体やenumのフィールドに転送する実装を生成します。構造体の場合、それらの実装は次のようになります：
 
 ```rust,ignore
 #![feature(rustc_private)]
@@ -71,15 +60,11 @@ impl<D: Decoder> Decodable<D> for MyStruct {
 ```
 [`rustc_serialize`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_serialize/index.html
 
-## Encoding and Decoding arena allocated types
+## アリーナに割り当てられた型のエンコードとデコード
 
-rustc has a lot of [arena allocated types].
-Deserializing these types isn't possible without access to the arena that they need to be allocated on.
-The [`TyDecoder`] and [`TyEncoder`] traits are subtraits of [`Decoder`] and [`Encoder`] that allow access to a [`TyCtxt`].
+rustcには多数の[アリーナに割り当てられた型][arena allocated types]があります。これらの型をデシリアライズするには、それらが割り当てられる必要があるアリーナへのアクセスが必要です。[`TyDecoder`]トレイトと[`TyEncoder`]トレイトは、[`TyCtxt`]へのアクセスを可能にする[`Decoder`]と[`Encoder`]のサブトレイトです。
 
-Types which contain `arena` allocated types can then bound the type parameter of their
-[`Encodable`] and [`Decodable`] implementations with these traits.
-For example
+`arena`に割り当てられた型を含む型は、その[`Encodable`]および[`Decodable`]実装の型パラメータをこれらのトレイトで制約できます。たとえば：
 
 ```rust,ignore
 impl<'tcx, D: TyDecoder<'tcx>> Decodable<D> for MyStruct<'tcx> {
@@ -87,19 +72,11 @@ impl<'tcx, D: TyDecoder<'tcx>> Decodable<D> for MyStruct<'tcx> {
 }
 ```
 
-The [`TyEncodable`] and [`TyDecodable`] [derive macros][derives] will expand to such
-an implementation.
+[`TyEncodable`]および[`TyDecodable`] [derive マクロ][derives]は、このような実装に展開されます。
 
-Decoding the actual `arena` allocated type is harder, because some of the
-implementations can't be written due to the [orphan rules]. To work around this,
-the [`RefDecodable`] trait is defined in [`rustc_middle`]. This can then be
-implemented for any type. The `TyDecodable` macro will call `RefDecodable` to
-decode references, but various generic code needs types to actually be
-`Decodable` with a specific decoder.
+実際の`arena`に割り当てられた型のデコードは、[orphan rules]のために一部の実装を書けないため、より複雑です。これを回避するために、[`RefDecodable`]トレイトが[`rustc_middle`]で定義されています。これは任意の型に実装できます。`TyDecodable`マクロは参照をデコードするために`RefDecodable`を呼び出しますが、さまざまなジェネリックコードは、型が特定のデコーダーで実際に`Decodable`である必要があります。
 
-For interned types instead of manually implementing `RefDecodable`, using a new
-type wrapper, like [`ty::Predicate`] and manually implementing `Encodable` and
-`Decodable` may be simpler.
+インターン化された型の場合、[`ty::Predicate`]のような新しい型ラッパーを使用し、手動で`Encodable`と`Decodable`を実装する方が、`RefDecodable`を手動で実装するよりも簡単かもしれません。
 
 [`Decodable`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_serialize/trait.Decodable.html
 [`Decoder`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_serialize/trait.Decoder.html
@@ -117,23 +94,13 @@ type wrapper, like [`ty::Predicate`] and manually implementing `Encodable` and
 [derives]: #derive-macros
 [orphan rules]:https://doc.rust-lang.org/reference/items/implementations.html#orphan-rules
 
-## Derive macros
+## Deriveマクロ
 
-The [`rustc_macros`] crate defines various derives to help implement `Decodable`
-and `Encodable`.
+[`rustc_macros`]クレートは、`Decodable`と`Encodable`の実装を支援するためのさまざまなderiveを定義しています。
 
-- The `Encodable` and `Decodable` macros generate implementations that apply to
-  all `Encoders` and `Decoders`. These should be used in crates that don't
-  depend on [`rustc_middle`], or that have to be serialized by a type that does
-  not implement `TyEncoder`.
-- [`MetadataEncodable`] and [`MetadataDecodable`] generate implementations that
-  only allow decoding by [`rustc_metadata::rmeta::encoder::EncodeContext`] and
-  [`rustc_metadata::rmeta::decoder::DecodeContext`]. These are used for types
-  that contain [`rustc_metadata::rmeta::`]`Lazy*`.
-- `TyEncodable` and `TyDecodable` generate implementation that apply to any
-  `TyEncoder` or `TyDecoder`. These should be used for types that are only
-  serialized in crate metadata and/or the incremental cache, which is most
-  serializable types in `rustc_middle`.
+- `Encodable`および`Decodable`マクロは、すべての`Encoders`と`Decoders`に適用される実装を生成します。これらは、[`rustc_middle`]に依存しないクレート、または`TyEncoder`を実装しない型によってシリアライズされる必要があるクレートで使用する必要があります。
+- [`MetadataEncodable`]および[`MetadataDecodable`]は、[`rustc_metadata::rmeta::encoder::EncodeContext`]および[`rustc_metadata::rmeta::decoder::DecodeContext`]によるデコードのみを許可する実装を生成します。これらは、[`rustc_metadata::rmeta::`]`Lazy*`を含む型に使用されます。
+- `TyEncodable`と`TyDecodable`は、任意の`TyEncoder`または`TyDecoder`に適用される実装を生成します。これらは、クレートメタデータおよび/またはインクリメンタルキャッシュでのみシリアライズされる型に使用する必要があります。これは`rustc_middle`のほとんどのシリアライズ可能な型に該当します。
 
 [`MetadataDecodable`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_macros/derive.MetadataDecodable.html
 [`MetadataEncodable`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_macros/derive.MetadataEncodable.html
@@ -143,42 +110,25 @@ and `Encodable`.
 [`rustc_metadata::rmeta::encoder::EncodeContext`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_metadata/rmeta/encoder/struct.EncodeContext.html
 [`rustc_middle`]: https://github.com/rust-lang/rust/tree/HEAD/compiler/rustc_middle
 
-## Shorthands
+## 短縮形
 
-`Ty` can be deeply recursive, if each `Ty` was encoded naively then crate
-metadata would be very large. To handle this, each `TyEncoder` has a cache of
-locations in its output where it has serialized types. If a type being encoded
-is in the cache, then instead of serializing the type as usual, the byte offset
-within the file being written is encoded instead. A similar scheme is used for
-`ty::Predicate`.
+`Ty`は深く再帰的になる可能性があるため、各`Ty`を素朴にエンコードすると、クレートメタデータが非常に大きくなります。これを処理するために、各`TyEncoder`は、型をシリアライズした出力内の場所のキャッシュを持っています。エンコードされる型がキャッシュにある場合、通常のように型をシリアライズする代わりに、書き込まれるファイル内のバイトオフセットがエンコードされます。`ty::Predicate`にも同様のスキームが使用されています。
 
 ## `LazyValue<T>`
 
-Crate metadata is initially loaded before the `TyCtxt<'tcx>` is created, so
-some deserialization needs to be deferred from the initial loading of metadata.
-The [`LazyValue<T>`] type wraps the (relative) offset in the crate metadata
-where a `T` has been serialized. There are also some variants, [`LazyArray<T>`]
-and [`LazyTable<I, T>`].
+クレートメタデータは、`TyCtxt<'tcx>`が作成される前に最初にロードされるため、一部のデシリアライゼーションはメタデータの最初のロードから延期される必要があります。[`LazyValue<T>`]型は、`T`がシリアライズされたクレートメタデータ内の（相対的な）オフセットをラップします。また、いくつかのバリアントもあります：[`LazyArray<T>`]および[`LazyTable<I, T>`]。
 
-The `LazyArray<[T]>` and `LazyTable<I, T>` types provide some functionality over
-`Lazy<Vec<T>>` and `Lazy<HashMap<I, T>>`:
+`LazyArray<[T]>`および`LazyTable<I, T>`型は、`Lazy<Vec<T>>`および`Lazy<HashMap<I, T>>`に対していくつかの機能を提供します：
 
-- It's possible to encode a `LazyArray<T>` directly from an `Iterator`, without
-  first collecting into a `Vec<T>`.
-- Indexing into a `LazyTable<I, T>` does not require decoding entries other
-  than the one being read.
+- `LazyArray<T>`を`Iterator`から直接エンコードすることができ、最初に`Vec<T>`に収集する必要はありません。
+- `LazyTable<I, T>`へのインデックスアクセスは、読み取られているエントリ以外のエントリをデコードする必要はありません。
 
-**note**: `LazyValue<T>` does not cache its value after being deserialized the
-first time. Instead the query system itself is the main way of caching these
-results.
+**注意**：`LazyValue<T>`は、最初にデシリアライズされた後、その値をキャッシュしません。代わりに、クエリシステム自体がこれらの結果をキャッシュする主な方法です。
 
 [`LazyArray<T>`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_metadata/rmeta/struct.LazyValue.html
 [`LazyTable<I, T>`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_metadata/rmeta/struct.LazyValue.html
 [`LazyValue<T>`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_metadata/rmeta/struct.LazyValue.html
 
-## Specialization
+## 特殊化
 
-A few types, most notably `DefId`, need to have different implementations for
-different `Encoder`s. This is currently handled by ad-hoc specializations, for
-example: `DefId` has a `default` implementation of `Encodable<E>` and a
-specialized one for `Encodable<CacheEncoder>`.
+いくつかの型、特に`DefId`は、異なる`Encoder`に対して異なる実装を持つ必要があります。これは現在、アドホックな特殊化によって処理されています。たとえば、`DefId`には`Encodable<E>`の`default`実装と、`Encodable<CacheEncoder>`の特殊化された実装があります。

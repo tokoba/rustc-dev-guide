@@ -1,66 +1,60 @@
-# Invariants of the type system
+# 型システムの不変条件
 
-FIXME: This file talks about invariants of the type system as a whole, not only the solver
+FIXME: このファイルは、ソルバーだけでなく、型システム全体の不変条件について説明しています
 
-There are a lot of invariants - things the type system guarantees to be true at all times -
-which are desirable or expected from other languages and type systems. Unfortunately, quite
-a few of them do not hold in Rust right now. This is either fundamental to its design or
-caused by bugs, and something that may change in the future.
+多くの不変条件があります - 型システムが常に真であることを保証するもの -
+これらは他の言語や型システムから望ましいまたは期待されるものです。残念ながら、かなり
+多くのものが現在Rustでは成り立っていません。これは、その設計の基本的なものであるか、
+バグによって引き起こされ、将来変更される可能性があるものです。
 
-It is important to know about the things you can assume while working on, and with, the
-type system, so here's an incomplete and unofficial list of invariants of
-the core type system:
+型システムの作業中および作業時に仮定できることを知ることは重要です。ここに、
+コア型システムの不変条件の不完全で非公式なリストがあります：
 
-- ✅: this invariant mostly holds, with some weird exceptions or current bugs
-- ❌: this invariant does not hold, and is unlikely to do so in the future; do not rely on it for soundness or have to be incredibly careful when doing so
+- ✅: この不変条件はほとんど成り立ちますが、いくつかの奇妙な例外または現在のバグがあります
+- ❌: この不変条件は成り立たず、将来的にそうなる可能性も低いです。健全性のためにこれに依存したり、そうする場合は非常に注意する必要があります
 
-### `wf(X)` implies `wf(normalize(X))` ✅
+### `wf(X)`は`wf(normalize(X))`を意味する ✅
 
-If a type containing aliases is well-formed, it should also be
-well-formed after normalizing said aliases. We rely on this as
-otherwise we would have to re-check for well-formedness for these
-types.
+エイリアスを含む型がwell-formedである場合、
+前記エイリアスを正規化した後もwell-formedであるべきです。これに依存しています。そうしないと、これらの
+型に対してwell-formednessを再チェックする必要があるからです。
 
-This currently does not hold due to a type system unsoundness: [#84533](https://github.com/rust-lang/rust/issues/84533).
+これは現在、型システムの健全性の欠如のため成り立っていません：[#84533](https://github.com/rust-lang/rust/issues/84533)。
 
-### Structural equality modulo regions implies semantic equality ✅
+### 領域を除いた構造的等価性は意味的等価性を意味する ✅
 
-If you have a some type and equate it to itself after replacing any regions with unique
-inference variables in both the lhs and rhs, the now potentially structurally different
-types should still be equal to each other.
+ある型があり、それを任意の領域を両方のlhsとrhsで一意の
+推論変数で置き換えた後に自身と等しくする場合、現在潜在的に構造的に異なる
+型は依然として互いに等しいべきです。
 
-This is needed to prevent goals from succeeding in HIR typeck and then failing in MIR borrowck.
-If this invariant is broken, MIR typeck ends up failing with an ICE.
+これは、HIR typeckでゴールが成功し、その後MIR borrowckで失敗することを防ぐために必要です。
+この不変条件が破られた場合、MIR typeckはICEで失敗することになります。
 
-### Applying inference results from a goal does not change its result ❌
+### ゴールから推論結果を適用してもその結果は変わらない ❌
 
-TODO: this invariant is formulated in a weird way and needs to be elaborated.
-Pretty much: I would like this check to only fail if there's a solver bug:
-<https://github.com/rust-lang/rust/blob/2ffeb4636b4ae376f716dc4378a7efb37632dc2d/compiler/rustc_trait_selection/src/solve/eval_ctxt.rs#L391-L407>.
-We should readd this check and see where it breaks :3
+TODO: この不変条件は奇妙な方法で定式化されており、詳しく説明する必要があります。
+かなり：このチェックがソルバーのバグがある場合にのみ失敗することを望みます：
+<https://github.com/rust-lang/rust/blob/2ffeb4636b4ae376f716dc4378a7efb37632dc2d/compiler/rustc_trait_selection/src/solve/eval_ctxt.rs#L391-L407>。
+このチェックを再追加し、どこで壊れるかを確認する必要があります :3
 
-If we prove some goal/equate types/whatever, apply the resulting inference constraints,
-and then redo the original action, the result should be the same.
+ゴールを証明したり、型を等しくしたり、何でもする場合、結果の推論制約を適用し、
+次に元のアクションをやり直すと、結果は同じであるべきです。
 
-This unfortunately does not hold - at least in the new solver - due to a few annoying reasons.
+これは残念ながら成り立ちません - 少なくとも新しいソルバーでは - いくつかの厄介な理由のためです。
 
-### The trait solver has to be *locally sound* ✅
+### トレイトソルバーは*局所的に健全*である必要がある ✅
 
-This means that we must never return *success* for goals for which no `impl` exists. That would
-mean we assume a trait is implemented even though it is not, which is very likely to result in
-actual unsoundness. When using `where`-bounds to prove a goal, the `impl` will be provided by the
-user of the item.
+これは、`impl`が存在しないゴールに対して*成功*を返してはならないことを意味します。それは
+トレイトが実装されていなくても実装されていると仮定することを意味し、実際の健全性の欠如を引き起こす可能性が非常に高いです。`where`境界を使用してゴールを証明する場合、`impl`はアイテムのユーザーによって提供されます。
 
-This invariant only holds if we check region constraints. As we do not check region constraints
-during implicit negative overlap check in coherence, this invariant is broken there. As this check
-relies on *completeness* of the trait solver, it is not able to use the current region constraints
-check - `InferCtxt::resolve_regions` - as its handling of type outlives goals is incomplete.
+この不変条件は、領域制約をチェックする場合にのみ成り立ちます。コヒーレンスの暗黙的な負のオーバーラップチェック中に領域制約をチェックしないため、この不変条件はそこで破られています。このチェックは
+トレイトソルバーの*完全性*に依存するため、現在の領域制約
+チェック - `InferCtxt::resolve_regions` - を使用できません。なぜなら、型outlives ゴールの処理が不完全だからです。
 
-### Normalization of semantically equal aliases in empty environments results in a unique type ✅
+### 空の環境での意味的に等しいエイリアスの正規化は一意の型をもたらす ✅
 
-Normalization for alias types/consts has to have a unique result. Otherwise we can easily 
-implement transmute in safe code. Given the following function, we have to make sure that
-the input and output types always get normalized to the same concrete type.
+エイリアス型/定数の正規化は一意の結果を持つ必要があります。そうしないと、安全なコードで簡単に
+transmute を実装できます。次の関数を考えると、入力と出力の型が常に同じ具体的な型に正規化されることを確認する必要があります。
 
 ```rust
 fn foo<T: Trait>(
@@ -70,103 +64,101 @@ fn foo<T: Trait>(
 }
 ```
 
-Many of the currently known unsound issues end up relying on this invariant being broken.
-It is however very difficult to imagine a sound type system without this invariant, so
-the issue is that the invariant is broken, not that we incorrectly rely on it.
+現在知られている健全でない問題の多くは、この不変条件が破られることに依存しています。
+しかし、この不変条件なしで健全な型システムを想像することは非常に困難なので、
+問題は不変条件が破られていることであり、誤ってそれに依存していることではありません。
 
-### The type system is complete ❌
+### 型システムは完全である ❌
 
-The type system is not complete.
-It often adds unnecessary inference constraints, and errors even though the goal could hold.
+型システムは完全ではありません。
+しばしば不要な推論制約を追加し、ゴールが成り立つ可能性があってもエラーを出します。
 
-- method selection
-- opaque type inference
-- handling type outlives constraints
-- preferring `ParamEnv` candidates over `Impl` candidates during candidate selection
-in the trait solver
+- メソッド選択
+- 不透明型推論
+- 型outlives制約の処理
+- トレイトソルバーの候補選択中に`Impl`候補よりも`ParamEnv`候補を優先
 
-### Goals keep their result from HIR typeck afterwards ✅
+### ゴールはHIR typeckからその後も結果を保持する ✅
 
-Having a goal which succeeds during HIR typeck but fails when being reevaluated during MIR borrowck causes ICE, e.g. [#140211](https://github.com/rust-lang/rust/issues/140211).
+HIR typeck中に成功するゴールが、MIR borrowck中に再評価されたときに失敗するとICEを引き起こします。例：[#140211](https://github.com/rust-lang/rust/issues/140211)。
 
-Having a goal which succeeds during HIR typeck but fails after being instantiated is unsound, e.g. [#140212](https://github.com/rust-lang/rust/issues/140212).
+HIR typeck中に成功するゴールが、インスタンス化された後に失敗すると健全性の欠如です。例：[#140212](https://github.com/rust-lang/rust/issues/140212)。
 
-It is interesting that we allow some incompleteness in the trait solver while still maintaining this limitation. It would be nice if there was a clear way to separate the "allowed incompleteness" from behavior which would break this invariant.
+トレイトソルバーでいくつかの不完全性を許容しながらも、この制限を維持することは興味深いです。「許可される不完全性」と、この不変条件を破る動作を分離する明確な方法があれば素晴らしいでしょう。
 
-#### Normalization must not change results
+#### 正規化は結果を変更してはならない
 
-This invariant is relied on to allow the normalization of generic aliases. Breaking
-it can easily result in unsoundness, e.g. [#57893](https://github.com/rust-lang/rust/issues/57893).
+この不変条件は、ジェネリックエイリアスの正規化を許可するために依存されています。これを破ると
+簡単に健全性の欠如をもたらす可能性があります。例：[#57893](https://github.com/rust-lang/rust/issues/57893)。
 
-#### Goals may still overflow after instantiation
+#### ゴールはインスタンス化後もオーバーフローする可能性がある
 
-This happens they start to hit the recursion limit.
-We also have diverging aliases which are scuffed.
-It's unclear how these should be handled :3
+これは、再帰制限に達し始めたときに発生します。
+また、乱雑な発散エイリアスもあります。
+これらをどのように処理すべきかは不明です :3
 
-### Trait goals in empty environments are proven by a unique impl ✅
+### 空の環境でのトレイトゴールは一意のimplによって証明される ✅
 
-If a trait goal holds with an empty environment, there should be a unique `impl`,
-either user-defined or builtin, which is used to prove that goal. This is
-necessary to select unique methods and associated items.
+トレイトゴールが空の環境で成り立つ場合、ユーザー定義または
+ビルトインのいずれかで、そのゴールを証明するために使用される一意の`impl`があるべきです。これは、
+一意のメソッドと関連アイテムを選択するために必要です。
 
-We do however break this invariant in a few cases, some of which are due to bugs, some by design:
-- *marker traits* are allowed to overlap as they do not have associated items
-- *specialization* allows specializing impls to overlap with their parent
-- the builtin trait object trait implementation can overlap with a user-defined impl:
+ただし、いくつかのケースでこの不変条件を破ります。そのうちのいくつかはバグによるもので、いくつかは設計によるものです：
+- *マーカートレイト*は関連アイテムを持たないため、オーバーラップが許可されています
+- *特殊化*により、特殊化implがその親とオーバーラップすることが許可されます
+- ビルトイントレイトオブジェクトのトレイト実装は、ユーザー定義のimplとオーバーラップする可能性があります：
 [#57893](https://github.com/rust-lang/rust/issues/57893)
 
 
-#### The type system is complete during the implicit negative overlap check in coherence ✅
+#### コヒーレンスの暗黙的な負のオーバーラップチェック中、型システムは完全である ✅
 
-For more on overlap checking, see [Coherence chapter].
+オーバーラップチェックの詳細については、[コヒーレンスの章]を参照してください。
 
-During the implicit negative overlap check in coherence,
-we must never return *error* for goals which can be proven.
-This would allow for overlapping impls with potentially different associated items,
-breaking a bunch of other invariants.
+コヒーレンスの暗黙的な負のオーバーラップチェック中、
+証明できるゴールに対して*エラー*を返してはなりません。
+これにより、潜在的に異なる関連アイテムを持つimplがオーバーラップすることが許可され、
+他の多くの不変条件が破られます。
 
-This invariant is currently broken in many different ways while actually something we rely on.
-We have to be careful as it is quite easy to break:
-- generalization of aliases
-- generalization during subtyping binders (luckily not exploitable in coherence)
+この不変条件は現在、多くの異なる方法で破られていますが、実際に依存しているものです。
+簡単に破ることができるので、注意する必要があります：
+- エイリアスの一般化
+- バインダーをサブタイプする際の一般化（幸いコヒーレンスでは悪用できません）
 
-### Trait solving must not depend on lifetimes being different ✅
+### トレイト解決はライフタイムが異なることに依存してはならない ✅
 
-If a goal holds with lifetimes being different, it must also hold with these lifetimes being the same. We otherwise get post-monomorphization errors during codegen or unsoundness due to invalid vtables.
+ライフタイムが異なるときにゴールが成り立つ場合、これらのライフタイムが同じであってもゴールは成り立つ必要があります。そうしないと、codegen中またはvtableが無効なため、ポストモノモーフィゼーションエラーが発生します。
 
-We could also just get inconsistent behavior when first proving a goal with different lifetimes which are later constrained to be equal.
+また、最初に異なるライフタイムでゴールを証明し、後で等しいと制約される場合、一貫性のない動作が発生する可能性があります。
 
-### Trait solving in bodies must not depend on lifetimes being equal ✅
+### 本文でのトレイト解決はライフタイムが等しいことに依存してはならない ✅
 
-We also have to be careful with relying on equality of regions in the trait solver.
-This is fine for codegen, as we treat all erased regions as equal. We can however
-lose equality information from HIR to MIR typeck.
+トレイトソルバーで領域の等価性に依存することにも注意する必要があります。
+これはcodegenでは問題ありません。すべての消去された領域を等しいものとして扱うためです。ただし、
+HIRからMIR typeckへの等価性情報を失う可能性があります。
 
-This currently does not hold with the new solver: [trait-system-refactor-initiative#27](https://github.com/rust-lang/trait-system-refactor-initiative/issues/27).
+これは現在、新しいソルバーでは成り立っていません：[trait-system-refactor-initiative#27](https://github.com/rust-lang/trait-system-refactor-initiative/issues/27)。
 
-### Removing ambiguity makes strictly more things compile ❌
+### 曖昧性を削除すると、厳密により多くのものがコンパイルされる ❌
 
-Ideally we *should* not rely on ambiguity for things to compile.
-Not doing that will cause future improvements to be breaking changes.
+理想的には、コンパイルのために曖昧性に依存*すべきではありません*。
+そうしないと、将来の改善が破壊的変更になります。
 
-Due to *incompleteness* this is not the case,
-and improving inference can result in inference changes, breaking existing projects.
+*不完全性*のため、これは当てはまらず、
+推論の改善は推論の変更をもたらし、既存のプロジェクトを破壊する可能性があります。
 
-### Semantic equality implies structural equality ✅
+### 意味的等価性は構造的等価性を意味する ✅
 
-Two types being equal in the type system must mean that they have the
-same `TypeId` after instantiating their generic parameters with concrete
-arguments. We can otherwise use their different `TypeId`s to impact trait selection.
+型システムで2つの型が等しいことは、それらのジェネリックパラメータを具体的な
+引数でインスタンス化した後、同じ`TypeId`を持つことを意味する必要があります。そうしないと、異なる`TypeId`を使用してトレイト選択に影響を与えることができます。
 
-We lookup types using structural equality during codegen, but this shouldn't necessarily be unsound
-- may result in redundant method codegen or backend type check errors?
-- we also rely on it in CTFE assertions
+codegen中に構造的等価性を使用して型を検索しますが、これは必ずしも健全でない必要はありません
+- 冗長なメソッドのcodegenまたはバックエンドの型チェックエラーを引き起こす可能性があります
+- CTFE アサーションでもこれに依存しています
 
-### Semantically different types have different `TypeId`s ✅
+### 意味的に異なる型は異なる`TypeId`を持つ ✅
 
-Semantically different `'static` types need different `TypeId`s to avoid transmutes,
-for example `for<'a> fn(&'a str)` vs `fn(&'static str)` must have a different `TypeId`.
+意味的に異なる`'static`型は、transmuteを避けるために異なる`TypeId`を持つ必要があります。
+たとえば、`for<'a> fn(&'a str)`対`fn(&'static str)`は異なる`TypeId`を持つ必要があります。
 
 
 [coherence chapter]: ../coherence.md

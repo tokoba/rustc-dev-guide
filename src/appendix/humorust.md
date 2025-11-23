@@ -1,7 +1,7 @@
-# Humor in Rust
+# Rustのユーモア
 
-What's a project without a sense of humor? And frankly some of these are
-enlightening?
+ユーモアのセンスのないプロジェクトなんてあるでしょうか？そして率直に言って、これらのいくつかは
+啓発的ですか？
 
 - [Weird exprs test](https://github.com/rust-lang/rust/blob/HEAD/tests/ui/expr/weird-exprs.rs)
 - [Ferris Rap](https://fitzgen.com/2018/12/13/rust-raps.html)

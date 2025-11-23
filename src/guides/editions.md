@@ -1,177 +1,139 @@
-# Editions
+# エディション
 
-This chapter gives an overview of how Edition support works in rustc.
-This assumes that you are familiar with what Editions are (see the [Edition Guide]).
+本章では、rustcにおけるエディションサポートの仕組みについて概要を説明します。
+ここでは、エディションとは何か（[エディションガイド]を参照）について理解していることを前提としています。
 
-[Edition Guide]: https://doc.rust-lang.org/edition-guide/
+[エディションガイド]: https://doc.rust-lang.org/edition-guide/
 
-## Edition definition
+## エディションの定義
 
-The `--edition` CLI flag specifies the edition to use for a crate.
-This can be accessed from [`Session::edition`].
-There are convenience functions like [`Session::at_least_rust_2021`] for checking the crate's
-edition, though you should be careful about whether you check the global session or the span, see
-[Edition hygiene] below.
+`--edition` CLIフラグは、クレートに使用するエディションを指定します。
+これは[`Session::edition`]からアクセスできます。
+クレートのエディションをチェックするための[`Session::at_least_rust_2021`]のような便利な関数がありますが、グローバルセッションをチェックするかスパンをチェックするかについて注意する必要があります。以下の[エディションハイジーン]を参照してください。
 
-As an alternative to the `at_least_rust_20xx` convenience methods, the [`Edition`] type also
-supports comparisons for doing range checks, such as `span.edition() >= Edition::Edition2021`.
+`at_least_rust_20xx`便利メソッドの代わりに、[`Edition`]型は範囲チェックを行うための比較もサポートしています。例えば、`span.edition() >= Edition::Edition2021`のようになります。
 
 [`Session::edition`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_session/struct.Session.html#method.edition
 [`Session::at_least_rust_2021`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_session/struct.Session.html#method.at_least_rust_2021
 [`Edition`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/edition/enum.Edition.html
 
-### Adding a new edition
+### 新しいエディションの追加
 
-Adding a new edition mainly involves adding a variant to the [`Edition`] enum and then fixing
-everything that is broken. See [#94461](https://github.com/rust-lang/rust/pull/94461) for an
-example.
+新しいエディションの追加は、主に[`Edition`]列挙型にバリアントを追加してから、壊れたすべてのものを修正することに関わります。例として[#94461](https://github.com/rust-lang/rust/pull/94461)を参照してください。
 
-### Features and Edition stability
+### 機能とエディションの安定性
 
-The [`Edition`] enum defines whether or not an edition is stable.
-If it is not stable, then the `-Zunstable-options` CLI option must be passed to enable it.
+[`Edition`]列挙型は、エディションが安定しているかどうかを定義します。
+安定していない場合、それを有効にするには`-Zunstable-options` CLIオプションを渡す必要があります。
 
-When adding a new feature, there are two options you can choose for how to handle stability with a
-future edition:
+新しい機能を追加する際、将来のエディションで安定性を扱う方法として2つのオプションを選択できます：
 
-- Just check the edition of the span like `span.at_least_rust_20xx()` (see [Edition hygiene]) or the
-  [`Session::edition`]. This will implicitly depend on the stability of the edition itself to
-  indicate that your feature is available.
-- Place your new behavior behind a [feature gate].
+- `span.at_least_rust_20xx()`のようにスパンのエディションをチェックするだけです（[エディションハイジーン]を参照）、または[`Session::edition`]を使用します。これは、機能が利用可能であることを示すために、エディション自体の安定性に暗黙的に依存します。
+- 新しい動作を[フィーチャーゲート]の後ろに配置します。
 
-It may be sufficient to only check the current edition for relatively simple changes.
-However, for larger language changes, you should consider creating a feature gate.
-There are several benefits to using a feature gate:
+比較的単純な変更の場合、現在のエディションのみをチェックするだけで十分な場合があります。
+ただし、大きな言語変更の場合は、フィーチャーゲートを作成することを検討してください。
+フィーチャーゲートを使用することには、いくつかの利点があります：
 
-- A feature gate makes it easier to work on and experiment with a new feature.
-- It makes the intent clear when the `#![feature(…)]` attribute is used that your new feature is
-  being enabled.
-- It makes testing of editions easier so that features that are not yet complete do not interfere
-  with testing of edition-specific features that are complete and ready.
-- It decouples the feature from an edition, which makes it easier for the team to make a deliberate
-  decision of whether or not a feature should be added to the next edition when the feature is
-  ready.
+- フィーチャーゲートにより、新しい機能の作業と実験が容易になります。
+- `#![feature(…)]`属性が使用されたときに、新しい機能が有効になっていることが明確になります。
+- エディションのテストが容易になり、まだ完成していない機能が完成して準備ができているエディション固有の機能のテストを妨げないようになります。
+- 機能がエディションから切り離されるため、機能の準備ができたときに、チームが次のエディションに機能を追加するかどうかを意図的に決定しやすくなります。
 
-When a feature is complete and ready, the feature gate can be removed (and the code should just
-check the span or `Session` edition to determine if it is enabled).
+機能が完成して準備ができたら、フィーチャーゲートを削除できます（コードはスパンまたは`Session`エディションをチェックして有効かどうかを判断するだけで済みます）。
 
-There are a few different options for doing feature checks:
+機能チェックを行うためのいくつかの異なるオプションがあります：
 
-- For highly experimental features, that may or may not be involved in an edition, they can
-  implement regular feature gates like `tcx.features().my_feature`, and ignore editions for the time
-  being.
+- 非常に実験的な機能で、エディションに関与する可能性がある、または関与しない可能性がある場合、`tcx.features().my_feature`のような通常のフィーチャーゲートを実装し、当面はエディションを無視することができます。
 
-- For experimental features that *might* be involved in an edition, they should implement gates with
-  `tcx.features().my_feature && span.at_least_rust_20xx()`.
-  This requires the user to still specify `#![feature(my_feature)]`, to avoid disrupting testing of
-  other edition features which are ready and have been accepted within the edition.
+- エディションに関与する*可能性がある*実験的な機能の場合、`tcx.features().my_feature && span.at_least_rust_20xx()`でゲートを実装する必要があります。
+  これには、ユーザーが`#![feature(my_feature)]`を指定する必要があり、準備ができてエディション内で受け入れられた他のエディション機能のテストを妨げないようにします。
 
-- For experimental features that have graduated to definitely be part of an edition,
-  they should implement gates with `tcx.features().my_feature || span.at_least_rust_20xx()`,
-  or just remove the feature check altogether and just check `span.at_least_rust_20xx()`.
+- エディションの一部であることが確実に決まった実験的な機能の場合、`tcx.features().my_feature || span.at_least_rust_20xx()`でゲートを実装するか、機能チェックを完全に削除して`span.at_least_rust_20xx()`のみをチェックします。
 
-If you need to do the feature gating in multiple places, consider placing the check in a single
-function so that there will only be a single place to update. For example:
+複数の場所で機能ゲートを行う必要がある場合は、単一の関数にチェックを配置して、更新する場所が1つだけになるようにすることを検討してください。例えば：
 
 ```rust,ignore
-// An example from Edition 2021 disjoint closure captures.
+// Edition 2021のdisjoint closure capturesの例
 
 fn enable_precise_capture(tcx: TyCtxt<'_>, span: Span) -> bool {
     tcx.features().capture_disjoint_fields || span.rust_2021()
 }
 ```
 
-See [Lints and stability](#lints-and-stability) below for more information about how lints handle
-stability.
+リントと安定性の詳細については、以下の[リントと安定性](#lints-and-stability)を参照してください。
 
-[feature gate]: ../feature-gates.md
+[フィーチャーゲート]: ../feature-gates.md
 
-## Edition parsing
+## エディションのパース
 
-For the most part, the lexer is edition-agnostic.
-Within [`Lexer`], tokens can be modified based on edition-specific behavior.
-For example, C-String literals like `c"foo"` are split into multiple tokens in editions before 2021.
-This is also where things like reserved prefixes are handled for the 2021 edition.
+ほとんどの場合、レクサーはエディションに依存しません。
+[`Lexer`]内では、トークンをエディション固有の動作に基づいて変更できます。
+例えば、`c"foo"`のようなC文字列リテラルは、2021より前のエディションでは複数のトークンに分割されます。
+これは、2021エディションの予約済みプレフィックスなどが処理される場所でもあります。
 
-Edition-specific parsing is relatively rare. One example is `async fn` which checks the span of the
-token to determine if it is the 2015 edition, and emits an error in that case.
-This can only be done if the syntax was already invalid.
+エディション固有のパースは比較的まれです。1つの例は`async fn`で、トークンのスパンをチェックして2015エディションかどうかを判断し、その場合はエラーを出力します。
+これは、構文がすでに無効である場合にのみ実行できます。
 
-If you need to do edition checking in the parser, you will normally want to look at the edition of
-the token, see [Edition hygiene].
-In some rare cases you may instead need to check the global edition from [`ParseSess::edition`].
+パーサーでエディションチェックを行う必要がある場合、通常はトークンのエディションを確認する必要があります。[エディションハイジーン]を参照してください。
+まれに、[`ParseSess::edition`]からグローバルエディションをチェックする必要がある場合があります。
 
-Most edition-specific parsing behavior is handled with [migration lints] instead of in the parser.
-This is appropriate when there is a *change* in syntax (as opposed to new syntax).
-This allows the old syntax to continue to work on previous editions.
-The lint then checks for the change in behavior.
-On older editions, the lint pass should emit the migration lint to help with migrating to new
-editions.
-On newer editions, your code should emit a hard error with `emit_err` instead.
-For example, the deprecated `start...end` pattern syntax emits the
-[`ellipsis_inclusive_range_patterns`] lint on editions before 2021, and in 2021 is an hard error via
-the `emit_err` method.
+ほとんどのエディション固有のパース動作は、パーサーではなく[マイグレーションリント]で処理されます。
+これは、構文の*変更*がある場合（新しい構文とは対照的に）に適切です。
+これにより、古い構文は以前のエディションで引き続き機能します。
+リントは、動作の変更をチェックします。
+古いエディションでは、リントパスは新しいエディションへの移行を支援するためにマイグレーションリントを出力する必要があります。
+新しいエディションでは、コードは代わりに`emit_err`でハードエラーを出力する必要があります。
+例えば、非推奨の`start...end`パターン構文は、2021より前のエディションで[`ellipsis_inclusive_range_patterns`]リントを出力し、2021では`emit_err`メソッドを介してハードエラーになります。
 
 [`Lexer`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_parse/lexer/struct.Lexer.html
 [`ParseSess::edition`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_session/parse/struct.ParseSess.html#structfield.edition
 [`ellipsis_inclusive_range_patterns`]: https://doc.rust-lang.org/nightly/rustc/lints/listing/warn-by-default.html#ellipsis-inclusive-range-patterns
 
-### Keywords
+### キーワード
 
-New keywords can be introduced across an edition boundary.
-This is implemented by functions like [`Symbol::is_used_keyword_conditional`], which rely on the
-ordering of how the keywords are defined.
+新しいキーワードは、エディション境界を越えて導入できます。
+これは、[`Symbol::is_used_keyword_conditional`]のような関数によって実装され、キーワードの定義方法の順序に依存します。
 
-When new keywords are introduced, the [`keyword_idents`] lint should be updated so that automatic
-migrations can transition code that might be using the keyword as an identifier (see
-[`KeywordIdents`]).
-An alternative to consider is to implement the keyword as a weak keyword if the position it is used
-is sufficient to distinguish it.
+新しいキーワードが導入されると、[`keyword_idents`]リントを更新して、自動マイグレーションがキーワードを識別子として使用している可能性のあるコードを移行できるようにする必要があります（[`KeywordIdents`]を参照）。
+考慮すべき代替案は、使用されている位置がそれを区別するのに十分であれば、キーワードを弱いキーワードとして実装することです。
 
-An additional option to consider is the `k#` prefix which was introduced in [RFC 3101].
-This allows the use of a keyword in editions *before* the edition where the keyword is introduced.
-This is currently not implemented.
+考慮すべき追加のオプションは、[RFC 3101]で導入された`k#`プレフィックスです。
+これにより、キーワードが導入されたエディション*より前の*エディションでキーワードを使用できます。
+これは現在実装されていません。
 
 [`Symbol::is_used_keyword_conditional`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/symbol/struct.Symbol.html#method.is_used_keyword_conditional
 [`keyword_idents`]: https://doc.rust-lang.org/nightly/rustc/lints/listing/allowed-by-default.html#keyword-idents
 [`KeywordIdents`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_lint/builtin/struct.KeywordIdents.html
 [RFC 3101]: https://rust-lang.github.io/rfcs/3101-reserved_prefixes.html
 
-### Edition hygiene
-[edition hygiene]: #edition-hygiene
+### エディションハイジーン
+[エディションハイジーン]: #edition-hygiene
 
-Spans are marked with the edition of the crate that the span came from.
-See [Macro hygiene] in the Edition Guide for a user-centric description of what this means.
+スパンは、スパンが来たクレートのエディションでマークされています。
+これがユーザーにとって何を意味するかについては、エディションガイドの[マクロハイジーン]を参照してください。
 
-You should normally use the edition from the token span instead of looking at the global `Session`
-edition.
-For example, use `span.edition().at_least_rust_2021()` instead of `sess.at_least_rust_2021()`.
-This helps ensure that macros behave correctly when used across crates.
+通常、グローバル`Session`エディションを見るのではなく、トークンスパンからエディションを使用する必要があります。
+例えば、`sess.at_least_rust_2021()`の代わりに`span.edition().at_least_rust_2021()`を使用します。
+これにより、マクロがクレート間で使用される場合に正しく動作するようになります。
 
-[Macro hygiene]: https://doc.rust-lang.org/nightly/edition-guide/editions/advanced-migrations.html#macro-hygiene
+[マクロハイジーン]: https://doc.rust-lang.org/nightly/edition-guide/editions/advanced-migrations.html#macro-hygiene
 
-## Lints
+## リント
 
-Lints support a few different options for interacting with editions.
-Lints can be *future incompatible edition migration lints*, which are used to support
-[migrations][migration lints] to newer editions.
-Alternatively, lints can be [edition-specific](#edition-specific-lints), where they change their
-default level starting in a specific edition.
+リントは、エディションと対話するためのいくつかの異なるオプションをサポートしています。
+リントは、新しいエディションへの[マイグレーション][マイグレーションリント]をサポートするために使用される*将来互換性のないエディションマイグレーションリント*にすることができます。
+あるいは、リントは[エディション固有](#edition-specific-lints)にすることができ、特定のエディションからデフォルトレベルが変更されます。
 
-### Migration lints
-[migration lints]: #migration-lints
-[migration lint]: #migration-lints
+### マイグレーションリント
+[マイグレーションリント]: #migration-lints
+[マイグレーションリント]: #migration-lints
 
-*Migration lints* are used to migrate projects from one edition to the next.
-They are implemented with a `MachineApplicable` [suggestion](../diagnostics.md#suggestions) which
-will rewrite code so that it will **successfully compile in both the previous and the next
-edition**.
-For example, the [`keyword_idents`] lint will take identifiers that conflict with a new keyword to
-use the raw identifier syntax to avoid the conflict (for example changing `async` to `r#async`).
+*マイグレーションリント*は、プロジェクトをあるエディションから次のエディションに移行するために使用されます。
+これらは、`MachineApplicable`[サジェスチョン](../diagnostics.md#suggestions)で実装され、コードを書き換えて**前のエディションと次のエディションの両方で正常にコンパイルされる**ようにします。
+例えば、[`keyword_idents`]リントは、新しいキーワードと競合する識別子を取得し、raw識別子構文を使用して競合を回避します（例えば、`async`を`r#async`に変更する）。
 
-Migration lints must be declared with the [`FutureIncompatibilityReason::EditionError`] or
-[`FutureIncompatibilityReason::EditionSemanticsChange`] [future-incompatible
-option](../diagnostics.md#future-incompatible-lints) in the lint declaration:
+マイグレーションリントは、リント宣言で[`FutureIncompatibilityReason::EditionError`]または[`FutureIncompatibilityReason::EditionSemanticsChange`]の[将来互換性のないオプション](../diagnostics.md#future-incompatible-lints)で宣言する必要があります：
 
 ```rust,ignore
 declare_lint! {
@@ -185,13 +147,11 @@ declare_lint! {
 }
 ```
 
-When declared like this, the lint is automatically added to the appropriate
-`rust-20xx-compatibility` lint group.
-When a user runs `cargo fix --edition`, cargo will pass the `--force-warn rust-20xx-compatibility`
-flag to force all of these lints to appear during the edition migration.
-Cargo also passes `--cap-lints=allow` so that no other lints interfere with the edition migration.
+このように宣言すると、リントは適切な`rust-20xx-compatibility`リントグループに自動的に追加されます。
+ユーザーが`cargo fix --edition`を実行すると、cargoは`--force-warn rust-20xx-compatibility`フラグを渡して、エディション移行中にこれらすべてのリントが表示されるようにします。
+Cargoは`--cap-lints=allow`も渡すため、他のリントがエディション移行を妨げることはありません。
 
-Make sure that the example code sets the correct edition. The example should illustrate the previous edition, and show what the migration warning would look like. For example, this lint for a 2024 migration shows an example in 2021:
+サンプルコードが正しいエディションを設定していることを確認してください。サンプルは前のエディションを示し、マイグレーション警告がどのように見えるかを示す必要があります。例えば、2024マイグレーション用のこのリントは、2021のサンプルを示しています：
 
 ```rust,ignore
 declare_lint! {
@@ -208,28 +168,24 @@ declare_lint! {
 }
 ```
 
-Migration lints can be either `Allow` or `Warn` by default.
-If it is `Allow`, users usually won't see this warning unless they are doing an edition migration
-manually or there is a problem during the migration.
-Most migration lints are `Allow`.
+マイグレーションリントは、デフォルトで`Allow`または`Warn`にすることができます。
+`Allow`の場合、ユーザーは通常、エディション移行を手動で行っている場合や移行中に問題がある場合を除き、この警告を表示しません。
+ほとんどのマイグレーションリントは`Allow`です。
 
-If it is `Warn` by default, users on all editions will see this warning.
-Only use `Warn` if you think it is important for everyone to be aware of the change, and to
-encourage people to update their code on all editions.
-Beware that new warn-by-default lint that hit many projects can be very disruptive and frustrating
-for users.
-You may consider switching an `Allow` to `Warn` several years after the edition stabilizes.
-This will only show up for the relatively small number of stragglers who have not updated to the new
-edition.
+デフォルトで`Warn`の場合、すべてのエディションのユーザーにこの警告が表示されます。
+変更を皆に認識してもらうことが重要であり、すべてのエディションでコードを更新するよう人々を促したい場合にのみ、`Warn`を使用してください。
+多くのプロジェクトに影響を与える新しい警告がデフォルトで警告になると、非常に破壊的で不満を招く可能性があることに注意してください。
+エディションが安定してから数年後に、`Allow`を`Warn`に切り替えることを検討するかもしれません。
+これは、新しいエディションに更新していない比較的少数の遅延者にのみ表示されます。
 
 [`keyword_idents`]: https://doc.rust-lang.org/nightly/rustc/lints/listing/allowed-by-default.html#keyword-idents
 [`FutureIncompatibilityReason::EditionError`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_lint_defs/enum.FutureIncompatibilityReason.html#variant.EditionError
 [`FutureIncompatibilityReason::EditionSemanticsChange`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_lint_defs/enum.FutureIncompatibilityReason.html#variant.EditionSemanticsChange
 
-### Edition-specific lints
+### エディション固有のリント
 
-Lints can be marked so that they have a different level starting in a specific edition.
-In the lint declaration, use the `@edition` marker:
+リントは、特定のエディションから異なるレベルになるようにマークできます。
+リント宣言では、`@edition`マーカーを使用します：
 
 ```rust,ignore
 declare_lint! {
@@ -240,46 +196,36 @@ declare_lint! {
 }
 ```
 
-Here, `SOME_LINT_NAME` defaults to `Allow` on all editions before 2024, and then becomes `Warn`
-afterwards.
+ここでは、`SOME_LINT_NAME`は2024より前のすべてのエディションで`Allow`をデフォルトとし、その後`Warn`になります。
 
-This should generally be used sparingly, as there are other options:
+これは一般的に控えめに使用する必要があります。他のオプションがあるためです：
 
-- Small impact stylistic changes unrelated to an edition can just make the lint `Warn` on all
-  editions. If you want people to adopt a different way to write things, then go ahead and commit to
-  having it show up for all projects.
+- エディションに関係のない小さな影響のスタイル変更は、すべてのエディションでリントを`Warn`にするだけで済みます。人々に物事を書く別の方法を採用してもらいたい場合は、すべてのプロジェクトに表示されるようにコミットしてください。
 
-  Beware that if a new warn-by-default lint hits many projects, it can be very disruptive and
-  frustrating for users.
+  多くのプロジェクトに影響を与える新しい警告がデフォルトで警告になると、非常に破壊的で不満を招く可能性があることに注意してください。
 
-- Change the new style to be a hard error in the new edition, and use a [migration lint] to
-  automatically convert projects to the new style. For example,
-  [`ellipsis_inclusive_range_patterns`] is a hard error in 2021, and warns in all previous editions.
+- 新しいスタイルを新しいエディションでハードエラーに変更し、[マイグレーションリント]を使用してプロジェクトを新しいスタイルに自動的に変換します。例えば、[`ellipsis_inclusive_range_patterns`]は2021でハードエラーになり、以前のすべてのエディションで警告します。
 
-  Beware that these cannot be added after the edition stabilizes.
+  これらは、エディションが安定した後に追加することはできないことに注意してください。
 
-- Migration lints can also change over time.
-  For example, the migration lint can start out as `Allow` by default.
-  For people performing the migration, they will automatically get updated to the new code.
-  Then, after some years, the lint can be made to `Warn` in previous editions.
+- マイグレーションリントも時間とともに変更できます。
+  例えば、マイグレーションリントはデフォルトで`Allow`として開始できます。
+  移行を実行する人々の場合、自動的に新しいコードに更新されます。
+  その後、数年後、リントは以前のエディションで`Warn`にすることができます。
 
-  For example [`anonymous_parameters`] was a 2018 Edition migration lint (and a hard-error in 2018)
-  that was `Allow` by default in previous editions.
-  Then, three years later, it was changed to `Warn` for all previous editions, so that all users got
-  a warning that the style was being phased out.
-  If this was a warning from the start, it would have impacted many projects and be very disruptive.
-  By making it part of the edition, most users eventually updated to the new edition and were
-  handled by the migration.
-  Switching to `Warn` only impacted a few stragglers who did not update.
+  例えば、[`anonymous_parameters`]は2018エディションのマイグレーションリント（2018ではハードエラー）で、以前のエディションではデフォルトで`Allow`でした。
+  その後、3年後、以前のすべてのエディションで`Warn`に変更され、すべてのユーザーにスタイルが段階的に廃止されているという警告が表示されるようになりました。
+  最初から警告だった場合、多くのプロジェクトに影響を与え、非常に破壊的だったでしょう。
+  エディションの一部にすることで、ほとんどのユーザーは最終的に新しいエディションに更新し、移行によって処理されました。
+  `Warn`に切り替えることは、更新しなかった少数の遅延者にのみ影響を与えました。
 
 [`ellipsis_inclusive_range_patterns`]: https://doc.rust-lang.org/nightly/rustc/lints/listing/warn-by-default.html#ellipsis-inclusive-range-patterns
 [`anonymous_parameters`]: https://doc.rust-lang.org/nightly/rustc/lints/listing/warn-by-default.html#anonymous-parameters
 
-### Lints and stability
+### リントと安定性
 
-Lints can be marked as being unstable, which can be helpful when developing a new edition feature,
-and you want to test out a migration lint.
-The feature gate can be specified in the lint's declaration like this:
+リントは不安定としてマークできます。これは、新しいエディション機能を開発していて、マイグレーションリントをテストしたい場合に役立ちます。
+フィーチャーゲートは、次のようにリントの宣言で指定できます：
 
 ```rust,ignore
 declare_lint! {
@@ -290,98 +236,84 @@ declare_lint! {
 }
 ```
 
-Then, the lint will only fire if the user has the appropriate `#![feature(my_feature_name)]`.
-Just beware that when it comes time to do crater runs testing the migration that the feature gate
-will need to be removed.
+その後、リントはユーザーが適切な`#![feature(my_feature_name)]`を持っている場合にのみ発火します。
+移行のテストをするcraterの実行を行う時が来たら、フィーチャーゲートを削除する必要があることに注意してください。
 
-Alternatively, you can implement an allow-by-default [migration lint] for an upcoming unstable
-edition without a feature gate.
-Although users may technically be able to enable the lint before the edition is stabilized, most
-will not notice the new lint exists, and it should not disrupt anything or cause any breakage.
+あるいは、フィーチャーゲートなしで今後の不安定なエディションに対してallow-by-default[マイグレーションリント]を実装できます。
+技術的には、ユーザーはエディションが安定する前にリントを有効にできるかもしれませんが、ほとんどの人は新しいリントが存在することに気づかず、何も中断したり破壊したりすることはありません。
 
-### Idiom lints
+### イディオムリント
 
-In the 2018 edition, there was a concept of "idiom lints" under the `rust-2018-idioms` lint group.
-The concept was to have new idiomatic styles under a different lint group separate from the forced
-migrations under the `rust-2018-compatibility` lint group, giving some flexibility as to how people
-opt-in to certain edition changes.
+2018エディションでは、`rust-2018-idioms`リントグループの下に「イディオムリント」の概念がありました。
+この概念は、`rust-2018-compatibility`リントグループの下の強制マイグレーションとは別の異なるリントグループの下に新しい慣用的なスタイルを持つことで、人々が特定のエディション変更にオプトインする方法について柔軟性を与えることでした。
 
-Overall this approach did not seem to work very well,
-and it is unlikely that we will use the idiom groups in the future.
+全体として、このアプローチはあまりうまく機能せず、将来イディオムグループを使用する可能性は低いです。
 
-## Standard library changes
+## 標準ライブラリの変更
 
-### Preludes
+### プレリュード
 
-Each edition comes with a specific prelude of the standard library.
-These are implemented as regular modules in [`core::prelude`] and [`std::prelude`].
-New items can be added to the prelude, just beware that this can conflict with user's pre-existing
-code.
-Usually a [migration lint] should be used to migrate existing code to avoid the conflict.
-For example, [`rust_2021_prelude_collisions`] is used to handle the collisions with the new traits
-in 2021.
+各エディションには、標準ライブラリの特定のプレリュードが付属しています。
+これらは、[`core::prelude`]および[`std::prelude`]の通常のモジュールとして実装されています。
+プレリュードに新しいアイテムを追加できますが、これはユーザーの既存のコードと競合する可能性があることに注意してください。
+通常、競合を回避するために既存のコードを移行するには、[マイグレーションリント]を使用する必要があります。
+例えば、[`rust_2021_prelude_collisions`]は、2021の新しいトレイトとの競合を処理するために使用されます。
 
 [`core::prelude`]: https://doc.rust-lang.org/core/prelude/index.html
 [`std::prelude`]: https://doc.rust-lang.org/std/prelude/index.html
 [`rust_2021_prelude_collisions`]: https://doc.rust-lang.org/nightly/rustc/lints/listing/allowed-by-default.html#rust-2021-prelude-collisions
 
-### Customized language behavior
+### カスタマイズされた言語動作
 
-Usually it is not possible to make breaking changes to the standard library.
-In some rare cases, the teams may decide that the behavior change is important enough to break this
-rule.
-The downside is that this requires special handling in the compiler to be able to distinguish when
-the old and new signatures or behaviors should be used.
+通常、標準ライブラリに破壊的な変更を加えることはできません。
+まれに、チームは動作の変更がこのルールを破るのに十分重要であると決定する場合があります。
+欠点は、古いシグネチャまたは動作と新しいシグネチャまたは動作をいつ使用するかを区別できるように、コンパイラで特別な処理が必要になることです。
 
-One example is the change in method resolution for [`into_iter()` of arrays][into-iter].
-This was implemented with the `#[rustc_skip_array_during_method_dispatch]` attribute on the
-`IntoIterator` trait which then tells the compiler to consider an alternate trait resolution choice
-based on the edition.
+1つの例は、配列の[`into_iter()`][into-iter]のメソッド解決の変更です。
+これは、`IntoIterator`トレイトの`#[rustc_skip_array_during_method_dispatch]`属性で実装され、エディションに基づいてコンパイラに代替トレイト解決の選択肢を検討するよう指示します。
 
-Another example is the [`panic!` macro changes][panic-macro].
-This required defining multiple panic macros, and having the built-in panic macro implementation
-determine the appropriate way to expand it.
-This also included the [`non_fmt_panics`] [migration lint] to adjust old code to the new form, which
-required the `rustc_diagnostic_item` attribute to detect the usage of the panic macro.
+別の例は、[`panic!`マクロの変更][panic-macro]です。
+これには、複数のpanicマクロを定義し、組み込みのpanicマクロ実装が適切な展開方法を決定する必要がありました。
+これには、panicマクロの使用を検出するために`rustc_diagnostic_item`属性が必要な、[`non_fmt_panics`][マイグレーションリント]も含まれていました。
 
-In general it is recommended to avoid these special cases except for very high value situations.
+一般的に、非常に価値の高い状況を除いて、これらの特殊なケースは避けることをお勧めします。
 
 [into-iter]: https://doc.rust-lang.org/nightly/edition-guide/rust-2021/IntoIterator-for-arrays.html
 [panic-macro]: https://doc.rust-lang.org/nightly/edition-guide/rust-2021/panic-macro-consistency.html
 [`non_fmt_panics`]: https://doc.rust-lang.org/nightly/rustc/lints/listing/warn-by-default.html#non-fmt-panics
 
-### Migrating the standard library edition
+### 標準ライブラリエディションの移行
 
-Updating the edition of the standard library itself roughly involves the following process:
+標準ライブラリ自体のエディションを更新するには、おおよそ次のプロセスが含まれます：
 
-- Wait until the newly stabilized edition has reached beta and the bootstrap compiler has been updated.
-- Apply migration lints. This can be an involved process since some code is in external submodules[^std-submodules], and the standard library makes heavy use of conditional compilation. Also, running `cargo fix --edition` can be impractical on the standard library itself. One approach is to individually add `#![warn(...)]` at the top of each crate for each lint, run `./x check library`, apply the migrations, remove the `#![warn(...)]` and commit each migration separately. You'll likely need to run `./x check` with `--target` for many different targets to get full coverage (otherwise you'll likely spend days or weeks getting CI to pass)[^ed-docker]. See also the [advanced migration guide] for more tips.
-    - Apply migrations to [`backtrace-rs`]. [Example for 2024](https://github.com/rust-lang/backtrace-rs/pull/700). Note that this doesn't update the edition of the crate itself because that is published independently on crates.io, and that would otherwise restrict the minimum Rust version. Consider adding some `#![deny()]` attributes to avoid regressions until its edition gets updated.
-    - Apply migrations to [`stdarch`], and update its edition, and formatting. [Example for 2024](https://github.com/rust-lang/stdarch/pull/1710).
-    - Post PRs to update the backtrace and stdarch submodules, and wait for those to land.
-    - Apply migration lints to the standard library crates, and update their edition. I recommend working one crate at a time starting with `core`. [Example for 2024](https://github.com/rust-lang/rust/pull/138162).
+- 新しく安定したエディションがbetaに到達し、ブートストラップコンパイラが更新されるまで待ちます。
+- マイグレーションリントを適用します。これは、一部のコードが外部サブモジュール[^std-submodules]にあり、標準ライブラリが条件付きコンパイルを多用しているため、複雑なプロセスになる可能性があります。また、標準ライブラリ自体で`cargo fix --edition`を実行することは実用的ではない場合があります。1つのアプローチは、各クレートの先頭に各リントごとに`#![warn(...)]`を個別に追加し、`./x check library`を実行し、マイグレーションを適用し、`#![warn(...)]`を削除して、各マイグレーションを個別にコミットすることです。完全なカバレッジを得るには、多くの異なるターゲットで`./x check`を`--target`とともに実行する必要があります（そうしないと、CIが通過するまでに数日または数週間かかる可能性があります）[^ed-docker]。その他のヒントについては、[上級マイグレーションガイド]も参照してください。
+    - [`backtrace-rs`]にマイグレーションを適用します。[2024の例](https://github.com/rust-lang/backtrace-rs/pull/700)。これは、crates.ioで独立して公開されているため、クレート自体のエディションは更新せず、そうしないと最小Rustバージョンが制限されることに注意してください。エディションが更新されるまで、リグレッションを回避するために、いくつかの`#![deny()]`属性を追加することを検討してください。
+    - [`stdarch`]にマイグレーションを適用し、エディションとフォーマットを更新します。[2024の例](https://github.com/rust-lang/stdarch/pull/1710)。
+    - backtraceとstdarchサブモジュールを更新するPRを投稿し、それらがマージされるまで待ちます。
+    - 標準ライブラリクレートにマイグレーションリントを適用し、エディションを更新します。`core`から始めて、一度に1つのクレートで作業することをお勧めします。[2024の例](https://github.com/rust-lang/rust/pull/138162)。
 
-[^std-submodules]: This will hopefully change in the future to pull these submodules into `rust-lang/rust`.
-[^ed-docker]: You'll also likely need to do a lot of testing for different targets, and this is where [docker testing](../tests/docker.md) comes in handy.
+[^std-submodules]: これは将来的に変更され、これらのサブモジュールを`rust-lang/rust`に取り込むことが期待されます。
+[^ed-docker]: また、さまざまなターゲットに対して多くのテストを行う必要があり、ここで[dockerテスト](../tests/docker.md)が役立ちます。
 
-[advanced migration guide]: https://doc.rust-lang.org/nightly/edition-guide/editions/advanced-migrations.html
+[上級マイグレーションガイド]: https://doc.rust-lang.org/nightly/edition-guide/editions/advanced-migrations.html
 [`backtrace-rs`]: https://github.com/rust-lang/backtrace-rs/
 [`stdarch`]: https://github.com/rust-lang/stdarch/
 
-## Stabilizing an edition
+## エディションの安定化
 
-After the edition team has given the go-ahead, the process for stabilizing an edition is roughly:
+エディションチームが承認を与えた後、エディションを安定化するプロセスはおおよそ次のとおりです：
 
-- Update [`LATEST_STABLE_EDITION`].
-- Update [`Edition::is_stable`].
-- Hunt and find any document that refers to edition by number, and update it:
-    - [`--edition` flag](https://github.com/rust-lang/rust/blob/HEAD/src/doc/rustc/src/command-line-arguments.md#--edition-specify-the-edition-to-use)
-    - [Rustdoc attributes](https://github.com/rust-lang/rust/blob/HEAD/src/doc/rustdoc/src/write-documentation/documentation-tests.md#attributes)
-- Clean up any tests that use the `//@ edition` header to remove the `-Zunstable-options` flag to ensure they are indeed stable. Note: Ideally this should be automated, see [#133582].
-- Bless any tests that change.
-- Update `lint-docs` to default to the new edition.
+- [`LATEST_STABLE_EDITION`]を更新します。
+- [`Edition::is_stable`]を更新します。
+- エディションを番号で参照するドキュメントを探して更新します：
+    - [`--edition`フラグ](https://github.com/rust-lang/rust/blob/HEAD/src/doc/rustc/src/command-line-arguments.md#--edition-specify-the-edition-to-use)
+    - [Rustdoc属性](https://github.com/rust-lang/rust/blob/HEAD/src/doc/rustdoc/src/write-documentation/documentation-tests.md#attributes)
+- `//@ edition`ヘッダーを使用するテストをクリーンアップして、`-Zunstable-options`フラグを削除し、実際に安定していることを確認します。注：これは理想的には自動化すべきです。[#133582]を参照してください。
+- 変更されるテストをblessします。
+- `lint-docs`を新しいエディションにデフォルト設定するように更新します。
 
-See [example for 2024](https://github.com/rust-lang/rust/pull/133349).
+[2024の例](https://github.com/rust-lang/rust/pull/133349)を参照してください。
 
 [`LATEST_STABLE_EDITION`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/edition/constant.LATEST_STABLE_EDITION.html
 [`Edition::is_stable`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/edition/enum.Edition.html#method.is_stable

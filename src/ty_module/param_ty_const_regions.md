@@ -1,7 +1,6 @@
-# Parameter `Ty`/`Const`/`Region`s
+# パラメータ `Ty`/`Const`/`Region`
 
-When inside of generic items, types can be written that use in scope generic parameters, for example `fn foo<'a, T>(_: &'a Vec<T>)`. In this specific case
-the `&'a Vec<T>` type would be represented internally as:
+ジェネリックアイテムの内部では、スコープ内のジェネリックパラメータを使用する型を書くことができます。例えば、`fn foo<'a, T>(_: &'a Vec<T>)` です。この特定のケースでは、`&'a Vec<T>` 型は内部的に次のように表現されます：
 ```
 TyKind::Ref(
   RegionKind::LateParam(DefId(foo), DefId(foo::'a), "'a"),
@@ -9,68 +8,62 @@ TyKind::Ref(
 )
 ```
 
-There are three separate ways we represent usages of generic parameters:
-- [`TyKind::Param`]/[`ConstKind::Param`]/[`RegionKind::EarlyParam`] for early bound generic parameters (note: all type and const parameters are considered early bound, see the [chapter on early vs late bound parameters][ch_early_late_bound] for more information)
-- [`TyKind::Bound`]/[`ConstKind::Bound`]/[`RegionKind::Bound`] for references to parameters introduced via higher ranked bounds or higher ranked types i.e. `for<'a> fn(&'a u32)` or `for<'a> T: Trait<'a>`. This is discussed in the [chapter on `Binder`s][ch_binders].
-- [`RegionKind::LateParam`] for late bound lifetime parameters, `LateParam` is discussed in the [chapter on instantiating `Binder`s][ch_instantiating_binders].
+ジェネリックパラメータの使用を表現する 3 つの別々の方法があります：
+- [`TyKind::Param`]/[`ConstKind::Param`]/[`RegionKind::EarlyParam`] 早期バウンドジェネリックパラメータ用（注：すべての型および定数パラメータは早期バウンドと見なされます。詳細については、[早期 vs 遅延バウンドパラメータに関する章][ch_early_late_bound]を参照してください）
+- [`TyKind::Bound`]/[`ConstKind::Bound`]/[`RegionKind::Bound`] 高階バウンドまたは高階型によって導入されたパラメータへの参照用、つまり `for<'a> fn(&'a u32)` または `for<'a> T: Trait<'a>`。これは [`Binder` に関する章][ch_binders]で議論されています。
+- [`RegionKind::LateParam`] 遅延バウンドライフタイムパラメータ用。`LateParam` は [`Binder` のインスタンス化に関する章][ch_instantiating_binders]で議論されています。
 
-This chapter only covers `TyKind::Param` `ConstKind::Param` and `RegionKind::EarlyParam`.
+この章では、`TyKind::Param`、`ConstKind::Param`、および `RegionKind::EarlyParam` のみを扱います。
 
-## Ty/Const Parameters
+## Ty/Const パラメータ
 
-As `TyKind::Param` and `ConstKind::Param` are implemented identically this section only refers to `TyKind::Param` for simplicity.
-However you should keep in mind that everything here also is true of `ConstKind::Param`
+`TyKind::Param` と `ConstKind::Param` は同一に実装されているため、このセクションでは簡略化のために `TyKind::Param` のみを参照します。ただし、ここでのすべてが `ConstKind::Param` にも当てはまることに留意してください
 
-Each `TyKind::Param` contains two things: the name of the parameter and an index.
+各 `TyKind::Param` には 2 つのものが含まれています：パラメータの名前とインデックス。
 
-See the following concrete example of a usage of `TyKind::Param`:
+`TyKind::Param` の使用の次の具体例を参照してください：
 ```rust,ignore
 struct Foo<T>(Vec<T>);
 ```
-The `Vec<T>` type is represented as `TyKind::Adt(Vec, &[GenericArgKind::Type(Param("T", 0))])`.
+`Vec<T>` 型は `TyKind::Adt(Vec, &[GenericArgKind::Type(Param("T", 0))])` として表現されます。
 
-The name is somewhat self explanatory, it's the name of the type parameter. The index of the type parameter is an integer indicating
-its order in the list of generic parameters in scope (note: this includes parameters defined on items on outer scopes than the item the parameter is defined on). Consider the following examples:
+名前はいくらか自明です。それは型パラメータの名前です。型パラメータのインデックスは、スコープ内のジェネリックパラメータのリストでのその順序を示す整数です（注：これには、パラメータが定義されているアイテムよりも外側のスコープのアイテムで定義されたパラメータも含まれます）。次の例を考えてみましょう：
 
 ```rust,ignore
 struct Foo<A, B> {
-  // A would have index 0
-  // B would have index 1
+  // A はインデックス 0 を持ちます
+  // B はインデックス 1 を持ちます
 
-  .. // some fields
+  .. // いくつかのフィールド
 }
 impl<X, Y> Foo<X, Y> {
   fn method<Z>() {
-    // inside here, X, Y and Z are all in scope
-    // X has index 0
-    // Y has index 1
-    // Z has index 2
+    // ここでは、X、Y、Z がすべてスコープ内にあります
+    // X はインデックス 0 を持ちます
+    // Y はインデックス 1 を持ちます
+    // Z はインデックス 2 を持ちます
   }
 }
 ```
 
-Concretely given the `ty::Generics` for the item the parameter is defined on, if the index is `2` then starting from the root `parent`, it will be the third parameter to be introduced. For example in the above example, `Z` has index `2` and is the third generic parameter to be introduced, starting from the `impl` block. 
+具体的には、パラメータが定義されているアイテムの `ty::Generics` が与えられたとき、インデックスが `2` の場合、ルート `parent` から開始して、3 番目に導入されるパラメータになります。例えば、上記の例では、`Z` はインデックス `2` を持ち、`impl` ブロックから開始して 3 番目に導入されるジェネリックパラメータです。
 
-The index fully defines the `Ty` and is the only part of `TyKind::Param` that matters for reasoning about the code we are compiling. 
+インデックスは `Ty` を完全に定義し、コンパイルしているコードについて推論するために重要な `TyKind::Param` の唯一の部分です。
 
-Generally we do not care what the name is and only use the index. The name is included for diagnostics and debug logs as otherwise it would be
-incredibly difficult to understand the output, i.e. `Vec<Param(0)>: Sized` vs `Vec<T>: Sized`. In debug output, parameter types are
-often printed out as `{name}/#{index}`, for example in the function `foo` if we were to debug print `Vec<T>` it would be written as `Vec<T/#0>`.
+一般的に、名前は気にせず、インデックスのみを使用します。名前は診断およびデバッグログに含まれています。そうでなければ、出力を理解することが非常に困難になるためです。つまり、`Vec<Param(0)>: Sized` 対 `Vec<T>: Sized` です。デバッグ出力では、パラメータ型はしばしば `{name}/#{index}` として出力されます。例えば、関数 `foo` で `Vec<T>` をデバッグ出力すると、`Vec<T/#0>` と書かれます。
 
-An alternative representation would be to only have the name, however using an index is more efficient as it means we can index into `GenericArgs` when instantiating generic parameters with some arguments. We would otherwise have to store `GenericArgs` as a `HashMap<Symbol, GenericArg>` and do a hashmap lookup everytime we used a generic item.
+代替表現は名前のみを持つことですが、インデックスを使用する方がより効率的です。なぜなら、ジェネリック引数でジェネリックパラメータをインスタンス化するときに `GenericArgs` にインデックスを付けることができるからです。そうでなければ、`GenericArgs` を `HashMap<Symbol, GenericArg>` として保存し、ジェネリックアイテムを使用するたびにハッシュマップルックアップを行う必要があります。
 
-In theory an index would also allow for having multiple distinct parameters that use the same name, e.g. 
-`impl<A> Foo<A> { fn bar<A>() { .. } }`.
-The rules against shadowing make this difficult but those language rules could change in the future.
+理論的には、インデックスは、同じ名前を使用する複数の異なるパラメータを持つことも可能にします。例えば、`impl<A> Foo<A> { fn bar<A>() { .. } }`。シャドウイングに対する規則はこれを困難にしますが、それらの言語規則は将来変わる可能性があります。
 
-### Lifetime parameters
+### ライフタイムパラメータ
 
-In contrast to `Ty`/`Const`'s `Param` singular `Param` variant, lifetimes have two variants for representing region parameters: [`RegionKind::EarlyParam`] and [`RegionKind::LateParam`]. The reason for this is due to function's distinguishing between [early and late bound parameters][ch_early_late_bound] which is discussed in an earlier chapter (see link).
+`Ty`/`Const` の単一の `Param` バリアントとは対照的に、ライフタイムにはリージョンパラメータを表現するための 2 つのバリアントがあります：[`RegionKind::EarlyParam`] と [`RegionKind::LateParam`]。この理由は、関数が[早期および遅延バウンドパラメータ][ch_early_late_bound]を区別するためです。これは前の章で議論されています（リンクを参照）。
 
-`RegionKind::EarlyParam` is structured identically to `Ty/Const`'s `Param` variant, it is simply a `u32` index and a `Symbol`. For lifetime parameters defined on non-function items we always use `ReEarlyParam`. For functions we use `ReEarlyParam` for any early bound parameters and `ReLateParam` for any late bound parameters. Note that just like `Ty` and `Const` params we often debug format them as `'SYMBOL/#INDEX`, see for example:
+`RegionKind::EarlyParam` は `Ty/Const` の `Param` バリアントと同一に構造化されています。それは単に `u32` インデックスと `Symbol` です。非関数アイテムで定義されたライフタイムパラメータには、常に `ReEarlyParam` を使用します。関数の場合、早期バウンドパラメータには `ReEarlyParam` を使用し、遅延バウンドパラメータには `ReLateParam` を使用します。`Ty` および `Const` パラメータと同様に、しばしばそれらを `'SYMBOL/#INDEX` としてデバッグフォーマットします。例えば、次を参照してください：
 
 ```rust,ignore
-// This function would have its signature represented as:
+// この関数は、そのシグネチャが次のように表現されます：
 //
 // ```
 // fn(
@@ -83,7 +76,7 @@ fn foo<'a, 'b, T: 'a>(one: T, two: &'a &'b u32) -> &'b u32 {
 }
 ```
 
-`RegionKind::LateParam` is discussed more in the chapter on [instantiating binders][ch_instantiating_binders].
+`RegionKind::LateParam` は、[バインダーのインスタンス化に関する章][ch_instantiating_binders]でさらに議論されています。
 
 [ch_early_late_bound]: ../early_late_parameters.md
 [ch_binders]: ./binders.md

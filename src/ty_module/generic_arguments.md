@@ -1,110 +1,87 @@
-# ADTs and Generic Arguments
+# ADT とジェネリック引数
 
-The term `ADT` stands for "Algebraic data type", in rust this refers to a struct, enum, or union.
+`ADT` という用語は「代数的データ型」の略で、Rust ではこれは struct、enum、または union を指します。
 
-## ADTs Representation
+## ADT の表現
 
-Let's consider the example of a type like `MyStruct<u32>`, where `MyStruct` is defined like so:
+`MyStruct` が次のように定義されている場合の `MyStruct<u32>` のような型の例を考えてみましょう：
 
 ```rust,ignore
 struct MyStruct<T> { x: u8, y: T }
 ```
 
-The type `MyStruct<u32>` would be an instance of `TyKind::Adt`:
+型 `MyStruct<u32>` は `TyKind::Adt` のインスタンスになります：
 
 ```rust,ignore
 Adt(&'tcx AdtDef, GenericArgs<'tcx>)
 //  ------------  ---------------
 //  (1)            (2)
 //
-// (1) represents the `MyStruct` part
-// (2) represents the `<u32>`, or "substitutions" / generic arguments
+// (1) `MyStruct` 部分を表す
+// (2) `<u32>` または「置換」/ ジェネリック引数を表す
 ```
 
-There are two parts:
+2 つの部分があります：
 
-- The [`AdtDef`][adtdef] references the struct/enum/union but without the values for its type
-  parameters. In our example, this is the `MyStruct` part *without* the argument `u32`.
-  (Note that in the HIR, structs, enums and unions are represented differently, but in `ty::Ty`,
-  they are all represented using `TyKind::Adt`.)
-- The [`GenericArgs`] is a list of values that are to be substituted
-for the generic parameters.  In our example of `MyStruct<u32>`, we would end up with a list like
-`[u32]`. We’ll dig more into generics and substitutions in a little bit.
+- [`AdtDef`][adtdef] は、型パラメータの値なしで struct/enum/union を参照します。この例では、これは引数 `u32` *なし* の `MyStruct` 部分です。（HIR では、struct、enum、union は異なる方法で表現されますが、`ty::Ty` では、それらはすべて `TyKind::Adt` を使用して表現されることに注意してください。）
+- [`GenericArgs`] は、ジェネリックパラメータに置換される値のリストです。`MyStruct<u32>` の例では、`[u32]` のようなリストになります。ジェネリクスと置換については、もう少し詳しく説明します。
 
 [adtdef]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.AdtDef.html
 [`GenericArgs`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/type.GenericArgs.html
 
-### **`AdtDef` and `DefId`**
+### **`AdtDef` と `DefId`**
 
-For every type defined in the source code, there is a unique `DefId` (see [this
-chapter](../hir.md#identifiers-in-the-hir)). This includes ADTs and generics. In the `MyStruct<T>`
-definition we gave above, there are two `DefId`s: one for `MyStruct` and one for `T`.  Notice that
-the code above does not generate a new `DefId` for `u32` because it is not defined in that code (it
-is only referenced).
+ソースコードで定義された各型には、一意の `DefId` があります（[この章](../hir.md#identifiers-in-the-hir)を参照）。これには ADT とジェネリクスが含まれます。上記で与えた `MyStruct<T>` 定義には、2 つの `DefId` があります：`MyStruct` 用と `T` 用です。上記のコードは `u32` の新しい `DefId` を生成しないことに注意してください。なぜなら、そのコードでは定義されていない（参照されているだけ）からです。
 
-`AdtDef` is more or less a wrapper around `DefId` with lots of useful helper methods. There is
-essentially a one-to-one relationship between `AdtDef` and `DefId`. You can get the `AdtDef` for a
-`DefId` with the [`tcx.adt_def(def_id)` query][adtdefq]. `AdtDef`s are all interned, as shown
-by the `'tcx` lifetime.
+`AdtDef` は、多くの便利なヘルパーメソッドを持つ `DefId` のラッパーのようなものです。`AdtDef` と `DefId` の間には、本質的に 1 対 1 の関係があります。[`tcx.adt_def(def_id)` クエリ][adtdefq]を使用して、`DefId` の `AdtDef` を取得できます。`'tcx` ライフタイムが示すように、`AdtDef` はすべてインターンされています。
 
 [adtdefq]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html#method.adt_def
 
-## Question: Why not substitute “inside” the `AdtDef`?
+## 質問：なぜ `AdtDef` の「内部」に置換しないのですか？
 
-Recall that we represent a generic struct with `(AdtDef, args)`. So why bother with this scheme?
+ジェネリック構造体を `(AdtDef, args)` で表現することを思い出してください。では、なぜこのスキームにこだわるのでしょうか？
 
-Well, the alternate way we could have chosen to represent types would be to always create a new,
-fully-substituted form of the `AdtDef` where all the types are already substituted. This seems like
-less of a hassle. However, the `(AdtDef, args)` scheme has some advantages over this.
+代わりに選択できた別の方法は、すべての型がすでに置換されている、常に新しい完全に置換された形式の `AdtDef` を作成することです。これはより面倒がないように思えます。ただし、`(AdtDef, args)` スキームには、これに対していくつかの利点があります。
 
-First, `(AdtDef, args)` scheme has an efficiency win:
+まず、`(AdtDef, args)` スキームには効率の勝利があります：
 
 ```rust,ignore
 struct MyStruct<T> {
-  ... 100s of fields ...
+  ... 100個のフィールド ...
 }
 
-// Want to do: MyStruct<A> ==> MyStruct<B>
+// やりたいこと: MyStruct<A> ==> MyStruct<B>
 ```
 
-in an example like this, we can instantiate `MyStruct<A>` as `MyStruct<B>` (and so on) very cheaply,
-by just replacing the one reference to `A` with `B`. But if we eagerly instantiated all the fields,
-that could be a lot more work because we might have to go through all of the fields in the `AdtDef`
-and update all of their types.
+このような例では、`A` への 1 つの参照を `B` に置き換えるだけで、`MyStruct<A>` を `MyStruct<B>`（など）として非常に安価にインスタンス化できます。しかし、すべてのフィールドを熱心にインスタンス化した場合、`AdtDef` のすべてのフィールドを調べてすべての型を更新する必要があるため、より多くの作業になる可能性があります。
 
-A bit more deeply, this corresponds to structs in Rust being [*nominal* types][nominal] — which
-means that they are defined by their *name* (and that their contents are then indexed from the
-definition of that name, and not carried along “within” the type itself).
+もう少し深く言うと、これは Rust の構造体が[*名目的*型][nominal]であることに対応しています – これは、それらが*名前*によって定義されることを意味します（そして、その内容はその名前の定義からインデックス付けされ、型自体の「内部」に運ばれるのではありません）。
 
 [nominal]: https://en.wikipedia.org/wiki/Nominal_type_system
 
 
-## The `GenericArgs` type
+## `GenericArgs` 型
 
-Given a generic type `MyType<A, B, …>`, we have to store the list of generic arguments for `MyType`.
+ジェネリック型 `MyType<A, B, …>` が与えられたとき、`MyType` のジェネリック引数のリストを保存する必要があります。
 
-In rustc this is done using [`GenericArgs`]. `GenericArgs` is a thin pointer to a slice of [`GenericArg`] representing a list of generic arguments for a generic item. For example, given a `struct HashMap<K, V>` with two type parameters, `K` and `V`, the `GenericArgs` used to represent the type `HashMap<i32, u32>` would be represented by `&'tcx [tcx.types.i32, tcx.types.u32]`.
+rustc では、これは [`GenericArgs`] を使用して行われます。`GenericArgs` は、ジェネリックアイテムのジェネリック引数のリストを表す [`GenericArg`] のスライスへの薄いポインタです。例えば、2 つの型パラメータ `K` と `V` を持つ `struct HashMap<K, V>` が与えられた場合、型 `HashMap<i32, u32>` を表すために使用される `GenericArgs` は `&'tcx [tcx.types.i32, tcx.types.u32]` で表現されます。
 
-`GenericArg` is conceptually an `enum` with three variants, one for type arguments, one for const arguments and one for lifetime arguments.
-In practice that is actually represented by [`GenericArgKind`] and [`GenericArg`] is a more space efficient version that has a method to
-turn it into a `GenericArgKind`.
+`GenericArg` は概念的には 3 つのバリアントを持つ `enum` で、1 つは型引数用、1 つは定数引数用、1 つはライフタイム引数用です。実際には、それは [`GenericArgKind`] によって表現され、[`GenericArg`] はそれを `GenericArgKind` に変換するメソッドを持つ、よりスペース効率の良いバージョンです。
 
-The actual `GenericArg` struct stores the type, lifetime or const as an interned pointer with the discriminant stored in the lower 2 bits.
-Unless you are working with the `GenericArgs` implementation specifically, you should generally not have to deal with `GenericArg` and instead
-make use of the safe [`GenericArgKind`](#genericargkind) abstraction obtainable via the `GenericArg::unpack()` method.
+実際の `GenericArg` 構造体は、型、ライフタイム、または定数をインターンされたポインタとして保存し、識別子を下位 2 ビットに保存します。`GenericArgs` 実装を具体的に扱っている場合を除き、一般的に `GenericArg` を直接扱う必要はなく、代わりに `GenericArg::unpack()` メソッドを介して取得可能な安全な [`GenericArgKind`](#genericargkind) 抽象化を利用する必要があります。
 
-In some cases you may have to construct a `GenericArg`, this can be done via `Ty/Const/Region::into()` or `GenericArgKind::pack`.
+場合によっては `GenericArg` を構築する必要があります。これは `Ty/Const/Region::into()` または `GenericArgKind::pack` を介して行うことができます。
 
 ```rust,ignore
-// An example of unpacking and packing a generic argument.
+// ジェネリック引数をアンパックおよびパックする例。
 fn deal_with_generic_arg<'tcx>(generic_arg: GenericArg<'tcx>) -> GenericArg<'tcx> {
-    // Unpack a raw `GenericArg` to deal with it safely.
+    // 生の `GenericArg` をアンパックして安全に扱います。
     let new_generic_arg: GenericArgKind<'tcx> = match generic_arg.unpack() {
         GenericArgKind::Type(ty) => { /* ... */ }
         GenericArgKind::Lifetime(lt) => { /* ... */ }
         GenericArgKind::Const(ct) => { /* ... */ }
     };
-    // Pack the `GenericArgKind` to store it in a generic args list.
+    // `GenericArgKind` をパックしてジェネリック引数リストに保存します。
     new_generic_arg.pack()
 }
 ```
@@ -114,15 +91,15 @@ fn deal_with_generic_arg<'tcx>(generic_arg: GenericArg<'tcx>) -> GenericArg<'tcx
 [`GenericArgKind`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/type.GenericArgKind.html
 [`GenericArgs`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/type.GenericArgs.html
 
-So pulling it all together:
+すべてをまとめると：
 
 ```rust,ignore
 struct MyStruct<T>(T);
 type Foo = MyStruct<u32>
 ```
 
-For the `MyStruct<U>` written in the `Foo` type alias, we would represent it in the following way:
+`Foo` 型エイリアスに書かれた `MyStruct<U>` については、次のように表現します：
 
-- There would be an `AdtDef` (and corresponding `DefId`) for `MyStruct`.
-- There would be a `GenericArgs` containing the list `[GenericArgKind::Type(Ty(u32))]`
-- And finally a `TyKind::Adt` with the `AdtDef` and `GenericArgs` listed above.
+- `MyStruct` の `AdtDef`（および対応する `DefId`）があります。
+- リスト `[GenericArgKind::Type(Ty(u32))]` を含む `GenericArgs` があります
+- そして最後に、上記の `AdtDef` と `GenericArgs` を持つ `TyKind::Adt` があります。

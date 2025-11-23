@@ -1,29 +1,23 @@
-# Pattern and exhaustiveness checking
+# パターンと網羅性チェック
 
-In Rust, pattern matching and bindings have a few very helpful properties. The
-compiler will check that bindings are irrefutable when made and that match arms
-are exhaustive.
+Rustでは、パターンマッチングと束縛にはいくつかの非常に便利なプロパティがあります。コンパイラは、束縛が反駁不可能であることをチェックし、match アームが網羅的であることをチェックします。
 
-## Pattern usefulness
+## パターンの有用性
 
-The central question that usefulness checking answers is:
-"in this match expression, is that branch redundant?".
-More precisely, it boils down to computing whether,
-given a list of patterns we have already seen,
-a given new pattern might match any new value.
+有用性チェックが答える中心的な質問は：
+「この match 式では、そのブランチは冗長か？」です。
+より正確には、すでに見たパターンのリストが与えられたときに、
+新しいパターンが新しい値にマッチする可能性があるかどうかを計算することに帰着します。
 
-For example, in the following match expression,
-we ask in turn whether each pattern might match something
-that wasn't matched by the patterns above it.
-Here we see the 4th pattern is redundant with the 1st;
-that branch will get an "unreachable" warning.
-The 3rd pattern may or may not be useful,
-depending on whether `Foo` has other variants than `Bar`.
-Finally, we can ask whether the whole match is exhaustive
-by asking whether the wildcard pattern (`_`)
-is useful relative to the list of all the patterns in that match.
-Here we can see that `_` is useful (it would catch `(false, None)`);
-this expression would therefore get a "non-exhaustive match" error.
+たとえば、次の match 式では、
+各パターンがその上のパターンでマッチされなかった何かにマッチするかどうかを順番に尋ねます。
+ここでは、4番目のパターンが1番目のものと冗長であることがわかります。
+そのブランチには「到達不可能」という警告が出されます。
+3番目のパターンは、`Foo` が `Bar` 以外のバリアントを持っているかどうかによって、有用かどうかが変わります。
+最後に、ワイルドカードパターン（`_`）がそのmatch内のすべてのパターンのリストに対して有用かどうかを尋ねることで、
+match全体が網羅的かどうかを尋ねることができます。
+ここでは、`_` が有用であることがわかります（`(false, None)` をキャッチします）。
+したがって、この式は「非網羅的なmatch」エラーが出ます。
 
 ```rust
 // x: (bool, Option<Foo>)
@@ -35,97 +29,94 @@ match x {
 }
 ```
 
-Thus usefulness is used for two purposes:
-detecting unreachable code (which is useful to the user),
-and ensuring that matches are exhaustive (which is important for soundness,
-because a match expression can return a value).
+したがって、有用性は2つの目的に使用されます：
+到達不可能なコードの検出（ユーザーにとって有用）、
+および match が網羅的であることの保証（match 式が値を返せるため、健全性にとって重要）。
 
-## Where it happens
+## 発生場所
 
-This check is done anywhere you can write a pattern: `match` expressions, `if let`, `let else`,
-plain `let`, and function arguments.
+このチェックは、パターンを書ける場所すべてで行われます：`match` 式、`if let`、`let else`、
+プレーンな `let`、および関数引数です。
 
 ```rust
 // `match`
-// Usefulness can detect unreachable branches and forbid non-exhaustive matches.
+// 有用性は到達不可能なブランチを検出し、非網羅的なmatchを禁止できます。
 match foo() {
     Ok(x) => x,
     Err(_) => panic!(),
 }
 
 // `if let`
-// Usefulness can detect unreachable branches.
+// 有用性は到達不可能なブランチを検出できます。
 if let Some(x) = foo() {
     // ...
 }
 
 // `while let`
-// Usefulness can detect infinite loops and dead loops.
+// 有用性は無限ループとデッドループを検出できます。
 while let Some(x) = it.next() {
     // ...
 }
 
-// Destructuring `let`
-// Usefulness can forbid non-exhaustive patterns.
+// 分解する `let`
+// 有用性は非網羅的なパターンを禁止できます。
 let Foo::Bar(x, y) = foo();
 
-// Destructuring function arguments
-// Usefulness can forbid non-exhaustive patterns.
+// 関数引数の分解
+// 有用性は非網羅的なパターンを禁止できます。
 fn foo(Foo { x, y }: Foo) {
     // ...
 }
 ```
 
-## The algorithm
+## アルゴリズム
 
-Exhaustiveness checking is run before MIR building in [`check_match`].
-It is implemented in the [`rustc_pattern_analysis`] crate,
-with the core of the algorithm in the [`usefulness`] module.
-That file contains a detailed description of the algorithm.
+網羅性チェックはMIRビルドの前に [`check_match`] で実行されます。
+これは [`rustc_pattern_analysis`] クレートに実装されており、
+アルゴリズムのコアは [`usefulness`] モジュールにあります。
+そのファイルには、アルゴリズムの詳細な説明が含まれています。
 
-## Important concepts
+## 重要な概念
 
-### Constructors and fields
+### コンストラクタとフィールド
 
-In the value `Pair(Some(0), true)`, `Pair` is called the constructor of the value, and `Some(0)` and
-`true` are its fields. Every matchable value can be decomposed in this way. Examples of
-constructors are: `Some`, `None`, `(,)` (the 2-tuple constructor), `Foo {..}` (the constructor for
-a struct `Foo`), and `2` (the constructor for the number `2`).
+値 `Pair(Some(0), true)` では、`Pair` はその値のコンストラクタと呼ばれ、`Some(0)` と
+`true` がそのフィールドです。すべてのマッチ可能な値はこの方法で分解できます。コンストラクタの例は：
+`Some`、`None`、`(,)`（2-タプルコンストラクタ）、`Foo {..}`（構造体 `Foo` のコンストラクタ）、
+および `2`（数値 `2` のコンストラクタ）です。
 
-Each constructor takes a fixed number of fields; this is called its arity. `Pair` and `(,)` have
-arity 2, `Some` has arity 1, `None` and `42` have arity 0. Each type has a known set of
-constructors. Some types have many constructors (like `u64`) or even an infinitely many (like `&str`
-and `&[T]`).
+各コンストラクタは固定数のフィールドを取ります。これはそのアリティと呼ばれます。`Pair` と `(,)` のアリティは
+2、`Some` のアリティは 1、`None` と `42` のアリティは 0 です。各型には既知のコンストラクタのセットがあります。
+いくつかの型は多くのコンストラクタ（`u64` など）または無限に多くのコンストラクタ（`&str` や `&[T]` など）を持っています。
 
-Patterns are similar: `Pair(Some(_), _)` has constructor `Pair` and two fields. The difference is
-that we get some extra pattern-only constructors, namely: the wildcard `_`, variable bindings,
-integer ranges like `0..=10`, and variable-length slices like `[_, .., _]`. We treat or-patterns
-separately.
+パターンも似ています：`Pair(Some(_), _)` はコンストラクタ `Pair` と2つのフィールドを持ちます。違いは、
+パターン専用のコンストラクタがいくつか追加されることです：ワイルドカード `_`、変数束縛、
+`0..=10` のような整数範囲、および `[_, .., _]` のような可変長スライスです。or-パターンは別途扱います。
 
-Now to check if a value `v` matches a pattern `p`, we check if `v`'s constructor matches `p`'s
-constructor, then recursively compare their fields if necessary. A few representative examples:
+値 `v` がパターン `p` にマッチするかどうかをチェックするには、`v` のコンストラクタが `p` の
+コンストラクタにマッチするかどうかをチェックし、必要に応じて再帰的にそれらのフィールドを比較します。いくつかの代表的な例：
 
 - `matches!(v, _) := true`
 - `matches!((v0,  v1), (p0,  p1)) := matches!(v0, p0) && matches!(v1, p1)`
 - `matches!(Foo { a: v0, b: v1 }, Foo { a: p0, b: p1 }) := matches!(v0, p0) && matches!(v1, p1)`
 - `matches!(Ok(v0), Ok(p0)) := matches!(v0, p0)`
-- `matches!(Ok(v0), Err(p0)) := false` (incompatible variants)
+- `matches!(Ok(v0), Err(p0)) := false`（非互換なバリアント）
 - `matches!(v, 1..=100) := matches!(v, 1) || ... || matches!(v, 100)`
-- `matches!([v0], [p0, .., p1]) := false` (incompatible lengths)
+- `matches!([v0], [p0, .., p1]) := false`（非互換な長さ）
 - `matches!([v0, v1, v2], [p0, .., p1]) := matches!(v0, p0) && matches!(v2, p1)`
 
-This concept is absolutely central to pattern analysis. The [`constructor`] module provides
-functions to extract, list and manipulate constructors. This is a useful enough concept that
-variations of it can be found in other places of the compiler, like in the MIR-lowering of a match
-expression and in some clippy lints.
+この概念はパターン解析の絶対的な中心です。[`constructor`] モジュールは、
+コンストラクタを抽出、リスト、操作する関数を提供します。これは十分に有用な概念であり、
+コンパイラの他の場所、たとえば match 式の MIR ローワリングや一部の clippy lint にも
+このバリエーションが見られます。
 
-### Constructor grouping and splitting
+### コンストラクタのグループ化と分割
 
-The pattern-only constructors (`_`, ranges and variable-length slices) each stand for a set of
-normal constructors, e.g. `_: Option<T>` stands for the set {`None`, `Some`} and `[_, .., _]` stands
-for the infinite set {`[,]`, `[,,]`, `[,,,]`, ...} of the slice constructors of arity >= 2.
+パターン専用のコンストラクタ（`_`、範囲、可変長スライス）は、それぞれ通常のコンストラクタの
+セットを表します。例えば、`_: Option<T>` は {`None`, `Some`} のセットを表し、`[_, .., _]` は
+アリティ >= 2 のスライスコンストラクタの無限集合 {`[,]`, `[,,]`, `[,,,]`, ...} を表します。
 
-In order to manage these constructors, we keep them as grouped as possible. For example:
+これらのコンストラクタを管理するために、できるだけグループ化された状態を保ちます。たとえば：
 
 ```rust
 match (0, false) {
@@ -135,9 +126,9 @@ match (0, false) {
 }
 ```
 
-In this example, all of `0`, `1`, .., `49` match the same arms, and thus can be treated as a group.
-In fact, in this match, the only ranges we need to consider are: `0..50`, `50..=100`,
-`101..=150`,`151..=200` and `201..`. Similarly:
+この例では、`0`、`1`、...、`49` のすべてが同じアームにマッチするため、グループとして扱うことができます。
+実際、この match では、考慮する必要がある範囲は：`0..50`、`50..=100`、
+`101..=150`、`151..=200`、および `201..` だけです。同様に：
 
 ```rust
 enum Direction { North, South, East, West }
@@ -148,18 +139,16 @@ match wind {
 }
 ```
 
-Here we can treat all the non-`North` constructors as a group, giving us only two cases to handle:
-`North`, and everything else.
+ここでは、すべての非 `North` コンストラクタをグループとして扱うことができ、
+2つのケースだけを処理すればよくなります：`North` とそれ以外のすべて。
 
-This is called "constructor splitting" and is crucial to having exhaustiveness run in reasonable
-time.
+これは「コンストラクタ分割」と呼ばれ、網羅性が合理的な時間で実行されるために重要です。
 
-### Usefulness vs reachability in the presence of empty types
+### 空の型の存在下での有用性と到達可能性
 
-This is likely the subtlest aspect of exhaustiveness. To be fully precise, a match doesn't operate
-on a value, it operates on a place. In certain unsafe circumstances, it is possible for a place to
-not contain valid data for its type. This has subtle consequences for empty types. Take the
-following:
+これはおそらく網羅性の最も微妙な側面です。完全に正確を期すと、match は値に対して動作するのではなく、
+場所に対して動作します。特定の unsafe な状況では、場所がその型の有効なデータを含まない可能性があります。
+これは空の型に対して微妙な結果をもたらします。次を考えてみてください：
 
 ```rust
 enum Void {}
@@ -172,10 +161,10 @@ unsafe {
 }
 ```
 
-In this example, `ptr` is a valid pointer pointing to a place with invalid data. The `_` pattern
-does not look at the contents of the place `*ptr`, so this code is ok and the arm is taken. In other
-words, despite the place we are inspecting being of type `Void`, there is a reachable arm. If the
-arm had a binding however:
+この例では、`ptr` は無効なデータを指す場所を指す有効なポインタです。`_` パターンは
+場所 `*ptr` の内容を見ないため、このコードは正常で、アームが取られます。言い換えれば、
+検査している場所が `Void` 型であるにもかかわらず、到達可能なアームがあります。しかし、
+アームが束縛を持っている場合：
 
 ```rust
 # #[derive(Copy, Clone)]
@@ -189,26 +178,24 @@ match *ptr {
 # }
 ```
 
-Here the binding loads the value of type `Void` from the `*ptr` place. In this example, this causes
-UB since the data is not valid. In the general case, this asserts validity of the data at `*ptr`.
-Either way, this arm will never be taken.
+ここでは、束縛が `*ptr` の場所から `Void` 型の値をロードします。この例では、データが有効でないため
+UB を引き起こします。一般的な場合、これは `*ptr` のデータの妥当性をアサートします。
+いずれにせよ、このアームは決して取られません。
 
-Finally, let's consider the empty match `match *ptr {}`. If we consider this exhaustive, then
-having invalid data at `*ptr` is invalid. In other words, the empty match is semantically
-equivalent to the `_a => ...` match. In the interest of explicitness, we prefer the case with an
-arm, hence we won't tell the user to remove the `_a` arm. In other words, the `_a` arm is
-unreachable yet not redundant. This is why we lint on redundant arms rather than unreachable
-arms, despite the fact that the lint says "unreachable".
+最後に、空の match `match *ptr {}` を考えてみましょう。これを網羅的と見なす場合、`*ptr` に無効なデータがあることは無効になります。言い換えれば、空の match は
+`_a => ...` match と意味的に同等です。明示性の観点から、アームのあるケースを好むので、
+`_a` アームを削除するようにユーザーに指示しません。言い換えれば、`_a` アームは
+到達不可能ですが冗長ではありません。これが、到達不可能なアームではなく冗長なアームに対して lint を行う理由です。
+lint が「到達不可能」と言っているにもかかわらずです。
 
-These considerations only affects certain places, namely those that can contain non-valid data
-without UB. These are: pointer dereferences, reference dereferences, and union field accesses. We
-track during exhaustiveness checking whether a given place is known to contain valid data.
+これらの考慮事項は特定の場所にのみ影響します。すなわち、UB なしで無効なデータを含むことができる場所です。
+これらは：ポインタの参照解除、参照の参照解除、および union フィールドアクセスです。網羅性チェック中に、
+与えられた場所が有効なデータを含むことが知られているかどうかを追跡します。
 
-Having said all that, the current implementation of exhaustiveness checking does not follow the
-above considerations. On stable, empty types are for the most part treated as non-empty. The
-[`exhaustive_patterns`] feature errs on the other end: it allows omitting arms that could be
-reachable in unsafe situations. The [`never_patterns`] experimental feature aims to fix this and
-permit the correct behavior of empty types in patterns.
+以上のすべてを述べた上で、網羅性チェックの現在の実装は上記の考慮事項に従っていません。stable では、
+空の型はほとんどの場合、空でないものとして扱われます。[`exhaustive_patterns`] 機能は反対側に偏っています：
+unsafe な状況で到達可能なアームを省略することを許可します。[`never_patterns`] 実験的機能は、
+これを修正し、パターン内の空の型の正しい動作を許可することを目指しています。
 
 [`check_match`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_build/thir/pattern/check_match/index.html
 [`rustc_pattern_analysis`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_pattern_analysis/index.html

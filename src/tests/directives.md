@@ -1,16 +1,14 @@
-# Compiletest directives
+# Compiletestディレクティブ
 
 <!--
-FIXME(jieyouxu) completely revise this chapter.
+FIXME(jieyouxu) この章を完全に改訂する。
 -->
 
-Directives are special comments that tell compiletest how to build and interpret a test.
-They may also appear in `rmake.rs` [run-make tests](compiletest.md#run-make-tests).
+ディレクティブは、compiletestにテストをビルドして解釈する方法を指示する特別なコメントです。
+これらは`rmake.rs` [run-makeテスト](compiletest.md#run-make-tests)にも表示される可能性があります。
 
-They are normally put after the short comment that explains the point of this
-test. Compiletest test suites use `//@` to signal that a comment is a directive.
-For example, this test uses the `//@ compile-flags` command to specify a custom
-flag to give to rustc when the test is compiled:
+これらは通常、このテストの要点を説明する短いコメントの後に配置されます。Compiletestテストスイートは、コメントがディレクティブであることを示すために`//@`を使用します。
+例えば、このテストは`//@ compile-flags`コマンドを使用して、テストがコンパイルされるときにrustcに渡すカスタムフラグを指定します：
 
 ```rust,ignore
 // Test the behavior of `0 - 1` when overflow checks are disabled.
@@ -23,414 +21,318 @@ fn main() {
 }
 ```
 
-Directives can be standalone (like `//@ run-pass`) or take a value (like `//@
-compile-flags: -C overflow-checks=off`).
+ディレクティブはスタンドアロン（`//@ run-pass`のように）または値を取る（`//@
+compile-flags: -C overflow-checks=off`のように）ことができます。
 
-Directives are written one directive per line: you cannot write multiple
-directives on the same line. For example, if you write `//@ only-x86
-only-windows` then `only-windows` is interpreted as a comment, not a separate
-directive.
+ディレクティブは1行に1つのディレクティブで記述されます：同じ行に複数のディレクティブを記述することはできません。例えば、`//@ only-x86
+only-windows`と書くと、`only-windows`はコメントとして解釈され、別のディレクティブとしては解釈されません。
 
-## Listing of compiletest directives
+## Compiletestディレクティブのリスト
 
-The following is a list of compiletest directives. Directives are linked to
-sections that describe the command in more detail if available. This list may
-not be exhaustive. Directives can generally be found by browsing the
-`TestProps` structure found in [`directives.rs`] from the compiletest source.
+以下は、compiletestディレクティブのリストです。利用可能な場合は、コマンドをより詳細に説明するセクションにディレクティブがリンクされています。このリストは網羅的ではない可能性があります。ディレクティブは一般的に、compiletestソースの[`directives.rs`]にある`TestProps`構造体を参照することで見つけることができます。
 
 [`directives.rs`]: https://github.com/rust-lang/rust/tree/HEAD/src/tools/compiletest/src/directives.rs
 
-### Assembly
+### アセンブリ
 
 <!-- date-check: Oct 2024 -->
 
-| Directive         | Explanation                   | Supported test suites | Possible values                        |
+| ディレクティブ         | 説明                   | サポートされているテストスイート | 可能な値                        |
 |-------------------|-------------------------------|-----------------------|----------------------------------------|
-| `assembly-output` | Assembly output kind to check | `assembly`            | `emit-asm`, `bpf-linker`, `ptx-linker` |
+| `assembly-output` | チェックするアセンブリ出力の種類 | `assembly`            | `emit-asm`, `bpf-linker`, `ptx-linker` |
 
-### Auxiliary builds
+### 補助ビルド
 
-See [Building auxiliary crates](compiletest.html#building-auxiliary-crates)
+[Building auxiliary crates](compiletest.html#building-auxiliary-crates)を参照
 
-| Directive             | Explanation                                                                                           | Supported test suites                  | Possible values                               |
+| ディレクティブ             | 説明                                                                                           | サポートされているテストスイート                  | 可能な値                               |
 |-----------------------|-------------------------------------------------------------------------------------------------------|----------------------------------------|-----------------------------------------------|
-| `aux-bin`             | Build a aux binary, made available in `auxiliary/bin` relative to test directory                      | All except `run-make`/`run-make-cargo` | Path to auxiliary `.rs` file                  |
-| `aux-build`           | Build a separate crate from the named source file                                                     | All except `run-make`/`run-make-cargo` | Path to auxiliary `.rs` file                  |
-| `aux-crate`           | Like `aux-build` but makes available as extern prelude                                                | All except `run-make`/`run-make-cargo` | `<extern_prelude_name>=<path/to/aux/file.rs>` |
-| `aux-codegen-backend` | Similar to `aux-build` but pass the compiled dylib to `-Zcodegen-backend` when building the main file | `ui-fulldeps`                          | Path to codegen backend file                  |
-| `proc-macro`          | Similar to `aux-build`, but for aux forces host and don't use `-Cprefer-dynamic`[^pm].                | All except `run-make`/`run-make-cargo` | Path to auxiliary proc-macro `.rs` file       |
-| `build-aux-docs`      | Build docs for auxiliaries as well.  Note that this only works with `aux-build`, not `aux-crate`.     | All except `run-make`/`run-make-cargo` | N/A                                           |
+| `aux-bin`             | 補助バイナリをビルドし、テストディレクトリ相対の`auxiliary/bin`で利用可能にする                      | `run-make`/`run-make-cargo`以外のすべて | 補助`.rs`ファイルへのパス                  |
+| `aux-build`           | 指定されたソースファイルから別のcrateをビルド                                                     | `run-make`/`run-make-cargo`以外のすべて | 補助`.rs`ファイルへのパス                  |
+| `aux-crate`           | `aux-build`と同様だが、extern preludeとして使用可能にする                                                | `run-make`/`run-make-cargo`以外のすべて | `<extern_prelude_name>=<path/to/aux/file.rs>` |
+| `aux-codegen-backend` | `aux-build`と同様だが、コンパイル済みdylibをメインファイルのビルド時に`-Zcodegen-backend`に渡す | `ui-fulldeps`                          | codegenバックエンドファイルへのパス                  |
+| `proc-macro`          | `aux-build`と同様だが、補助に対してhostを強制し、`-Cprefer-dynamic`を使用しない[^pm]。                | `run-make`/`run-make-cargo`以外のすべて | 補助proc-macro `.rs`ファイルへのパス       |
+| `build-aux-docs`      | 補助のドキュメントもビルドします。注：これは`aux-build`でのみ機能し、`aux-crate`では機能しません。     | `run-make`/`run-make-cargo`以外のすべて | N/A                                           |
 
-[^pm]: please see the [Auxiliary proc-macro section](compiletest.html#auxiliary-proc-macro) in the compiletest chapter for specifics.
+[^pm]: 詳細については、compiletestの章の[Auxiliary proc-macroセクション](compiletest.html#auxiliary-proc-macro)を参照してください。
 
-### Controlling outcome expectations
+### 結果の期待値の制御
 
-See [Controlling pass/fail
-expectations](ui.md#controlling-passfail-expectations).
+[Controlling pass/fail
+expectations](ui.md#controlling-passfail-expectations)を参照。
 
-| Directive                   | Explanation                                 | Supported test suites                     | Possible values |
+| ディレクティブ                   | 説明                                 | サポートされているテストスイート                     | 可能な値 |
 |-----------------------------|---------------------------------------------|-------------------------------------------|-----------------|
-| `check-pass`                | Building (no codegen) should pass           | `ui`, `crashes`, `incremental`            | N/A             |
-| `check-fail`                | Building (no codegen) should fail           | `ui`, `crashes`                           | N/A             |
-| `build-pass`                | Building should pass                        | `ui`, `crashes`, `codegen`, `incremental` | N/A             |
-| `build-fail`                | Building should fail                        | `ui`, `crashes`                           | N/A             |
-| `run-pass`                  | Program must exit with code `0`             | `ui`, `crashes`, `incremental`            | N/A             |
-| `run-fail`                  | Program must exit with code `1..=127`       | `ui`, `crashes`                           | N/A             |
-| `run-crash`                 | Program must crash                          | `ui`                                      | N/A             |
-| `run-fail-or-crash`         | Program must `run-fail` or `run-crash`      | `ui`                                      | N/A             |
-| `ignore-pass`               | Ignore `--pass` flag                        | `ui`, `crashes`, `codegen`, `incremental` | N/A             |
-| `dont-check-failure-status` | Don't check exact failure status (i.e. `1`) | `ui`, `incremental`                       | N/A             |
-| `failure-status`            | Check                                       | `ui`, `crashes`                           | Any `u16`       |
-| `should-ice`                | Check failure status is `101`               | `coverage`, `incremental`                 | N/A             |
-| `should-fail`               | Compiletest self-test                       | All                                       | N/A             |
+| `check-pass`                | ビルド（codegenなし）は合格する必要がある           | `ui`, `crashes`, `incremental`            | N/A             |
+| `check-fail`                | ビルド（codegenなし）は失敗する必要がある           | `ui`, `crashes`                           | N/A             |
+| `build-pass`                | ビルドは合格する必要がある                        | `ui`, `crashes`, `codegen`, `incremental` | N/A             |
+| `build-fail`                | ビルドは失敗する必要がある                        | `ui`, `crashes`                           | N/A             |
+| `run-pass`                  | プログラムはコード`0`で終了する必要がある             | `ui`, `crashes`, `incremental`            | N/A             |
+| `run-fail`                  | プログラムはコード`1..=127`で終了する必要がある       | `ui`, `crashes`                           | N/A             |
+| `run-crash`                 | プログラムはクラッシュする必要がある                          | `ui`                                      | N/A             |
+| `run-fail-or-crash`         | プログラムは`run-fail`または`run-crash`する必要がある      | `ui`                                      | N/A             |
+| `ignore-pass`               | `--pass`フラグを無視する                        | `ui`, `crashes`, `codegen`, `incremental` | N/A             |
+| `dont-check-failure-status` | 正確な失敗ステータス（つまり`1`）をチェックしない | `ui`, `incremental`                       | N/A             |
+| `failure-status`            | チェック                                       | `ui`, `crashes`                           | 任意の`u16`       |
+| `should-ice`                | 失敗ステータスが`101`であることをチェック               | `coverage`, `incremental`                 | N/A             |
+| `should-fail`               | Compiletestセルフテスト                       | すべて                                       | N/A             |
 
-### Controlling output snapshots and normalizations
+### 出力スナップショットと正規化の制御
 
-See [Normalization](ui.md#normalization), [Output
-comparison](ui.md#output-comparison) and [Rustfix tests](ui.md#rustfix-tests)
-for more details.
+詳細については、[Normalization](ui.md#normalization)、[Output
+comparison](ui.md#output-comparison)、[Rustfix tests](ui.md#rustfix-tests)を参照してください。
 
-| Directive                         | Explanation                                                                                                              | Supported test suites                        | Possible values                                                                         |
+| ディレクティブ                         | 説明                                                                                                              | サポートされているテストスイート                        | 可能な値                                                                         |
 |-----------------------------------|--------------------------------------------------------------------------------------------------------------------------|----------------------------------------------|-----------------------------------------------------------------------------------------|
-| `check-run-results`               | Check run test binary `run-{pass,fail}` output snapshot                                                                  | `ui`, `crashes`, `incremental` if `run-pass` | N/A                                                                                     |
-| `error-pattern`                   | Check that output contains a specific string                                                                             | `ui`, `crashes`, `incremental` if `run-pass` | String                                                                                  |
-| `regex-error-pattern`             | Check that output contains a regex pattern                                                                               | `ui`, `crashes`, `incremental` if `run-pass` | Regex                                                                                   |
-| `check-stdout`                    | Check `stdout` against `error-pattern`s from running test binary[^check_stdout]                                          | `ui`, `crashes`, `incremental`               | N/A                                                                                     |
-| `normalize-stderr-32bit`          | Normalize actual stderr (for 32-bit platforms) with a rule `"<raw>" -> "<normalized>"` before comparing against snapshot | `ui`, `incremental`                          | `"<RAW>" -> "<NORMALIZED>"`, `<RAW>`/`<NORMALIZED>` is regex capture and replace syntax |
-| `normalize-stderr-64bit`          | Normalize actual stderr (for 64-bit platforms) with a rule `"<raw>" -> "<normalized>"` before comparing against snapshot | `ui`, `incremental`                          | `"<RAW>" -> "<NORMALIZED>"`, `<RAW>`/`<NORMALIZED>` is regex capture and replace syntax |
-| `normalize-stderr`                | Normalize actual stderr with a rule `"<raw>" -> "<normalized>"` before comparing against snapshot                        | `ui`, `incremental`                          | `"<RAW>" -> "<NORMALIZED>"`, `<RAW>`/`<NORMALIZED>` is regex capture and replace syntax |
-| `normalize-stdout`                | Normalize actual stdout with a rule `"<raw>" -> "<normalized>"` before comparing against snapshot                        | `ui`, `incremental`                          | `"<RAW>" -> "<NORMALIZED>"`, `<RAW>`/`<NORMALIZED>` is regex capture and replace syntax |
-| `dont-check-compiler-stderr`      | Don't check actual compiler stderr vs stderr snapshot                                                                    | `ui`                                         | N/A                                                                                     |
-| `dont-check-compiler-stdout`      | Don't check actual compiler stdout vs stdout snapshot                                                                    | `ui`                                         | N/A                                                                                     |
-| `dont-require-annotations`        | Don't require line annotations for the given diagnostic kind (`//~ KIND`) to be exhaustive                               | `ui`, `incremental`                          | `ERROR`, `WARN`, `NOTE`, `HELP`, `SUGGESTION`                                           |
-| `run-rustfix`                     | Apply all suggestions via `rustfix`, snapshot fixed output, and check fixed output builds                                | `ui`                                         | N/A                                                                                     |
-| `rustfix-only-machine-applicable` | `run-rustfix` but only machine-applicable suggestions                                                                    | `ui`                                         | N/A                                                                                     |
-| `exec-env`                        | Env var to set when executing a test                                                                                     | `ui`, `crashes`                              | `<KEY>=<VALUE>`                                                                         |
-| `unset-exec-env`                  | Env var to unset when executing a test                                                                                   | `ui`, `crashes`                              | Any env var name                                                                        |
-| `stderr-per-bitwidth`             | Generate a stderr snapshot for each bitwidth                                                                             | `ui`                                         | N/A                                                                                     |
-| `forbid-output`                   | A pattern which must not appear in stderr/`cfail` output                                                                 | `ui`, `incremental`                          | Regex pattern                                                                           |
-| `run-flags`                       | Flags passed to the test executable                                                                                      | `ui`                                         | Arbitrary flags                                                                         |
-| `known-bug`                       | No error annotation needed due to known bug                                                                              | `ui`, `crashes`, `incremental`               | Issue number `#123456`                                                                  |
-| `compare-output-by-lines`         | Compare the output by lines, rather than as a single string                                                              | All                                          | N/A                                                                                     |
+| `check-run-results`               | テストバイナリ`run-{pass,fail}`出力スナップショットの実行をチェック                                                                  | `ui`, `crashes`, `incremental` （`run-pass`の場合） | N/A                                                                                     |
+| `error-pattern`                   | 出力に特定の文字列が含まれていることをチェック                                                                             | `ui`, `crashes`, `incremental` （`run-pass`の場合） | 文字列                                                                                  |
+| `regex-error-pattern`             | 出力に正規表現パターンが含まれていることをチェック                                                                               | `ui`, `crashes`, `incremental` （`run-pass`の場合） | 正規表現                                                                                   |
+| `check-stdout`                    | テストバイナリの実行からの`stdout`を`error-pattern`に対してチェック[^check_stdout]                                          | `ui`, `crashes`, `incremental`               | N/A                                                                                     |
+| `normalize-stderr-32bit`          | スナップショットと比較する前に、実際のstderr（32ビットプラットフォーム用）を`"<raw>" -> "<normalized>"`ルールで正規化 | `ui`, `incremental`                          | `"<RAW>" -> "<NORMALIZED>"`、`<RAW>`/`<NORMALIZED>`は正規表現キャプチャと置換構文 |
+| `normalize-stderr-64bit`          | スナップショットと比較する前に、実際のstderr（64ビットプラットフォーム用）を`"<raw>" -> "<normalized>"`ルールで正規化 | `ui`, `incremental`                          | `"<RAW>" -> "<NORMALIZED>"`、`<RAW>`/`<NORMALIZED>`は正規表現キャプチャと置換構文 |
+| `normalize-stderr`                | スナップショットと比較する前に、実際のstderrを`"<raw>" -> "<normalized>"`ルールで正規化                        | `ui`, `incremental`                          | `"<RAW>" -> "<NORMALIZED>"`、`<RAW>`/`<NORMALIZED>`は正規表現キャプチャと置換構文 |
+| `normalize-stdout`                | スナップショットと比較する前に、実際のstdoutを`"<raw>" -> "<normalized>"`ルールで正規化                        | `ui`, `incremental`                          | `"<RAW>" -> "<NORMALIZED>"`、`<RAW>`/`<NORMALIZED>`は正規表現キャプチャと置換構文 |
+| `dont-check-compiler-stderr`      | 実際のコンパイラstderrとstderrスナップショットをチェックしない                                                                    | `ui`                                         | N/A                                                                                     |
+| `dont-check-compiler-stdout`      | 実際のコンパイラstdoutとstdoutスナップショットをチェックしない                                                                    | `ui`                                         | N/A                                                                                     |
+| `dont-require-annotations`        | 指定された診断種類（`//~ KIND`）の行注釈が網羅的であることを要求しない                               | `ui`, `incremental`                          | `ERROR`, `WARN`, `NOTE`, `HELP`, `SUGGESTION`                                           |
+| `run-rustfix`                     | すべての提案を`rustfix`経由で適用し、修正された出力をスナップショットし、修正された出力がビルドされることをチェック                                | `ui`                                         | N/A                                                                                     |
+| `rustfix-only-machine-applicable` | `run-rustfix`だが、機械適用可能な提案のみ                                                                    | `ui`                                         | N/A                                                                                     |
+| `exec-env`                        | テストを実行するときに設定する環境変数                                                                                     | `ui`, `crashes`                              | `<KEY>=<VALUE>`                                                                         |
+| `unset-exec-env`                  | テストを実行するときに設定を解除する環境変数                                                                                   | `ui`, `crashes`                              | 任意の環境変数名                                                                        |
+| `stderr-per-bitwidth`             | 各ビット幅のstderrスナップショットを生成                                                                             | `ui`                                         | N/A                                                                                     |
+| `forbid-output`                   | stderrや`cfail`出力に表示されてはならないパターン                                                                 | `ui`, `incremental`                          | 正規表現パターン                                                                           |
+| `run-flags`                       | テスト実行可能ファイルに渡されるフラグ                                                                                      | `ui`                                         | 任意のフラグ                                                                         |
+| `known-bug`                       | 既知のバグのため、エラー注釈は不要                                                                              | `ui`, `crashes`, `incremental`               | issue番号`#123456`                                                                  |
+| `compare-output-by-lines`         | 出力を単一の文字列としてではなく、行ごとに比較                                                              | すべて                                          | N/A                                                                                     |
 
-[^check_stdout]: presently <!-- date-check: Oct 2024 --> this has a weird quirk
-    where the test binary's stdout and stderr gets concatenated and then
-    `error-pattern`s are matched on this combined output, which is ??? slightly
-    questionable to say the least.
+[^check_stdout]: 現在<!-- date-check: Oct 2024 -->これには奇妙な癖があり、テストバイナリのstdoutとstderrが連結され、この結合された出力で`error-pattern`がマッチされます。これは少なくとも疑わしいです。
 
-### Controlling when tests are run
+### テストの実行タイミングの制御
 
-These directives are used to ignore the test in some situations, which
-means the test won't be compiled or run.
+これらのディレクティブは、いくつかの状況でテストを無視するために使用されます。これは、テストがコンパイルまたは実行されないことを意味します。
 
-* `ignore-X` where `X` is a target detail or other criteria on which to ignore the test (see below)
-* `only-X` is like `ignore-X`, but will *only* run the test on that target or
-  stage
-* `ignore-auxiliary` is intended for files that *participate* in one or more other
-  main test files but that `compiletest` should not try to build the file itself.
-  Please backlink to which main test is actually using the auxiliary file.
-* `ignore-test` always ignores the test. This can be used to temporarily disable
-  a test if it is currently not working, but you want to keep it in tree to
-  re-enable it later.
+* `ignore-X`、ここで`X`はターゲットの詳細またはテストを無視する他の基準です（以下を参照）
+* `only-X`は`ignore-X`に似ていますが、そのターゲットまたはステージでテストを実行*のみ*します
+* `ignore-auxiliary`は、1つ以上の他のメインテストファイルに*参加*するファイルを対象としていますが、`compiletest`がファイル自体をビルドしようとするべきではありません。実際に補助ファイルを使用しているメインテストへのバックリンクを含めてください。
+* `ignore-test`は常にテストを無視します。これは、テストが現在機能していない場合に一時的にテストを無効にするために使用できますが、後で再度有効にするためにツリーに保持したい場合に使用できます。
 
-Some examples of `X` in `ignore-X` or `only-X`:
+`ignore-X`または`only-X`の`X`の例：
 
-- A full target triple: `aarch64-apple-ios`
-- Architecture: `aarch64`, `arm`, `mips`, `wasm32`, `x86_64`, `x86`,
+- 完全なターゲットトリプル：`aarch64-apple-ios`
+- アーキテクチャ：`aarch64`, `arm`, `mips`, `wasm32`, `x86_64`, `x86`,
   ...
-- OS: `android`, `emscripten`, `freebsd`, `ios`, `linux`, `macos`, `windows`,
+- OS：`android`, `emscripten`, `freebsd`, `ios`, `linux`, `macos`, `windows`,
   ...
-- Environment (fourth word of the target triple): `gnu`, `msvc`, `musl`
-- Pointer width: `32bit`, `64bit`
-- Endianness: `endian-big`
-- Stage: `stage1`, `stage2`
-- Binary format: `elf`
-- Channel: `stable`, `beta`
-- When cross compiling: `cross-compile`
-- When [remote testing] is used: `remote`
-- When particular debuggers are being tested: `cdb`, `gdb`, `lldb`
-- When particular debugger versions are matched: `ignore-gdb-version`
-- Specific [compare modes]: `compare-mode-polonius`, `compare-mode-chalk`,
+- 環境（ターゲットトリプルの4番目の単語）：`gnu`, `msvc`, `musl`
+- ポインタ幅：`32bit`, `64bit`
+- エンディアン：`endian-big`
+- ステージ：`stage1`, `stage2`
+- バイナリフォーマット：`elf`
+- チャンネル：`stable`, `beta`
+- クロスコンパイル時：`cross-compile`
+- [リモートテスト]が使用される場合：`remote`
+- 特定のデバッガがテストされる場合：`cdb`, `gdb`, `lldb`
+- 特定のデバッガバージョンが一致する場合：`ignore-gdb-version`
+- 特定の[比較モード]：`compare-mode-polonius`, `compare-mode-chalk`,
   `compare-mode-split-dwarf`, `compare-mode-split-dwarf-single`
-- The two different test modes used by coverage tests:
+- カバレッジテストで使用される2つの異なるテストモード：
   `ignore-coverage-map`, `ignore-coverage-run`
-- When testing a dist toolchain: `dist`
-  - This needs to be enabled with `COMPILETEST_ENABLE_DIST_TESTS=1`
-- The `rustc_abi` of the target: e.g. `rustc_abi-x86_64-sse2`
+- distツールチェーンをテストする場合：`dist`
+  - これは`COMPILETEST_ENABLE_DIST_TESTS=1`で有効にする必要があります
+- ターゲットの`rustc_abi`：例：`rustc_abi-x86_64-sse2`
 
-The following directives will check rustc build settings and target
-settings:
+次のディレクティブは、rustcビルド設定とターゲット設定をチェックします：
 
-- `needs-asm-support` — ignores if the **host** architecture doesn't have
-  stable support for `asm!`. For tests that cross-compile to explicit targets
-  via `--target`, use `needs-llvm-components` instead to ensure the appropriate
-  backend is available.
-- `needs-profiler-runtime` — ignores the test if the profiler runtime was not
-  enabled for the target
-  (`build.profiler = true` in rustc's `bootstrap.toml`)
-- `needs-sanitizer-support` — ignores if the sanitizer support was not enabled
-  for the target (`sanitizers = true` in rustc's `bootstrap.toml`)
-- `needs-sanitizer-{address,hwaddress,leak,memory,thread}` — ignores if the
-  corresponding sanitizer is not enabled for the target (AddressSanitizer,
-  hardware-assisted AddressSanitizer, LeakSanitizer, MemorySanitizer or
-  ThreadSanitizer respectively)
-- `needs-run-enabled` — ignores if it is a test that gets executed, and running
-  has been disabled. Running tests can be disabled with the `x test --run=never`
-  flag, or running on fuchsia.
-- `needs-unwind` — ignores if the target does not support unwinding
-- `needs-rust-lld` — ignores if the rust lld support is not enabled (`rust.lld =
-  true` in `bootstrap.toml`)
-- `needs-threads` — ignores if the target does not have threading support
-- `needs-subprocess`  — ignores if the target does not have subprocess support
-- `needs-symlink` — ignores if the target does not support symlinks. This can be
-  the case on Windows if the developer did not enable privileged symlink
-  permissions.
-- `ignore-std-debug-assertions` — ignores if std was built with debug
-  assertions.
-- `needs-std-debug-assertions` — ignores if std was not built with debug
-  assertions.
-- `ignore-rustc-debug-assertions` — ignores if rustc was built with debug
-  assertions.
-- `needs-rustc-debug-assertions` — ignores if rustc was not built with debug
-  assertions.
-- `needs-target-has-atomic` — ignores if target does not have support for all
-  specified atomic widths, e.g. the test with `//@ needs-target-has-atomic: 8,
-  16, ptr` will only run if it supports the comma-separated list of atomic
-  widths.
-- `needs-dynamic-linking` — ignores if target does not support dynamic linking
-  (which is orthogonal to it being unable to create `dylib` and `cdylib` crate types)
-- `needs-crate-type` — ignores if target platform does not support one or more
-  of the comma-delimited list of specified crate types. For example,
-  `//@ needs-crate-type: cdylib, proc-macro` will cause the test to be ignored
-  on `wasm32-unknown-unknown` target because the target does not support the
-  `proc-macro` crate type.
-- `needs-target-std` — ignores if target platform does not have std support.
-- `ignore-backends` — ignores the listed backends, separated by whitespace characters. Please note
-  that this directive can be overriden with the `--bypass-ignore-backends=[BACKEND]` command line
-  flag. 
-- `needs-backends` — only runs the test if current codegen backend is listed.
+- `needs-asm-support` — **ホスト**アーキテクチャが`asm!`の安定サポートを持たない場合に無視します。`--target`経由で明示的なターゲットにクロスコンパイルするテストの場合は、代わりに`needs-llvm-components`を使用して、適切なバックエンドが利用可能であることを確認してください。
+- `needs-profiler-runtime` — プロファイラランタイムがターゲットで有効になっていない場合、テストを無視します
+  （rustcの`bootstrap.toml`の`build.profiler = true`）
+- `needs-sanitizer-support` — サニタイザサポートがターゲットで有効になっていない場合に無視します（rustcの`bootstrap.toml`の`sanitizers = true`）
+- `needs-sanitizer-{address,hwaddress,leak,memory,thread}` — 対応するサニタイザがターゲットで有効になっていない場合に無視します（AddressSanitizer、ハードウェア支援AddressSanitizer、LeakSanitizer、MemorySanitizer、ThreadSanitizerのいずれか）
+- `needs-run-enabled` — 実行されるテストで、実行が無効になっている場合に無視します。テストの実行は、`x test --run=never`フラグで無効にするか、fuchsiaで実行することで無効にできます。
+- `needs-unwind` — ターゲットがアンワインドサポートを持たない場合に無視します
+- `needs-rust-lld` — rust lldサポートが有効になっていない場合に無視します（`bootstrap.toml`の`rust.lld = true`）
+- `needs-threads` — ターゲットがスレッドサポートを持たない場合に無視します
+- `needs-subprocess`  — ターゲットがサブプロセスサポートを持たない場合に無視します
+- `needs-symlink` — ターゲットがシンボリックリンクをサポートしていない場合に無視します。これは、開発者が特権シンボリックリンク権限を有効にしていない場合、Windowsで当てはまる可能性があります。
+- `ignore-std-debug-assertions` — stdがデバッグアサーション付きでビルドされている場合に無視します。
+- `needs-std-debug-assertions` — stdがデバッグアサーションなしでビルドされている場合に無視します。
+- `ignore-rustc-debug-assertions` — rustcがデバッグアサーション付きでビルドされている場合に無視します。
+- `needs-rustc-debug-assertions` — rustcがデバッグアサーションなしでビルドされている場合に無視します。
+- `needs-target-has-atomic` — ターゲットが指定されたすべてのアトミック幅のサポートを持たない場合に無視します。例えば、`//@ needs-target-has-atomic: 8,
+  16, ptr`を含むテストは、カンマ区切りのアトミック幅リストをサポートしている場合にのみ実行されます。
+- `needs-dynamic-linking` — ターゲットが動的リンクをサポートしていない場合に無視します
+  （`dylib`および`cdylib`クレートタイプを作成できないこととは直交しています）
+- `needs-crate-type` — ターゲットプラットフォームが、カンマ区切りで指定された1つ以上のクレートタイプをサポートしていない場合に無視します。例えば、
+  `//@ needs-crate-type: cdylib, proc-macro`は、ターゲットが`proc-macro`クレートタイプをサポートしていないため、`wasm32-unknown-unknown`ターゲットでテストを無視します。
+- `needs-target-std` — ターゲットプラットフォームがstdサポートを持たない場合に無視します。
+- `ignore-backends` — 空白文字で区切られた、リストされたバックエンドを無視します。このディレクティブは`--bypass-ignore-backends=[BACKEND]`コマンドラインフラグで上書きできることに注意してください。
+- `needs-backends` — 現在のcodegenバックエンドがリストされている場合にのみテストを実行します。
 
-The following directives will check LLVM support:
+次のディレクティブはLLVMサポートをチェックします：
 
-- `exact-llvm-major-version: 19` — ignores if the llvm major version does not
-  match the specified llvm major version.
-- `min-llvm-version: 13.0` — ignored if the LLVM version is less than the given
-  value
-- `min-system-llvm-version: 12.0` — ignored if using a system LLVM and its
-  version is less than the given value
-- `max-llvm-major-version: 19` — ignored if the LLVM major version is higher
-  than the given major version
-- `ignore-llvm-version: 9.0` — ignores a specific LLVM version
-- `ignore-llvm-version: 7.0 - 9.9.9` — ignores LLVM versions in a range
-  (inclusive)
-- `needs-llvm-components: powerpc` — ignores if the specific LLVM component was
-  not built. Note: The test will fail on CI (when
-  `COMPILETEST_REQUIRE_ALL_LLVM_COMPONENTS` is set) if the component does not
-  exist.
-- `needs-forced-clang-based-tests` — test is ignored unless the environment
-  variable `RUSTBUILD_FORCE_CLANG_BASED_TESTS` is set, which enables building
-  clang alongside LLVM
-  - This is only set in two CI jobs ([`x86_64-gnu-debug`] and
-    [`aarch64-gnu-debug`]), which only runs a
-    subset of `run-make` tests. Other tests with this directive will not
-    run at all, which is usually not what you want.
+- `exact-llvm-major-version: 19` — llvmメジャーバージョンが指定されたllvmメジャーバージョンと一致しない場合に無視します。
+- `min-llvm-version: 13.0` — LLVMバージョンが指定された値より低い場合に無視します
+- `min-system-llvm-version: 12.0` — システムLLVMを使用していて、そのバージョンが指定された値より低い場合に無視します
+- `max-llvm-major-version: 19` — LLVMメジャーバージョンが指定されたメジャーバージョンより高い場合に無視します
+- `ignore-llvm-version: 9.0` — 特定のLLVMバージョンを無視します
+- `ignore-llvm-version: 7.0 - 9.9.9` — 範囲内（両端を含む）のLLVMバージョンを無視します
+- `needs-llvm-components: powerpc` — 特定のLLVMコンポーネントがビルドされていない場合に無視します。注：コンポーネントが存在しない場合、CI（`COMPILETEST_REQUIRE_ALL_LLVM_COMPONENTS`が設定されている場合）でテストは失敗します。
+- `needs-forced-clang-based-tests` — 環境変数`RUSTBUILD_FORCE_CLANG_BASED_TESTS`が設定されていない限り、テストは無視されます。これにより、LLVMと一緒にclangをビルドできます
+  - これは2つのCIジョブ（[`x86_64-gnu-debug`]と
+    [`aarch64-gnu-debug`]）でのみ設定され、`run-make`テストのサブセットのみを実行します。このディレクティブを持つ他のテストはまったく実行されません。これは通常、望ましいことではありません。
 
-See also [Debuginfo tests](compiletest.md#debuginfo-tests) for directives for
-ignoring debuggers.
+デバッガを無視するためのディレクティブについては、[Debuginfo tests](compiletest.md#debuginfo-tests)も参照してください。
 
 [remote testing]: running.md#running-tests-on-a-remote-machine
 [compare modes]: ui.md#compare-modes
 [`x86_64-gnu-debug`]: https://github.com/rust-lang/rust/blob/ab3dba92db355b8d97db915a2dca161a117e959c/src/ci/docker/host-x86_64/x86_64-gnu-debug/Dockerfile#L32
 [`aarch64-gnu-debug`]: https://github.com/rust-lang/rust/blob/20c909ff9cdd88d33768a4ddb8952927a675b0ad/src/ci/docker/host-aarch64/aarch64-gnu-debug/Dockerfile#L32
 
-### Affecting how tests are built
+### テストのビルド方法への影響
 
-| Directive           | Explanation                                                                                  | Supported test suites                      | Possible values                                                                            |
-|---------------------|----------------------------------------------------------------------------------------------|--------------------------------------------|--------------------------------------------------------------------------------------------|
-| `compile-flags`     | Flags passed to `rustc` when building the test or aux file                                   | All except for `run-make`/`run-make-cargo` | Any valid `rustc` flags, e.g. `-Awarnings -Dfoo`. Cannot be `-Cincremental` or `--edition` |
-| `edition`           | The edition used to build the test                                                           | All except for `run-make`/`run-make-cargo` | Any valid `--edition` value                                                                |
-| `rustc-env`         | Env var to set when running `rustc`                                                          | All except for `run-make`/`run-make-cargo` | `<KEY>=<VALUE>`                                                                            |
-| `unset-rustc-env`   | Env var to unset when running `rustc`                                                        | All except for `run-make`/`run-make-cargo` | Any env var name                                                                           |
-| `incremental`       | Proper incremental support for tests outside of incremental test suite                       | `ui`, `crashes`                            | N/A                                                                                        |
-| `no-prefer-dynamic` | Don't use `-C prefer-dynamic`, don't build as a dylib via a `--crate-type=dylib` preset flag | `ui`, `crashes`                            | N/A                                                                                        |
+| ディレクティブ           | 説明                                                                                  | サポートされているテストスイート                      | 可能な値                                                                            |
+|---------------------|----------------------------------------------------------------------------------------------|--------------------------------------------|---------------------------------------------------------------------------------------------|
+| `compile-flags`     | テストまたは補助ファイルをビルドするときに`rustc`に渡されるフラグ                                   | `run-make`/`run-make-cargo`以外のすべて | 任意の有効な`rustc`フラグ、例：`-Awarnings -Dfoo`。`-Cincremental`または`--edition`は不可 |
+| `edition`           | テストのビルドに使用されるエディション                                                           | `run-make`/`run-make-cargo`以外のすべて | 任意の有効な`--edition`値                                                                |
+| `rustc-env`         | `rustc`を実行するときに設定する環境変数                                                          | `run-make`/`run-make-cargo`以外のすべて | `<KEY>=<VALUE>`                                                                            |
+| `unset-rustc-env`   | `rustc`を実行するときに設定を解除する環境変数                                                        | `run-make`/`run-make-cargo`以外のすべて | 任意の環境変数名                                                                           |
+| `incremental`       | インクリメンタルテストスイート外のテストに対する適切なインクリメンタルサポート                       | `ui`, `crashes`                            | N/A                                                                                        |
+| `no-prefer-dynamic` | `-C prefer-dynamic`を使用せず、`--crate-type=dylib`プリセットフラグ経由でdylibとしてビルドしない | `ui`, `crashes`                            | N/A                                                                                        |
 
 <div class="warning">
 
-Tests (outside of `run-make`/`run-make-cargo`) that want to use incremental tests not in the
-incremental test-suite must not pass `-C incremental` via `compile-flags`, and
-must instead use the `//@ incremental` directive.
+インクリメンタルテストスイートにないインクリメンタルテストを使用したい（`run-make`/`run-make-cargo`以外の）テストは、`compile-flags`経由で`-C incremental`を渡してはならず、代わりに`//@ incremental`ディレクティブを使用する必要があります。
 
-Consider writing the test as a proper incremental test instead.
+代わりに、テストを適切なインクリメンタルテストとして書くことを検討してください。
 
 </div>
 
-#### The edition directive
+#### editionディレクティブ
 
-The `//@ edition` directive can take an exact edition, a bounded range of editions,
-or a left-bounded half-open range of editions.
-This affects which edition is used by `./x test` to run the test.
+`//@ edition`ディレクティブは、正確なエディション、エディションの有界範囲、またはエディションの左有界半開範囲を取ることができます。
+これは、`./x test`がテストを実行するために使用するエディションに影響します。
 
-For example:
+例：
 
-- A test with the `//@ edition: 2018` directive will only run under the 2018 edition.
-- A test with the `//@ edition: 2015..2021` directive can be run under the 2015, 2018, and 2021 editions.
-  However, CI will only run the test with the lowest edition in the range (which is 2015 in this example).
-- A test with the `//@ edition: 2018..` directive will run under 2018 edition or greater.
-  However, CI will only run the test with the lowest edition in the range (which is 2018 in this example).
+- `//@ edition: 2018`ディレクティブを持つテストは、2018エディションの下でのみ実行されます。
+- `//@ edition: 2015..2021`ディレクティブを持つテストは、2015、2018、および2021エディションの下で実行できます。
+  ただし、CIは範囲内の最低エディション（この例では2015）でのみテストを実行します。
+- `//@ edition: 2018..`ディレクティブを持つテストは、2018エディション以上で実行されます。
+  ただし、CIは範囲内の最低エディション（この例では2018）でのみテストを実行します。
 
-You can also force `./x test` to use a specific edition by passing the `-- --edition=` argument.
-However, tests with the `//@ edition` directive will clamp the value passed to the argument.
-For example, if we run `./x test -- --edition=2015`:
+`-- --edition=`引数を渡すことで、`./x test`に特定のエディションを使用させることもできます。
+ただし、`//@ edition`ディレクティブを持つテストは、引数に渡された値をクランプします。
+例えば、`./x test -- --edition=2015`を実行する場合：
 
-- A test with the `//@ edition: 2018` will run with the 2018 edition. 
-- A test with the `//@ edition: 2015..2021` will be run with the 2015 edition. 
-- A test with the `//@ edition: 2018..` will run with the 2018 edition. 
+- `//@ edition: 2018`を持つテストは、2018エディションで実行されます。
+- `//@ edition: 2015..2021`を持つテストは、2015エディションで実行されます。
+- `//@ edition: 2018..`を持つテストは、2018エディションで実行されます。
 
 ### Rustdoc
 
-| Directive   | Explanation                                                  | Supported test suites                   | Possible values           |
-|-------------|--------------------------------------------------------------|-----------------------------------------|---------------------------|
-| `doc-flags` | Flags passed to `rustdoc` when building the test or aux file | `rustdoc`, `rustdoc-js`, `rustdoc-json` | Any valid `rustdoc` flags |
+| ディレクティブ   | 説明                                                  | サポートされているテストスイート                   | 可能な値           |
+|-------------|--------------------------------------------------------------|---------------------------------------|---------------------------|
+| `doc-flags` | テストまたは補助ファイルをビルドするときに`rustdoc`に渡されるフラグ | `rustdoc`, `rustdoc-js`, `rustdoc-json` | 任意の有効な`rustdoc`フラグ |
 
 <!--
-**FIXME(rustdoc)**: what does `check-test-line-numbers-match` do?
-Asked in
-<https://rust-lang.zulipchat.com/#narrow/stream/266220-t-rustdoc/topic/What.20is.20the.20.60check-test-line-numbers-match.60.20directive.3F>.
+**FIXME(rustdoc)**: `check-test-line-numbers-match`は何をしますか？
+<https://rust-lang.zulipchat.com/#narrow/stream/266220-t-rustdoc/topic/What.20is.20the.20.60check-test-line-numbers-match.60.20directive.3F>で質問しました。
 -->
 
-#### Test-suite-specific directives
+#### テストスイート固有のディレクティブ
 
-The test suites [`rustdoc`][rustdoc-html-tests], [`rustdoc-js`/`rustdoc-js-std`][rustdoc-js-tests]
-and [`rustdoc-json`][rustdoc-json-tests] each feature an additional set of directives whose basic
-syntax resembles the one of compiletest directives but which are ultimately read and checked by
-separate tools. For more information, please read their respective chapters as linked above.
+テストスイート[`rustdoc`][rustdoc-html-tests]、[`rustdoc-js`/`rustdoc-js-std`][rustdoc-js-tests]、[`rustdoc-json`][rustdoc-json-tests]は、基本的な構文がcompiletestディレクティブのものに似ているが、最終的には別々のツールによって読み取られてチェックされる追加のディレクティブセットをそれぞれ備えています。詳細については、上記にリンクされているそれぞれの章を参照してください。
 
 [rustdoc-html-tests]: ../rustdoc-internals/rustdoc-test-suite.md
 [rustdoc-js-tests]: ../rustdoc-internals/search.html#testing-the-search-engine
 [rustdoc-json-tests]: ../rustdoc-internals/rustdoc-json-test-suite.md
 
-### Pretty printing
+### プリティプリンティング
 
-See [Pretty-printer](compiletest.md#pretty-printer-tests).
+[Pretty-printer](compiletest.md#pretty-printer-tests)を参照。
 
-#### Misc directives
+#### その他のディレクティブ
 
-- `no-auto-check-cfg` — disable auto check-cfg (only for `--check-cfg` tests)
-- [`revisions`](compiletest.md#revisions) — compile multiple times
--[`forbid-output`](compiletest.md#incremental-tests) — incremental cfail rejects
-      output pattern
-- [`should-ice`](compiletest.md#incremental-tests) — incremental cfail should
-      ICE
-- [`reference`] — an annotation linking to a rule in the reference
-- `disable-gdb-pretty-printers` — disable gdb pretty printers for debuginfo tests
+- `no-auto-check-cfg` — 自動check-cfgを無効にする（`--check-cfg`テストのみ）
+- [`revisions`](compiletest.md#revisions) — 複数回コンパイル
+-[`forbid-output`](compiletest.md#incremental-tests) — インクリメンタルcfailは出力パターンを拒否
+- [`should-ice`](compiletest.md#incremental-tests) — インクリメンタルcfailはICEする必要がある
+- [`reference`] — リファレンスのルールへのリンク注釈
+- `disable-gdb-pretty-printers` — debuginfoテスト用のgdbプリティプリンタを無効にする
 
 [`reference`]: https://github.com/rust-lang/reference/blob/master/docs/authoring.md#test-rule-annotations
 
-### Tool-specific directives
+### ツール固有のディレクティブ
 
-The following directives affect how certain command-line tools are invoked, in
-test suites that use those tools:
+次のディレクティブは、これらのツールを使用するテストスイートで、特定のコマンドラインツールの呼び出し方法に影響します：
 
-- `filecheck-flags` adds extra flags when running LLVM's `FileCheck` tool.
-  - Used by [codegen tests](compiletest.md#codegen-tests),
-  [assembly tests](compiletest.md#assembly-tests), and
-  [MIR-opt tests](compiletest.md#mir-opt-tests).
-- `llvm-cov-flags` adds extra flags when running LLVM's `llvm-cov` tool.
-  - Used by [coverage tests](compiletest.md#coverage-tests) in `coverage-run` mode.
+- `filecheck-flags`は、LLVMの`FileCheck`ツールを実行するときに追加のフラグを追加します。
+  - [codegenテスト](compiletest.md#codegen-tests)、
+  [assemblyテスト](compiletest.md#assembly-tests)、
+  [MIR-optテスト](compiletest.md#mir-opt-tests)で使用されます。
+- `llvm-cov-flags`は、LLVMの`llvm-cov`ツールを実行するときに追加のフラグを追加します。
+  - `coverage-run`モードの[coverageテスト](compiletest.md#coverage-tests)で使用されます。
 
-### Tidy specific directives
+### Tidy固有のディレクティブ
 
-The following directives control how the [tidy script](../conventions.md#formatting)
-verifies tests.
+次のディレクティブは、[tidyスクリプト](../conventions.md#formatting)がテストを検証する方法を制御します。
 
-- `ignore-tidy-target-specific-tests` disables checking that the appropriate
-  LLVM component is required (via a `needs-llvm-components` directive) when a
-  test is compiled for a specific target (via the `--target` flag in a
-  `compile-flag` directive).
+- `ignore-tidy-target-specific-tests`は、テストが特定のターゲット用にコンパイルされる場合（`compile-flag`ディレクティブの`--target`フラグ経由）に、適切なLLVMコンポーネントが必要であること（`needs-llvm-components`ディレクティブ経由）のチェックを無効にします。
 - [`unused-revision-names`](compiletest.md#ignoring-unused-revision-names) -
-      suppress tidy checks for mentioning unknown revision names.
+      未知のリビジョン名の言及に対するtidyチェックを抑制します。
 
-## Substitutions
+## 置換
 
-Directive values support substituting a few variables which will be replaced
-with their corresponding value. For example, if you need to pass a compiler flag
-with a path to a specific file, something like the following could work:
+ディレクティブの値は、対応する値に置き換えられるいくつかの変数の置換をサポートしています。例えば、特定のファイルへのパスを使用してコンパイラフラグを渡す必要がある場合、次のようなものが機能する可能性があります：
 
 ```rust,ignore
 //@ compile-flags: --remap-path-prefix={{src-base}}=/the/src
 ```
 
-Where the sentinel `{{src-base}}` will be replaced with the appropriate path
-described below:
+ここで、センチネル`{{src-base}}`は、以下に説明する適切なパスに置き換えられます：
 
-- `{{cwd}}`: The directory where compiletest is run from. This may not be the
-  root of the checkout, so you should avoid using it where possible.
-  - Examples: `/path/to/rust`, `/path/to/build/root`
-- `{{src-base}}`: The directory where the test is defined. This is equivalent to
-  `$DIR` for [output normalization].
-  - Example: `/path/to/rust/tests/ui/error-codes`
-- `{{build-base}}`: The base directory where the test's output goes. This is
-  equivalent to `$TEST_BUILD_DIR` for [output normalization].
-  - Example: `/path/to/rust/build/x86_64-unknown-linux-gnu/test/ui`
-- `{{rust-src-base}}`: The sysroot directory where libstd/libcore/... are
-  located
-- `{{sysroot-base}}`: Path of the sysroot directory used to build the test.
-  - Mainly intended for `ui-fulldeps` tests that run the compiler via API.
-- `{{target-linker}}`: Linker that would be passed to `-Clinker` for this test,
-  or blank if no linker override is active.
-  - Mainly intended for `ui-fulldeps` tests that run the compiler via API.
-- `{{target}}`: The target the test is compiling for
-  - Example: `x86_64-unknown-linux-gnu`
+- `{{cwd}}`：compiletestが実行されるディレクトリ。これはチェックアウトのルートではない可能性があるため、可能な限り使用を避ける必要があります。
+  - 例：`/path/to/rust`, `/path/to/build/root`
+- `{{src-base}}`：テストが定義されているディレクトリ。これは[出力正規化]の`$DIR`と同等です。
+  - 例：`/path/to/rust/tests/ui/error-codes`
+- `{{build-base}}`：テストの出力が格納されるベースディレクトリ。これは[出力正規化]の`$TEST_BUILD_DIR`と同等です。
+  - 例：`/path/to/rust/build/x86_64-unknown-linux-gnu/test/ui`
+- `{{rust-src-base}}`：libstd/libcore/...が配置されているsysrootディレクトリ
+- `{{sysroot-base}}`：テストのビルドに使用されるsysrootディレクトリのパス。
+  - 主に、API経由でコンパイラを実行する`ui-fulldeps`テストを対象としています。
+- `{{target-linker}}`：このテストのために`-Clinker`に渡されるリンカ。リンカのオーバーライドがアクティブでない場合は空白です。
+  - 主に、API経由でコンパイラを実行する`ui-fulldeps`テストを対象としています。
+- `{{target}}`：テストがコンパイルされるターゲット
+  - 例：`x86_64-unknown-linux-gnu`
 
-See
-[`tests/ui/argfile/commandline-argfile.rs`](https://github.com/rust-lang/rust/blob/HEAD/tests/ui/argfile/commandline-argfile.rs)
-for an example of a test that uses this substitution.
+この置換を使用するテストの例については、
+[`tests/ui/argfile/commandline-argfile.rs`](https://github.com/rust-lang/rust/blob/HEAD/tests/ui/argfile/commandline-argfile.rs)を参照してください。
 
 [output normalization]: ui.md#normalization
 
 
-## Adding a directive
+## ディレクティブの追加
 
-One would add a new directive if there is a need to define some test property or
-behavior on an individual, test-by-test basis. A directive property serves as
-the directive's backing store (holds the command's current value) at runtime.
+テストプロパティや動作を個々のテストごとに定義する必要がある場合、新しいディレクティブを追加します。ディレクティブプロパティは、実行時にディレクティブのバッキングストア（コマンドの現在の値を保持）として機能します。
 
-To add a new directive property:
+新しいディレクティブプロパティを追加するには：
 
-1. Look for the `pub struct TestProps` declaration in
-   [`src/tools/compiletest/src/directives.rs`] and add the new public property to
-   the end of the declaration.
-2. Look for the `impl TestProps` implementation block immediately following the
-   struct declaration and initialize the new property to its default value.
+1. [`src/tools/compiletest/src/directives.rs`]の`pub struct TestProps`宣言を探し、新しいパブリックプロパティを宣言の最後に追加します。
+2. 構造体宣言の直後の`impl TestProps`実装ブロックを探し、新しいプロパティをデフォルト値に初期化します。
 
-### Adding a new directive parser
+### 新しいディレクティブパーサーの追加
 
-When `compiletest` encounters a test file, it parses the file a line at a time
-by calling every parser defined in the `Config` struct's implementation block,
-also in [`src/tools/compiletest/src/directives.rs`] (note that the `Config` struct's
-declaration block is found in [`src/tools/compiletest/src/common.rs`]).
-`TestProps`'s `load_from()` method will try passing the current line of text to
-each parser, which, in turn typically checks to see if the line begins with a
-particular commented (`//@`) directive such as `//@ must-compile-successfully`
-or `//@ failure-status`. Whitespace after the comment marker is optional.
+`compiletest`がテストファイルに遭遇すると、ファイルを1行ずつ解析し、同じく[`src/tools/compiletest/src/directives.rs`]にある`Config`構造体の実装ブロックで定義されたすべてのパーサーを呼び出します（`Config`構造体の宣言ブロックは[`src/tools/compiletest/src/common.rs`]にあります）。
+`TestProps`の`load_from()`メソッドは、現在のテキスト行を各パーサーに渡そうとします。各パーサーは、行が`//@ must-compile-successfully`や`//@ failure-status`のような特定のコメント付き（`//@`）ディレクティブで始まるかどうかをチェックします。コメントマーカーの後の空白はオプションです。
 
-Parsers will override a given directive property's default value merely by being
-specified in the test file as a directive or by having a parameter value
-specified in the test file, depending on the directive.
+パーサーは、テストファイルでディレクティブとして指定されるか、テストファイルでパラメータ値が指定されることで、指定されたディレクティブプロパティのデフォルト値を上書きします（ディレクティブによって異なります）。
 
-Parsers defined in `impl Config` are typically named `parse_<directive-name>`
-(note kebab-case `<directive-command>` transformed to snake-case
-`<directive_command>`). `impl Config` also defines several 'low-level' parsers
-which make it simple to parse common patterns like simple presence or not
-(`parse_name_directive()`), `directive:parameter(s)`
-(`parse_name_value_directive()`), optional parsing only if a particular `cfg`
-attribute is defined (`has_cfg_prefix()`) and many more. The low-level parsers
-are found near the end of the `impl Config` block; be sure to look through them
-and their associated parsers immediately above to see how they are used to avoid
-writing additional parsing code unnecessarily.
+`impl Config`で定義されたパーサーは、通常`parse_<directive-name>`という名前です
+（kebab-caseの`<directive-command>`がsnake_caseの`<directive_command>`に変換されることに注意してください）。`impl Config`は、単純な存在または非存在（`parse_name_directive()`）、`directive:parameter(s)`
+（`parse_name_value_directive()`）、特定の`cfg`属性が定義されている場合のみのオプションの解析（`has_cfg_prefix()`）など、一般的なパターンを簡単に解析できるいくつかの「低レベル」パーサーも定義しています。低レベルのパーサーは、`impl Config`ブロックの終わり近くにあります。それらとその関連するパーサーをすぐ上で確認して、不必要に追加の解析コードを書くことを避けるために、どのように使用されているかを確認してください。
 
-As a concrete example, here is the implementation for the
-`parse_failure_status()` parser, in [`src/tools/compiletest/src/directives.rs`]:
+具体的な例として、[`src/tools/compiletest/src/directives.rs`]の
+`parse_failure_status()`パーサーの実装を以下に示します：
 
 ```diff
 @@ -232,6 +232,7 @@ pub struct TestProps {
@@ -472,20 +374,11 @@ As a concrete example, here is the implementation for the
 +    }
 ```
 
-### Implementing the behavior change
+### 動作変更の実装
 
-When a test invokes a particular directive, it is expected that some behavior
-will change as a result. What behavior, obviously, will depend on the purpose of
-the directive. In the case of `failure-status`, the behavior that changes is
-that `compiletest` expects the failure code defined by the directive invoked in
-the test, rather than the default value.
+テストが特定のディレクティブを呼び出すと、その結果として何らかの動作が変更されることが期待されます。どのような動作が変更されるかは、明らかにディレクティブの目的に依存します。`failure-status`の場合、変更される動作は、`compiletest`がデフォルト値ではなく、テストで呼び出されたディレクティブによって定義された失敗コードを期待することです。
 
-Although specific to `failure-status` (as every directive will have a different
-implementation in order to invoke behavior change) perhaps it is helpful to see
-the behavior change implementation of one case, simply as an example. To
-implement `failure-status`, the `check_correct_failure_status()` function found
-in the `TestCx` implementation block, located in
-[`src/tools/compiletest/src/runtest.rs`], was modified as per below:
+`failure-status`に固有（すべてのディレクティブは動作変更を呼び出すために異なる実装を持つため）ですが、おそらく1つのケースの動作変更実装を見ることは、単に例として役立つかもしれません。`failure-status`を実装するために、[`src/tools/compiletest/src/runtest.rs`]にある`TestCx`実装ブロックにある`check_correct_failure_status()`関数が以下のように変更されました：
 
 ```diff
 @@ -295,11 +295,14 @@ impl<'test> TestCx<'test> {
@@ -524,13 +417,7 @@ in the `TestCx` implementation block, located in
      }
 ```
 
-Note the use of `self.props.failure_status` to access the directive property. In
-tests which do not specify the failure status directive,
-`self.props.failure_status` will evaluate to the default value of 101 at the
-time of this writing. But for a test which specifies a directive of, for
-example, `//@ failure-status: 1`, `self.props.failure_status` will evaluate to
-1, as `parse_failure_status()` will have overridden the `TestProps` default
-value, for that test specifically.
+`self.props.failure_status`を使用してディレクティブプロパティにアクセスすることに注意してください。失敗ステータスディレクティブを指定しないテストでは、`self.props.failure_status`は、この記事の執筆時点でのデフォルト値101に評価されます。しかし、例えば`//@ failure-status: 1`というディレクティブを指定するテストの場合、`self.props.failure_status`は1に評価されます。これは、`parse_failure_status()`がそのテスト専用に`TestProps`のデフォルト値を上書きしたためです。
 
 [`src/tools/compiletest/src/directives.rs`]: https://github.com/rust-lang/rust/tree/HEAD/src/tools/compiletest/src/directives.rs
 [`src/tools/compiletest/src/common.rs`]: https://github.com/rust-lang/rust/tree/HEAD/src/tools/compiletest/src/common.rs

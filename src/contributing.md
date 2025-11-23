@@ -1,233 +1,193 @@
-# Contribution procedures
+# 貢献手順
 
-## Bug reports
+## バグレポート
 
-While bugs are unfortunate, they're a reality in software.
-We can't fix what we don't know about, so please report liberally.
-If you're not sure if something is a bug, feel free to open an issue anyway.
+バグは不幸なことですが、ソフトウェアにおいては現実です。
+知らないことは修正できないので、自由に報告してください。
+何かがバグかどうか確信が持てない場合でも、とにかく問題を開いてください。
 
-**If you believe reporting your bug publicly represents a security risk to Rust users,
-please follow our [instructions for reporting security vulnerabilities][vuln]**.
+**バグを公開して報告することがRustユーザーにセキュリティリスクをもたらすと考える場合は、[instructions for reporting security vulnerabilities][vuln]に従ってください**。
 
 [vuln]: https://www.rust-lang.org/policies/security
 
-If you're using the nightly channel, please check if the bug exists in the
-latest toolchain before filing your bug.
-It might be fixed already.
+ナイトリーチャンネルを使用している場合は、バグをファイルする前に、最新のツールチェーンでバグが存在するかどうかを確認してください。
+すでに修正されている可能性があります。
 
-If you have the chance, before reporting a bug, please [search existing issues],
-as it's possible that someone else has already reported your error.
-This doesn't always work, and sometimes it's hard to know what to search for, so consider this
-extra credit.
-We won't mind if you accidentally file a duplicate report.
+バグを報告する前に、時間があれば[search existing issues]してください。他の誰かがすでにあなたのエラーを報告している可能性があるためです。
+これは常にうまくいくとは限らず、何を検索すればよいかを知るのが難しい場合もあるため、これは追加のクレジットと考えてください。
+重複したレポートを誤ってファイルしても気にしません。
 
-Similarly, to help others who encountered the bug find your issue, consider
-filing an issue with a descriptive title, which contains information that might be unique to it.
-This can be the language or compiler feature used, the
-conditions that trigger the bug, or part of the error message if there is any.
-An example could be: **"impossible case reached" on lifetime inference for impl
-Trait in return position**.
+同様に、バグに遭遇した他の人があなたの問題を見つけるのを助けるために、説明的なタイトルで問題をファイルすることを検討してください。タイトルには、それに固有の情報が含まれている必要があります。
+これには、使用される言語またはコンパイラ機能、バグをトリガーする条件、またはエラーメッセージの一部(ある場合)が含まれます。
+例としては、**impl Traitの戻り位置のライフタイム推論で「不可能なケースに到達しました」**が挙げられます。
 
-Opening an issue is as easy as following [this link][create an issue] and filling out the fields
-in the appropriate provided template.
+問題を開くことは、[this link][create an issue]に従って、適切に提供されたテンプレートのフィールドに記入するだけで簡単です。
 
-## Bug fixes or "normal" code changes
+## バグ修正または「通常の」コード変更
 
-For most PRs, no special procedures are needed.
-You can just [open a PR], and it will be reviewed, approved, and merged.
-This includes most bug fixes, refactorings, and other user-invisible changes.
-The next few sections talk about exceptions to this rule.
+ほとんどのPRでは、特別な手順は必要ありません。
+[open a PR]するだけで、レビュー、承認、マージされます。
+これには、ほとんどのバグ修正、リファクタリング、およびその他のユーザーに見えない変更が含まれます。
+次のいくつかのセクションでは、このルールの例外について説明します。
 
-Also, note that it is perfectly acceptable to open WIP PRs or GitHub [Draft PRs].
-Some people prefer to do this so they can get feedback along the
-way or share their code with a collaborator.
-Others do this so they can utilize
-the CI to build and test their PR (e.g. when developing on a slow machine).
+また、WIP PRまたはGitHub [Draft PRs]を開くことは完全に受け入れられることに注意してください。
+一部の人々は、途中でフィードバックを得たり、コラボレーターとコードを共有したりできるように、これを行うことを好みます。
+他の人は、CIを利用してPRをビルドおよびテストできるように、これを行います(例:遅いマシンで開発している場合)。
 
 [open a PR]: #pull-requests
 [Draft PRs]: https://github.blog/2019-02-14-introducing-draft-pull-requests/
 
-## New features
+## 新機能
 
-Rust has strong backwards-compatibility guarantees.
-Thus, new features can't just be implemented directly in stable Rust.
-Instead, we have 3 release channels: stable, beta, and nightly.
+Rustには強力な後方互換性の保証があります。
+したがって、新機能を安定版Rustに直接実装することはできません。
+代わりに、stable、beta、nightlyの3つのリリースチャネルがあります。
 
-- **Stable**: this is the latest stable release for general usage.
-- **Beta**: this is the next release (will be stable within 6 weeks).
-- **Nightly**: follows the `main` branch of the repo.
-  This is the only channel where unstable features are intended to be used,
-  which happens via opt-in feature gates.
+- **Stable**: これは一般的な使用のための最新の安定リリースです。
+- **Beta**: これは次のリリースです(6週間以内に安定版になります)。
+- **Nightly**: `main`ブランチに従います。
+  これは、オプトインの機能ゲートを介して不安定な機能が使用されることを意図した唯一のチャネルです。
 
-See [this chapter on implementing new features](./implementing_new_features.md) for more
-information.
+詳細については、[this chapter on implementing new features](./implementing_new_features.md)を参照してください。
 
-### Breaking changes
+### 破壊的変更
 
-Breaking changes have a [dedicated section][Breaking Changes] in the dev-guide.
+破壊的変更には、dev-guideに[dedicated section][Breaking Changes]があります。
 
-### Major changes
+### 主要な変更
 
-The compiler team has a special process for large changes, whether or not they cause breakage.
-This process is called a Major Change Proposal (MCP).
-MCP is a relatively lightweight mechanism for getting feedback on large changes to the
-compiler (as opposed to a full RFC or a design meeting with the team).
+コンパイラチームには、破壊を引き起こすかどうかに関係なく、大規模な変更に対する特別なプロセスがあります。
+このプロセスは、主要変更提案(MCP)と呼ばれます。
+MCPは、(完全なRFCまたはチームとの設計ミーティングとは対照的に)コンパイラへの大規模な変更に関するフィードバックを得るための比較的軽量なメカニズムです。
 
-Example of things that might require MCPs include major refactorings, changes
-to important types, or important changes to how the compiler does something, or
-smaller user-facing changes.
+MCPが必要になる可能性のあるものの例には、主要なリファクタリング、重要な型への変更、コンパイラが何かを行う方法への重要な変更、または小規模なユーザー向けの変更が含まれます。
 
-**When in doubt, ask [on Zulip].
-It would be a shame to put a lot of work
-into a PR that ends up not getting merged!** [See this document][mcpinfo] for more info on MCPs.
+**疑問がある場合は、[on Zulip]で尋ねてください。
+多くの作業を費やしたPRが最終的にマージされないのは残念です!** MCPの詳細については、[See this document][mcpinfo]を参照してください。
 
 [mcpinfo]: https://forge.rust-lang.org/compiler/proposals-and-stabilization.html#how-do-i-submit-an-mcp
 [on Zulip]: https://rust-lang.zulipchat.com/#narrow/stream/131828-t-compiler
 
-### Performance
+### パフォーマンス
 
-Compiler performance is important.
-We have put a lot of effort over the last few years into [gradually improving it][perfdash].
+コンパイラのパフォーマンスは重要です。
+過去数年間に[gradually improving it][perfdash]するために多くの努力が払われてきました。
 
 [perfdash]: https://perf.rust-lang.org/dashboard.html
 
-If you suspect that your change may cause a performance regression (or
-improvement), you can request a "perf run" (and your reviewer may also request one
-before approving).
-This is yet another bot that will compile a collection of
-benchmarks on a compiler with your changes.
-The numbers are reported
-[here][perf], and you can see a comparison of your changes against the latest `main`.
+変更がパフォーマンスのリグレッション(または改善)を引き起こす可能性があると思われる場合は、「perf run」をリクエストできます(レビュアーも承認前にリクエストする場合があります)。
+これは、変更を加えたコンパイラでベンチマークのコレクションをコンパイルする別のボットです。
+数値は[here][perf]で報告され、最新の`main`に対する変更の比較を確認できます。
 
-> For an introduction to the performance of Rust code in general
-> which would also be useful in rustc development, see [The Rust Performance Book].
+> 一般的なRustコードのパフォーマンスの紹介については、rustc開発でも役立つ[The Rust Performance Book]を参照してください。
 
 [perf]: https://perf.rust-lang.org
 [The Rust Performance Book]: https://nnethercote.github.io/perf-book/
 
-## Pull requests
+## プルリクエスト
 
-Pull requests (or PRs for short) are the primary mechanism we use to change Rust.
-GitHub itself has some [great documentation][about-pull-requests] on using the Pull Request feature.
-We use the ["fork and pull" model][development-models],
-where contributors push changes to their personal fork and create pull requests to
-bring those changes into the source repository.
-We have [a chapter](git.md) on how to use Git when contributing to Rust.
+プルリクエスト(または略してPR)は、Rustを変更するために使用する主要なメカニズムです。
+GitHub自体には、プルリクエスト機能の使用に関する優れた[great documentation][about-pull-requests]があります。
+私たちは["fork and pull" model][development-models]を使用しています。
+これは、貢献者が変更を個人のフォークにプッシュし、それらの変更をソースリポジトリに取り込むためのプルリクエストを作成するものです。
+Rustへの貢献時にGitを使用する方法については、[a chapter](git.md)があります。
 
-> **Advice for potentially large, complex, cross-cutting and/or very domain-specific changes**
+> **潜在的に大規模で複雑な、横断的および/または非常にドメイン固有の変更に関するアドバイス**
 >
-> The compiler reviewers on rotation usually each have areas of the compiler that they know well,
-> but also have areas that they are not very familiar with. If your PR contains changes that are
-> large, complex, cross-cutting and/or highly domain-specific, it becomes very difficult to find a
-> suitable reviewer who is comfortable in reviewing all of the changes in such a PR. This is also
-> true if the changes are not only compiler-specific but also contains changes which fall under the
-> purview of reviewers from other teams, like the standard library team. [There's a bot][triagebot]
-> which notifies the relevant teams and pings people who have setup specific alerts based on the
-> files modified.
+> ローテーション中のコンパイラレビュアーは、通常、よく知っているコンパイラの領域がありますが、
+> よく知らない領域もあります。PRに大規模で複雑な、横断的および/または高度にドメイン固有の変更が含まれている場合、
+> そのようなPRのすべての変更をレビューすることに自信を持つ適切なレビュアーを見つけることが非常に困難になります。これは、
+> 変更がコンパイラ固有のものだけでなく、標準ライブラリチームなど他のチームのレビュアーの管轄下にある変更も含まれている場合にも当てはまります。[There's a bot][triagebot]が関連するチームに通知し、変更されたファイルに基づいて特定のアラートを設定している人にpingします。
 >
-> Before making such changes, you are strongly encouraged to **discuss your proposed changes with
-> the compiler team beforehand** (and with other teams that the changes would require approval
-> from), and work with the compiler team to see if we can help you **break down a large potentially
-> unreviewable PR into a series of smaller more individually reviewable PRs**.
+> そのような変更を行う前に、**コンパイラチームと事前に提案された変更について議論する**ことを強くお勧めします。また、コンパイラチームと協力して、**大規模で潜在的にレビュー不可能なPRを、より個別にレビュー可能な一連の小さなPRに分解できるか**を確認してください。
 >
-> You can communicate with the compiler team by creating a [#t-compiler thread on Zulip][t-compiler]
-> to discuss your proposed changes.
+> [#t-compiler thread on Zulip][t-compiler]を作成して、提案された変更について議論できます。
 >
-> Communicating with the compiler team beforehand helps in several ways:
+> コンパイラチームと事前にコミュニケーションを取ることは、いくつかの点で役立ちます:
 >
-> 1. It increases the likelihood of your PRs being reviewed in a timely manner.
->     - We can help you identify suitable reviewers *before* you open actual PRs, or help find
->       advisors and liaisons to help you navigate the change procedures, or help with running
->       try-jobs, perf runs and crater runs as suitable.
-> 2. It helps the compiler team track your changes.
-> 3. The compiler team can perform vibe checks on your changes early and often, to see if the
->    direction of the changes align with what the compiler team prefers to see.
-> 4. Helps to avoid situations where you may have invested significant time and effort into large
->   changes that the compiler team might not be willing to accept, or finding out very late that the
->   changes are in a direction that the compiler team disagrees with.
+> 1. PRがタイムリーにレビューされる可能性が高まります。
+>     - 実際のPRを開く*前に*適切なレビュアーを特定するのを手伝ったり、変更手順をナビゲートするためのアドバイザーや連絡係を見つけたり、try-jobs、perf runs、crater runsを適切に実行するのを手伝ったりできます。
+> 2. コンパイラチームが変更を追跡するのに役立ちます。
+> 3. コンパイラチームは、変更の方向がコンパイラチームが好む方向と一致しているかどうかを早期かつ頻繁にバイブチェックできます。
+> 4. コンパイラチームが受け入れたくない大規模な変更に多大な時間と労力を投資した状況、または変更がコンパイラチームが同意しない方向にあることを非常に遅く知った状況を避けるのに役立ちます。
 
 [about-pull-requests]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests
 [development-models]: https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/getting-started/about-collaborative-development-models#fork-and-pull-model
 [t-compiler]: https://rust-lang.zulipchat.com/#narrow/stream/131828-t-compiler
 [triagebot]: https://github.com/rust-lang/rust/blob/HEAD/triagebot.toml
 
-### Keeping your branch up-to-date
+### ブランチを最新に保つ
 
-The CI in rust-lang/rust applies your patches directly against current `main`,
-not against the commit your branch is based on.
-This can lead to unexpected failures
-if your branch is outdated, even when there are no explicit merge conflicts.
+rust-lang/rustのCIは、ブランチがベースにしているコミットではなく、現在の`main`に直接パッチを適用します。
+これにより、ブランチが古くなっている場合、明示的なマージコンフリクトがなくても予期しない失敗が発生する可能性があります。
 
-Update your branch only when needed: when you have merge conflicts, upstream CI is broken and blocking your green PR, or a maintainer requests it.
-Avoid updating an already-green PR under review unless necessary.
-During review, make incremental commits to address feedback.
-Prefer to squash or rebase only at the end, or when a reviewer requests it.
+必要な場合にのみブランチを更新してください: マージコンフリクトがある場合、アップストリームCIが壊れていて緑のPRをブロックしている場合、またはメンテナがリクエストした場合。
+レビュー中にすでに緑のPRを更新することは避けてください(必要でない限り)。
+レビュー中は、フィードバックに対処するためにインクリメンタルコミットを行ってください。
+スカッシュまたはリベースは、最後に、またはレビュアーがリクエストした場合にのみ行うことをお勧めします。
 
-When updating, use `git push --force-with-lease` and leave a brief comment explaining what changed.
-Some repos prefer merging from `upstream/main` instead of rebasing;
-follow the project's conventions.
-See [keeping things up to date](git.md#keeping-things-up-to-date) for detailed instructions.
+更新する場合は、`git push --force-with-lease`を使用し、何が変更されたかを説明する簡単なコメントを残してください。
+一部のリポジトリは、リベースではなく`upstream/main`からマージすることを好みます。
+プロジェクトの規約に従ってください。
+詳細な手順については、[keeping things up to date](git.md#keeping-things-up-to-date)を参照してください。
 
-After rebasing, it's recommended to [run the relevant tests locally](tests/intro.md) to catch any issues before CI runs.
+リベース後は、CIが実行される前に問題をキャッチするために、[run the relevant tests locally](tests/intro.md)を実行することをお勧めします。
 
 ### r?
 
-All pull requests are reviewed by another person.
-We have a bot, [@rustbot], that will automatically assign a random person
-to review your request based on which files you changed.
+すべてのプルリクエストは他の人によってレビューされます。
+[@rustbot]というボットがあり、変更したファイルに基づいてランダムな人を自動的に割り当ててリクエストをレビューします。
 
-If you want to request that a specific person reviews your pull request, you
-can add an `r?` to the pull request description or in a comment.
-For example, if you want to ask a review by @awesome-reviewer,
-add the following to the end of the pull request description:
+特定の人にプルリクエストのレビューをリクエストする場合は、
+プルリクエストの説明またはコメントに`r?`を追加できます。
+例えば、@awesome-reviewerにレビューをリクエストする場合は、
+プルリクエストの説明の最後に次のように追加します:
 
     r? @awesome-reviewer
 
-[@rustbot] will then assign the PR to that reviewer instead of a random person.
-This is entirely optional.
+[@rustbot]は、ランダムな人の代わりに、そのレビュアーにPRを割り当てます。
+これは完全にオプションです。
 
-You can also assign a random reviewer from a specific team by writing `r? rust-lang/groupname`.
-As an example, if you were making a diagnostics change,
-you could get a reviewer from the diagnostics team by adding:
+`r? rust-lang/groupname`と書くことで、特定のチームからランダムなレビュアーを割り当てることもできます。
+例えば、診断の変更を行っている場合、
+次のように追加することで、診断チームからレビュアーを取得できます:
 
     r? rust-lang/diagnostics
 
-For a full list of possible `groupname`s,
-check the `adhoc_groups` section at the [triagebot.toml config file],
-or the list of teams in the [rust-lang teams database].
+可能な`groupname`の完全なリストについては、
+[triagebot.toml config file]の`adhoc_groups`セクション、
+または[rust-lang teams database]のチームのリストを確認してください。
 
-### Waiting for reviews
+### レビューを待つ
 
 > NOTE
 >
-> Pull request reviewers are often working at capacity,
-> and many of them are contributing on a volunteer basis.
-> In order to minimize review delays,
-> pull request authors and assigned reviewers should ensure that the review label
-> (`S-waiting-on-review` and `S-waiting-on-author`) stays updated,
-> invoking these commands when appropriate:
+> プルリクエストのレビュアーは、多くの場合、能力の限界で作業しており、
+> 彼らの多くはボランティアベースで貢献しています。
+> レビューの遅延を最小限に抑えるために、
+> プルリクエストの著者と割り当てられたレビュアーは、レビューラベル
+> (`S-waiting-on-review`および`S-waiting-on-author`)を更新し続けることを確認し、
+> 適切な場合にこれらのコマンドを呼び出す必要があります:
 >
 > - `@rustbot author`:
->   the review is finished,
->   and PR author should check the comments and take action accordingly.
+>   レビューが終了し、
+>   PR著者はコメントを確認して適切に行動する必要があります。
 >
 > - `@rustbot review`:
->   the author is ready for a review,
->   and this PR will be queued again in the reviewer's queue.
+>   著者はレビューの準備ができており、
+>   このPRはレビュアーのキューに再度キューされます。
 
-Please note that the reviewers are humans, who for the most part work on `rustc` in their free time.
-This means that they can take some time to respond and review your PR.
-It also means that reviewers can miss some PRs that are assigned to them.
+レビュアーは人間であり、その大部分は空き時間に`rustc`に取り組んでいることに注意してください。
+これは、応答してPRをレビューするのに時間がかかる可能性があることを意味します。
+また、レビュアーは自分に割り当てられたPRの一部を見逃す可能性があることも意味します。
 
-To try to move PRs forward, the Triage WG regularly goes through all PRs that
-are waiting for review and haven't been discussed for at least 2 weeks.
-If you don't get a review within 2 weeks, feel free to ask the Triage WG on
-Zulip ([#t-release/triage]).
-They have knowledge of when to ping, who might be on vacation, etc.
+PRを前進させるために、Triage WGは定期的に、レビューを待っていて、少なくとも2週間議論されていないすべてのPRを通過します。
+2週間以内にレビューを受けられない場合は、Zulip([#t-release/triage])でTriage WGに気軽に尋ねてください。
+彼らは、いつpingするか、誰が休暇中かなどについての知識を持っています。
 
-The reviewer may request some changes using the GitHub code review interface.
-They may also request special procedures for some PRs.
-See [Crater] and [Breaking Changes] chapters for some examples of such procedures.
+レビュアーは、GitHub codeレビューインターフェースを使用していくつかの変更をリクエストする場合があります。
+また、一部のPRに対して特別な手順をリクエストする場合もあります。
+そのような手順の例については、[Crater]および[Breaking Changes]章を参照してください。
 
 [r?]: https://github.com/rust-lang/rust/pull/78133#issuecomment-712692371
 [#t-release/triage]: https://rust-lang.zulipchat.com/#narrow/stream/242269-t-release.2Ftriage
@@ -235,241 +195,214 @@ See [Crater] and [Breaking Changes] chapters for some examples of such procedure
 
 ### CI
 
-In addition to being reviewed by a human, pull requests are automatically tested,
-thanks to continuous integration (CI).
-Basically, every time you open and update
-a pull request, CI builds the compiler and tests it against the
-[compiler test suite], and also performs other tests such as checking that
-your pull request is in compliance with Rust's style guidelines.
+人間によってレビューされることに加えて、プルリクエストは自動的にテストされます。
+継続的インテグレーション(CI)のおかげです。
+基本的に、プルリクエストを開いて更新するたびに、
+CIはコンパイラをビルドし、[compiler test suite]に対してテストし、
+プルリクエストがRustのスタイルガイドラインに準拠しているかどうかを確認するなどの他のテストも実行します。
 
-Running continuous integration tests allows PR authors to catch mistakes early
-without going through a first review cycle, and also helps reviewers stay aware
-of the status of a particular pull request.
+継続的インテグレーションテストを実行することで、PR著者は最初のレビューサイクルを経ずに早期にミスをキャッチでき、レビュアーが特定のプルリクエストのステータスを把握するのにも役立ちます。
 
-Rust has plenty of CI capacity, and you should never have to worry about wasting
-computational resources each time you push a change.
-It is also perfectly fine
-(and even encouraged!) to use the CI to test your changes if it can help your productivity.
-In particular, we don't recommend running the full `./x test` suite locally,
-since it takes a very long time to execute.
+Rustには十分なCI容量があり、変更をプッシュするたびに計算リソースを無駄にすることを心配する必要はありません。
+また、生産性を向上させることができる場合は、CIを使用して変更をテストすることも完全に問題ありません(さらに推奨されます!)。
+特に、ローカルで完全な`./x test`スイートを実行することはお勧めしません。
+実行に非常に時間がかかるためです。
 
 ### r+
 
-After someone has reviewed your pull request, they will leave an annotation
-on the pull request with an `r+`.
-It will look something like this:
+誰かがあなたのプルリクエストをレビューした後、彼らは`r+`でプルリクエストに注釈を残します。
+次のようになります:
 
     @bors r+
 
-This tells [@bors], our lovable integration bot, that your pull request has been approved.
-The PR then enters the [merge queue], where [@bors]
-will run *all* the tests on *every* platform we support.
-If it all works out, [@bors] will merge your code into `main` and close the pull request.
+これは、愛らしい統合ボット[@bors]に、プルリクエストが承認されたことを伝えます。
+その後、PRは[merge queue]に入り、[@bors]は
+サポートしている*すべての*プラットフォームで*すべての*テストを実行します。
+すべてがうまくいくと、[@bors]はあなたのコードを`main`にマージし、プルリクエストを閉じます。
 
-Depending on the scale of the change, you may see a slightly different form of `r+`:
+変更の規模に応じて、わずかに異なる形式の`r+`が表示される場合があります:
 
     @bors r+ rollup
 
-The additional `rollup` tells [@bors] that this change should always be "rolled up".
-Changes that are rolled up are tested and merged alongside other PRs, to speed the process up.
-Typically, only small changes that are expected not to conflict
-with one another are marked as "always roll up".
+追加の`rollup`は、[@bors]にこの変更を常に「ロールアップ」する必要があることを伝えます。
+ロールアップされた変更は、プロセスをスピードアップするために、他のPRと一緒にテストおよびマージされます。
+通常、互いに競合しないと予想される小さな変更のみが「常にロールアップ」としてマークされます。
 
-Be patient;
-this can take a while and the queue can sometimes be long.
-Also, note that PRs are never merged by hand.
+辛抱強く待ってください。
+これには時間がかかることがあり、キューが長い場合があります。
+また、PRは手動でマージされることは決してないことに注意してください。
 
 [@rustbot]: https://github.com/rustbot
 [@bors]: https://github.com/bors
 
-### Opening a PR
+### PRを開く
 
-You are now ready to file a pull request (PR)?
-Great!
-Here are a few points you should be aware of.
+プルリクエスト(PR)をファイルする準備ができましたか?
+素晴らしい!
+注意すべき点がいくつかあります。
 
-All pull requests should be filed against the `main` branch,
-unless you know for sure that you should target a different branch.
+すべてのプルリクエストは、特定のブランチをターゲットにする必要があると確信していない限り、`main`ブランチに対してファイルする必要があります。
 
-Run some style checks before you submit the PR:
+PRを送信する前に、いくつかのスタイルチェックを実行してください:
 
     ./x test tidy --bless
 
-We recommend to make this check before every pull request (and every new commit in a pull request);
-you can add [git hooks] before every push to make sure you never forget to make this check.
-The CI will also run tidy and will fail if tidy fails.
+このチェックをすべてのプルリクエスト(およびプルリクエストのすべての新しいコミット)の前に行うことをお勧めします。
+このチェックを忘れないようにするために、すべてのプッシュ前に[git hooks]を追加できます。
+CIもtidyを実行し、tidyが失敗した場合は失敗します。
 
-Rust follows a _no merge-commit policy_,
-meaning that when you encounter merge conflicts,
-you are expected to always rebase instead of merging.
-For example,
-always use rebase when bringing the latest changes from the `main` branch to your feature branch.
-If your PR contains merge commits, it will get marked as `has-merge-commits`.
-Once you have removed the merge commits, e.g., through an interactive rebase, you
-should remove the label again:
+Rustは_マージコミットなしポリシー_に従っています。
+つまり、マージコンフリクトに遭遇した場合、
+マージする代わりに常にリベースすることが期待されます。
+例えば、
+`main`ブランチから機能ブランチに最新の変更を取り込む場合は、常にリベースを使用してください。
+PRにマージコミットが含まれている場合、`has-merge-commits`としてマークされます。
+マージコミットを削除したら(例:インタラクティブリベースを通じて)、
+ラベルを再度削除する必要があります:
 
     @rustbot label -has-merge-commits
 
-See [this chapter][labeling] for more details.
+詳細については、[this chapter][labeling]を参照してください。
 
-If you encounter merge conflicts or when a reviewer asks you to perform some
-changes, your PR will get marked as `S-waiting-on-author`.
-When you resolve them, you should use `@rustbot` to mark it as `S-waiting-on-review`:
+マージコンフリクトに遭遇した場合、またはレビュアーが変更を実行するよう求めた場合、PRは`S-waiting-on-author`としてマークされます。
+それらを解決したら、`@rustbot`を使用して`S-waiting-on-review`としてマークする必要があります:
 
     @rustbot ready
 
-GitHub allows [closing issues using keywords][closing-keywords].
-This feature should be used to keep the issue tracker tidy.
-However, it is generally preferred
-to put the "closes #123" text in the PR description rather than the issue commit;
-particularly during rebasing, citing the issue number in the commit can "spam"
-the issue in question.
+GitHubでは、[closing issues using keywords][closing-keywords]が可能です。
+この機能は、問題トラッカーを整理するために使用する必要があります。
+ただし、一般的には、
+PRの説明に「closes #123」テキストを配置することが好まれます(問題コミットではなく)。
+特にリベース中に、コミット内の問題番号を引用すると、問題の「スパム」が発生する可能性があります。
 
-However, if your PR fixes a stable-to-beta or stable-to-stable regression and has
-been accepted for a beta and/or stable backport (i.e., it is marked `beta-accepted`
-and/or `stable-accepted`), please do *not* use any such keywords since we don't
-want the corresponding issue to get auto-closed once the fix lands on `main`.
-Please update the PR description while still mentioning the issue somewhere.
-For example, you could write `Fixes (after beta backport) #NNN.`.
+ただし、PRが安定版からベータ版または安定版から安定版へのリグレッションを修正し、ベータ版および/または安定版のバックポートが受け入れられた場合(つまり、`beta-accepted`および/または`stable-accepted`とマークされている場合)は、そのようなキーワードを使用しないでください。修正が`main`にランドすると、対応する問題が自動的に閉じられることを望んでいないためです。
+問題をどこかで言及しながら、PR説明を更新してください。
+例えば、`Fixes (after beta backport) #NNN.`と書くことができます。
 
-As for further actions, please keep a sharp look-out for a PR whose title begins with
-`[beta]` or `[stable]` and which backports the PR in question.
-When that one gets merged, the relevant issue can be closed.
-The closing comment should mention all PRs that were involved.
-If you don't have the permissions to close the issue, please
-leave a comment on the original PR asking the reviewer to close it for you.
+さらなるアクションについては、タイトルが`[beta]`または`[stable]`で始まり、問題のPRをバックポートするPRを鋭く監視してください。
+それがマージされたら、関連する問題を閉じることができます。
+クロージングコメントは、関連するすべてのPRに言及する必要があります。
+問題を閉じる権限がない場合は、
+レビュアーに閉じてもらうように元のPRにコメントを残してください。
 
 [labeling]: ./rustbot.md#issue-relabeling
 [closing-keywords]: https://docs.github.com/en/issues/tracking-your-work-with-issues/linking-a-pull-request-to-an-issue
 
-### Reverting a PR
+### PRを元に戻す
 
-When a PR leads to miscompile, significant performance regressions, or other critical issues, we may
-want to revert that PR with a regression test case.
-You can also check out the [revert policy] on
-Forge docs (which is mainly targeted for reviewers, but contains useful info for PR authors too).
+PRがミスコンパイル、重大なパフォーマンスのリグレッション、またはその他の重大な問題を引き起こした場合、リグレッションテストケースでそのPRを元に戻したい場合があります。
+また、[revert policy]をForgeドキュメント(主にレビュアーを対象としていますが、PR著者にとっても有用な情報が含まれています)で確認することもできます。
 
-If the PR contains huge changes, it can be challenging to revert, making it harder to review
-incremental fixes in subsequent updates.
-Or if certain code in that PR is heavily depended upon by
-subsequent PRs, reverting it can become difficult.
+PRに巨大な変更が含まれている場合、元に戻すのが難しくなり、後続の更新でインクリメンタルな修正をレビューするのがより困難になる可能性があります。
+または、そのPRの特定のコードが後続のPRによって大きく依存されている場合、元に戻すことが困難になる可能性があります。
 
-In such cases, we can identify the problematic code and disable it for some input, as shown in [#128271][#128271].
+そのような場合、問題のあるコードを特定し、一部の入力に対して無効にすることができます。例として[#128271][#128271]があります。
 
-For MIR optimizations, we can also use the `-Zunsound-mir-opt` option to gate the mir-opt, as shown
-in [#132356][#132356].
+MIR最適化の場合、[#132356][#132356]に示されているように、`-Zunsound-mir-opt`オプションを使用してmir-optをゲートすることもできます。
 
 [revert policy]: https://forge.rust-lang.org/compiler/reviews.html?highlight=revert#reverts
 [#128271]: https://github.com/rust-lang/rust/pull/128271
 [#132356]: https://github.com/rust-lang/rust/pull/132356
 
-## External dependencies
+## 外部依存関係
 
-This section has moved to ["Using External Repositories"](./external-repos.md).
+このセクションは、["Using External Repositories"](./external-repos.md)に移動しました。
 
-## Writing documentation
+## ドキュメントの記述
 
-Documentation improvements are very welcome.
-The source of `doc.rust-lang.org`
-is located in [`src/doc`] in the tree, and standard API documentation is generated
-from the source code itself (e.g. [`library/std/src/lib.rs`][std-root]). Documentation pull requests
-function in the same way as other pull requests.
+ドキュメントの改善は非常に歓迎されます。
+`doc.rust-lang.org`のソースは
+ツリーの[`src/doc`]にあり、標準APIドキュメントはソースコード自体から生成されます(例:[`library/std/src/lib.rs`][std-root])。ドキュメントのプルリクエストは、他のプルリクエストと同じように機能します。
 
 [`src/doc`]: https://github.com/rust-lang/rust/tree/HEAD/src/doc
 [std-root]: https://github.com/rust-lang/rust/blob/HEAD/library/std/src/lib.rs#L1
 
-To find documentation-related issues, use the [A-docs label].
+ドキュメント関連の問題を見つけるには、[A-docs label]を使用してください。
 
-You can find documentation style guidelines in [RFC 1574].
+ドキュメントのスタイルガイドラインは[RFC 1574]にあります。
 
-To build the standard library documentation, use `x doc --stage 1 library --open`.
-To build the documentation for a book (e.g. the unstable book), use `x doc src/doc/unstable-book.`
-Results should appear in `build/host/doc`, as well as automatically open in your default browser.
-See [Building Documentation](./building/compiler-documenting.md#building-documentation) for more
-information.
+標準ライブラリのドキュメントをビルドするには、`x doc --stage 1 library --open`を使用してください。
+本(例:不安定な本)のドキュメントをビルドするには、`x doc src/doc/unstable-book.`を使用してください。
+結果は`build/host/doc`に表示され、デフォルトのブラウザで自動的に開かれます。
+詳細については、[Building Documentation](./building/compiler-documenting.md#building-documentation)を参照してください。
 
-You can also use `rustdoc` directly to check small fixes.
-For example, `rustdoc src/doc/reference.md` will render reference to `doc/reference.html`.
-The CSS might be messed up, but you can verify that the HTML is right.
+また、`rustdoc`を直接使用して小さな修正を確認することもできます。
+例えば、`rustdoc src/doc/reference.md`は、referenceを`doc/reference.html`にレンダリングします。
+CSSが乱れる可能性がありますが、HTMLが正しいことを確認できます。
 
-Please notice that we don't accept typography/spellcheck fixes to **internal documentation**
-as it's usually not worth the churn or the review time.
-Examples of internal documentation is code comments and rustc api docs.
-However, feel free to fix those if accompanied by other improvements in the same PR.
+**内部ドキュメント**に対するタイポグラフィ/スペルチェックの修正は受け付けていません。
+通常、チャーンやレビュー時間に見合わないためです。
+内部ドキュメントの例は、コードコメントとrustc apiドキュメントです。
+ただし、同じPRで他の改善を伴う場合は、それらを修正してもかまいません。
 
-### Contributing to rustc-dev-guide
+### rustc-dev-guideへの貢献
 
-Contributions to the [rustc-dev-guide] are always welcome, and can be made directly at
-[the rust-lang/rustc-dev-guide repo][rdgrepo].
-The issue tracker in that repo is also a great way to find things that need doing.
-There are issues for beginners and advanced compiler devs alike!
+[rustc-dev-guide]への貢献はいつでも歓迎されており、[the rust-lang/rustc-dev-guide repo][rdgrepo]で直接行うことができます。
+そのリポジトリの問題トラッカーも、やるべきことを見つける素晴らしい方法です。
+初心者と上級コンパイラ開発者の両方のための問題があります!
 
-Just a few things to keep in mind:
+覚えておくべきことがいくつかあります:
 
-- Please try to avoid overly long lines and use semantic line breaks (where you break the line after each sentence).
-  There is no strict limit on line lengths;
-  let the sentence or part of the sentence flow to its proper end on the same line.
+- 過度に長い行を避け、セマンティックラインブレーク(各文の後で行を改行する)を使用するようにしてください。
+  行の長さに厳密な制限はありません。
+  文または文の一部を適切な最後まで同じ行に流してください。
 
-  You can use a tool in ci/sembr to help with this.
-  Its help output can be seen with this command:
+  ci/sembrのツールを使用してこれを支援できます。
+  ヘルプ出力は次のコマンドで表示できます:
 
   ```console
   cargo run --manifest-path ci/sembr/Cargo.toml -- --help
   ```
 
-- When contributing text to the guide, please contextualize the information with some time period
-  and/or a reason so that the reader knows how much to trust the information.
-  Aim to provide a reasonable amount of context, possibly including but not limited to:
+- ガイドにテキストを貢献する際は、読者が情報をどれだけ信頼できるかを知るために、いくつかの時間枠および/または理由で情報をコンテキスト化してください。
+  妥当な量のコンテキストを提供することを目指してください。これには以下が含まれますが、これらに限定されません:
 
-  - A reason for why the text may be out of date other than "change",
-    as change is a constant across the project.
+  - テキストが時代遅れになる可能性がある理由(「変更」以外)。
+    変更はプロジェクト全体で一定です。
 
-  - The date the comment was added, e.g. instead of writing _"Currently, ..."_
-    or _"As of now, ..."_, consider adding the date, in one of the following formats:
+  - コメントが追加された日付。例えば、_「現在、...」_や_「今のところ、...」_と書く代わりに、
+    日付を追加することを検討してください。次のいずれかの形式で:
     - Jan 2021
     - January 2021
     - jan 2021
     - january 2021
 
-    There is a CI action (in `.github/workflows/date-check.yml`)
-    that generates a monthly report showing those that are over 6 months old
-    ([example](https://github.com/rust-lang/rustc-dev-guide/issues/2052)).
+    CIアクション(`.github/workflows/date-check.yml`にあります)があり、
+    6ヶ月以上経過したものを示す月次レポートを生成します
+    ([example](https://github.com/rust-lang/rustc-dev-guide/issues/2052))。
 
-    For the action to pick the date, add a special annotation before specifying the date:
+    アクションが日付を取得するには、日付を指定する前に特別な注釈を追加してください:
 
     ```md
     <!-- date-check --> Nov 2025
     ```
 
-    Example:
+    例:
 
     ```md
     As of <!-- date-check --> Nov 2025, the foo did the bar.
     ```
 
-    For cases where the date should not be part of the visible rendered output,
-    use the following instead:
+    日付を表示されるレンダリング出力の一部にしたくない場合は、
+    代わりに次を使用してください:
 
     ```md
     <!-- date-check: Nov 2025 -->
     ```
 
-  - A link to a relevant WG, tracking issue, `rustc` rustdoc page, or similar, that may provide
-    further explanation for the change process or a way to verify that the information is not
-    outdated.
+  - 変更プロセスのさらなる説明を提供する可能性がある、または情報が古くなっていないことを確認する方法を提供する可能性がある、関連するWG、トラッキング問題、`rustc` rustdocページ、または同様のものへのリンク。
 
-- If a text grows rather long (more than a few page scrolls) or complicated (more than four
-  subsections), it might benefit from having a Table of Contents at the beginning,
-  which you can auto-generate by including the `<!-- toc -->` marker at the top.
+- テキストがかなり長くなる場合(数ページスクロール以上)または複雑になる場合(4つ以上のサブセクション)、最初に目次があると役立つ場合があります。
+  上部に`<!-- toc -->`マーカーを含めることで、自動生成できます。
 
-#### ⚠️ Note: Where to contribute `rustc-dev-guide` changes
+#### ⚠️ 注意: rustc-dev-guide変更をどこに貢献するか
 
-For detailed information about where to contribute rustc-dev-guide changes and the benefits of doing so,
-see [the rustc-dev-guide working group documentation].
+rustc-dev-guide変更をどこに貢献するか、そしてそうすることの利点に関する詳細情報については、
+[the rustc-dev-guide working group documentation]を参照してください。
 
-## Issue triage
+## 問題のトリアージ
 
-Please see <https://forge.rust-lang.org/release/issue-triaging.html>.
+<https://forge.rust-lang.org/release/issue-triaging.html>を参照してください。
 
 [stable-]: https://github.com/rust-lang/rust/labels?q=stable
 [beta-]: https://github.com/rust-lang/rust/labels?q=beta
@@ -484,23 +417,23 @@ Please see <https://forge.rust-lang.org/release/issue-triaging.html>.
 [S-tracking-]: https://github.com/rust-lang/rust/labels?q=s-tracking
 [the rustc-dev-guide working group documentation]: https://forge.rust-lang.org/wg-rustc-dev-guide/index.html#where-to-contribute-rustc-dev-guide-changes
 
-### rfcbot labels
+### rfcbotラベル
 
-[rfcbot] uses its own labels for tracking the process of coordinating
-asynchronous decisions, such as approving or rejecting a change.
-This is used for [RFCs], issues, and pull requests.
+[rfcbot]は、非同期決定の調整プロセスを追跡するために独自のラベルを使用します。
+例えば、変更の承認または拒否などです。
+これは[RFCs]、問題、およびプルリクエストに使用されます。
 
-| Labels | Color | Description |
+| ラベル | 色 | 説明 |
 |--------|-------|-------------|
-| [proposed-final-comment-period] | <span class="label-color" style="background-color:#ededed;">&#x2003;</span>&nbsp;Gray | Currently awaiting signoff of all team members in order to enter the final comment period. |
-| [disposition-merge] | <span class="label-color" style="background-color:#008800;">&#x2003;</span>&nbsp;Green | Indicates the intent is to merge the change. |
-| [disposition-close] | <span class="label-color" style="background-color:#dd0000;">&#x2003;</span>&nbsp;Red | Indicates the intent is to not accept the change and close it. |
-| [disposition-postpone] | <span class="label-color" style="background-color:#ededed;">&#x2003;</span>&nbsp;Gray | Indicates the intent is to not accept the change at this time and postpone it to a later date. |
-| [final-comment-period] | <span class="label-color" style="background-color:#1e76d9;">&#x2003;</span>&nbsp;Blue | Currently soliciting final comments before merging or closing. |
-| [finished-final-comment-period] | <span class="label-color" style="background-color:#f9e189;">&#x2003;</span>&nbsp;Light Yellow | The final comment period has concluded, and the issue will be merged or closed. |
-| [postponed] | <span class="label-color" style="background-color:#fbca04;">&#x2003;</span>&nbsp;Yellow | The issue has been postponed. |
-| [closed] | <span class="label-color" style="background-color:#dd0000;">&#x2003;</span>&nbsp;Red | The issue has been rejected. |
-| [to-announce] | <span class="label-color" style="background-color:#ededed;">&#x2003;</span>&nbsp;Gray | Issues that have finished their final-comment-period and should be publicly announced. Note: the rust-lang/rust repository uses this label differently, to announce issues at the triage meetings. |
+| [proposed-final-comment-period] | <span class="label-color" style="background-color:#ededed;">&#x2003;</span>&nbsp;Gray | 最終コメント期間に入るために、すべてのチームメンバーのサインオフを待っています。 |
+| [disposition-merge] | <span class="label-color" style="background-color:#008800;">&#x2003;</span>&nbsp;Green | 変更をマージする意図を示します。 |
+| [disposition-close] | <span class="label-color" style="background-color:#dd0000;">&#x2003;</span>&nbsp;Red | 変更を受け入れずに閉じる意図を示します。 |
+| [disposition-postpone] | <span class="label-color" style="background-color:#ededed;">&#x2003;</span>&nbsp;Gray | 今回は変更を受け入れず、後日延期する意図を示します。 |
+| [final-comment-period] | <span class="label-color" style="background-color:#1e76d9;">&#x2003;</span>&nbsp;Blue | マージまたは閉じる前に最終コメントを求めています。 |
+| [finished-final-comment-period] | <span class="label-color" style="background-color:#f9e189;">&#x2003;</span>&nbsp;Light Yellow | 最終コメント期間が終了し、問題はマージまたは閉じられます。 |
+| [postponed] | <span class="label-color" style="background-color:#fbca04;">&#x2003;</span>&nbsp;Yellow | 問題は延期されました。 |
+| [closed] | <span class="label-color" style="background-color:#dd0000;">&#x2003;</span>&nbsp;Red | 問題は拒否されました。 |
+| [to-announce] | <span class="label-color" style="background-color:#ededed;">&#x2003;</span>&nbsp;Gray | 最終コメント期間を終えた問題で、公に発表する必要があります。注意: rust-lang/rustリポジトリは、このラベルを異なる方法で使用しており、トリアージミーティングで問題を発表します。 |
 
 [disposition-merge]: https://github.com/rust-lang/rust/labels/disposition-merge
 [disposition-close]: https://github.com/rust-lang/rust/labels/disposition-close
@@ -514,9 +447,9 @@ This is used for [RFCs], issues, and pull requests.
 [rfcbot]: https://github.com/anp/rfcbot-rs/
 [RFCs]: https://github.com/rust-lang/rfcs
 
-## Helpful links and information
+## 役立つリンクと情報
 
-This section has moved to the ["About this guide"] chapter.
+このセクションは["About this guide"]章に移動しました。
 
 ["About this guide"]: about-this-guide.md#other-places-to-find-information
 [search existing issues]: https://github.com/rust-lang/rust/issues?q=is%3Aissue

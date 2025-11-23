@@ -1,76 +1,61 @@
-# The solver
+# ソルバー
 
-Also consider reading the documentation for [the recursive solver in chalk][chalk]
-as it is very similar to this implementation and also talks about limitations of this
-approach.
+[chalkの再帰的ソルバー][chalk]のドキュメントも参照してください。
+この実装に非常に似ており、このアプローチの制限についても説明しています。
 
 [chalk]: https://rust-lang.github.io/chalk/book/recursive.html
 
-## A rough walkthrough
+## 大まかなウォークスルー
 
-The entry-point of the solver is `InferCtxtEvalExt::evaluate_root_goal`. This
-function sets up the root `EvalCtxt` and then calls `EvalCtxt::evaluate_goal`,
-to actually enter the trait solver.
+ソルバーのエントリーポイントは`InferCtxtEvalExt::evaluate_root_goal`です。この
+関数はルート`EvalCtxt`をセットアップし、次に`EvalCtxt::evaluate_goal`を呼び出して、
+実際にトレイトソルバーに入ります。
 
-`EvalCtxt::evaluate_goal` handles [canonicalization](./canonicalization.md), caching,
-overflow, and solver cycles. Once that is done, it creates a nested `EvalCtxt` with a
-separate local `InferCtxt` and calls `EvalCtxt::compute_goal`, which is responsible for the
-'actual solver behavior'. We match on the `PredicateKind`, delegating to a separate function
-for each one.
+`EvalCtxt::evaluate_goal`は、[正規化](./canonicalization.md)、キャッシング、
+オーバーフロー、およびソルバーサイクルを処理します。それが完了すると、別のローカル`InferCtxt`を持つネストされた`EvalCtxt`を作成し、`EvalCtxt::compute_goal`を呼び出します。これは
+「実際のソルバー動作」を担当します。`PredicateKind`にマッチし、それぞれに対して別の関数に委譲します。
 
-For trait goals, such a `Vec<T>: Clone`, `EvalCtxt::compute_trait_goal` has
-to collect all the possible ways this goal can be proven via
-`EvalCtxt::assemble_and_evaluate_candidates`. Each candidate is handled in
-a separate "probe", to not leak inference constraints to the other candidates.
-We then try to merge the assembled candidates via `EvalCtxt::merge_candidates`.
+`Vec<T>: Clone`のようなトレイトゴールの場合、`EvalCtxt::compute_trait_goal`は
+`EvalCtxt::assemble_and_evaluate_candidates`を介してこのゴールを証明できるすべての可能な方法を収集する必要があります。各候補は、他の候補に推論制約をリークしないように、別の「プローブ」で処理されます。
+次に、`EvalCtxt::merge_candidates`を介して組み立てられた候補をマージしようとします。
 
 
-## Important concepts and design patterns
+## 重要な概念と設計パターン
 
 ### `EvalCtxt::add_goal`
 
-To prove nested goals, we don't directly call `EvalCtxt::compute_goal`, but instead
-add the goal to the `EvalCtxt` with `EvalCtxt::all_goal`. We then prove all nested
-goals together in either `EvalCtxt::try_evaluate_added_goals` or
-`EvalCtxt::evaluate_added_goals_and_make_canonical_response`. This allows us to handle
-inference constraints from later goals.
+ネストされたゴールを証明するために、`EvalCtxt::compute_goal`を直接呼び出すのではなく、
+代わりに`EvalCtxt::all_goal`でゴールを`EvalCtxt`に追加します。次に、すべてのネストされた
+ゴールを`EvalCtxt::try_evaluate_added_goals`または
+`EvalCtxt::evaluate_added_goals_and_make_canonical_response`のいずれかで一緒に証明します。これにより、
+後のゴールからの推論制約を処理できます。
 
-E.g. if we have both `?x: Debug` and `(): ConstrainToU8<?x>` as nested goals,
-then proving `?x: Debug` is initially ambiguous, but after proving `(): ConstrainToU8<?x>`
-we constrain `?x` to `u8` and proving `u8: Debug` succeeds.
+たとえば、`?x: Debug`と`(): ConstrainToU8<?x>`の両方をネストされたゴールとして持っている場合、
+`?x: Debug`を証明することは最初は曖昧ですが、`(): ConstrainToU8<?x>`を証明した後は
+`?x`を`u8`に制約し、`u8: Debug`を証明することは成功します。
 
-### Matching on `TyKind`
+### `TyKind`でのマッチング
 
-We lazily normalize types in the solver, so we always have to assume that any types
-and constants are potentially unnormalized. This means that matching on `TyKind` can easily
-be incorrect.
+ソルバーで型を遅延正規化するため、型と
+定数が潜在的に非正規化されていると常に仮定する必要があります。これは、`TyKind`でのマッチングが簡単に不正確になる可能性があることを意味します。
 
-We handle normalization in two different ways. When proving `Trait` goals when normalizing
-associated types, we separately assemble candidates depending on whether they structurally
-match the self type. Candidates which match on the self type are handled in
-`EvalCtxt::assemble_candidates_via_self_ty` which recurses via
-`EvalCtxt::assemble_candidates_after_normalizing_self_ty`, which normalizes the self type
-by one level. In all other cases we have to match on a `TyKind` we first use
-`EvalCtxt::try_normalize_ty` to normalize the type as much as possible.
+正規化は2つの異なる方法で処理します。関連型を正規化する際に`Trait`ゴールを証明する際、
+自己型に構造的に一致するかどうかに応じて候補を別々に組み立てます。自己型にマッチする候補は、
+自己型を1レベル正規化する`EvalCtxt::assemble_candidates_after_normalizing_self_ty`を介して再帰する`EvalCtxt::assemble_candidates_via_self_ty`で処理されます。他のすべての場合で`TyKind`にマッチする必要がある場合、最初に
+`EvalCtxt::try_normalize_ty`を使用して型を可能な限り正規化します。
 
-### Higher ranked goals
+### 高階ランクのゴール
 
-In case the goal is higher-ranked, e.g. `for<'a> F: FnOnce(&'a ())`, `EvalCtxt::compute_goal`
-eagerly instantiates `'a` with a placeholder and then recursively proves
-`F: FnOnce(&'!a ())` as a nested goal.
+ゴールが高階ランクの場合、例えば`for<'a> F: FnOnce(&'a ())`、`EvalCtxt::compute_goal`は
+`'a`をプレースホルダで熱心にインスタンス化し、次に再帰的に
+`F: FnOnce(&'!a ())`をネストされたゴールとして証明します。
 
-### Dealing with choice
+### 選択の扱い
 
-Some goals can be proven in multiple ways. In these cases we try each option in
-a separate "probe" and then attempt to merge the resulting responses by using
-`EvalCtxt::try_merge_responses`. If merging the responses fails, we use
-`EvalCtxt::flounder` instead, returning ambiguity. For some goals, we try to
-incompletely prefer some choices over others in case `EvalCtxt::try_merge_responses`
-fails.
+一部のゴールは複数の方法で証明できます。これらの場合、各オプションを
+別の「プローブ」で試し、次に`EvalCtxt::try_merge_responses`を使用して結果のレスポンスをマージしようとします。レスポンスのマージに失敗した場合、代わりに`EvalCtxt::flounder`を使用して曖昧性を返します。一部のゴールでは、`EvalCtxt::try_merge_responses`が
+失敗した場合に、一部の選択を他の選択よりも不完全に優先しようとします。
 
-## Learning more
+## さらに学ぶ
 
-The solver should be fairly self-contained. I hope that the above information provides a
-good foundation when looking at the code itself. Please reach out on Zulip if you get stuck
-while doing so or there are some quirks and design decisions which were unclear and deserve
-better comments or should be mentioned here.
+ソルバーはかなり自己完結型であるべきです。上記の情報が、コード自体を見る際に良い基盤を提供することを願っています。行き詰まった場合、またはいくつかの特異性や設計決定が不明確で、より良いコメントに値するか、ここで言及すべき場合は、Zulipで連絡してください。

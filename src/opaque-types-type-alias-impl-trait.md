@@ -1,22 +1,22 @@
-# Opaque types (type alias `impl Trait`)
+# 不透明型（型エイリアス `impl Trait`）
 
-Opaque types are syntax to declare an opaque type alias that only
-exposes a specific set of traits as their interface; the concrete type in the
-background is inferred from a certain set of use sites of the opaque type.
+不透明型は、インターフェースとして特定のトレイトセットのみを公開する
+不透明な型エイリアスを宣言する構文です。背後にある具体的な型は、
+不透明型の特定の使用サイトのセットから推論されます。
 
-This is expressed by using `impl Trait` within type aliases, for example:
+これは型エイリアス内で`impl Trait`を使用することで表現されます。例えば：
 
 ```rust,ignore
 type Foo = impl Bar;
 ```
 
-This declares an opaque type named `Foo`, of which the only information is that
-it implements `Bar`. Therefore, any of `Bar`'s interface can be used on a `Foo`,
-but nothing else (regardless of whether it implements any other traits).
+これは`Foo`という名前の不透明型を宣言し、その唯一の情報は
+`Bar`を実装していることです。したがって、`Bar`のインターフェースは`Foo`に対して使用できますが、
+それ以外は使用できません（他のトレイトを実装しているかどうかに関わらず）。
 
-Since there needs to be a concrete background type,
-you can (as of <!-- date-check --> January 2021) express that type
-by using the opaque type in a "defining use site".
+具体的な背後の型が必要なため、
+（<!-- date-check --> 2021年1月現在）「定義使用サイト」で
+その型を表現できます。
 
 ```rust,ignore
 struct Struct;
@@ -26,27 +26,25 @@ fn foo() -> Foo {
 }
 ```
 
-Any other "defining use site" needs to produce the exact same type.
+他の「定義使用サイト」は、全く同じ型を生成する必要があります。
 
-## Defining use site(s)
+## 定義使用サイト
 
-Currently only the return value of a function can be a defining use site
-of an opaque type (and only if the return type of that function contains
-the opaque type).
+現在、関数の戻り値のみが不透明型の定義使用サイトになることができます
+（そして、その関数の戻り型が不透明型を含む場合のみ）。
 
-The defining use of an opaque type can be any code *within* the parent
-of the opaque type definition. This includes any siblings of the
-opaque type and all children of the siblings.
+不透明型の定義使用は、不透明型定義の親内の任意のコードになることができます。
+これには、不透明型の任意の兄弟と、
+兄弟のすべての子が含まれます。
 
-The initiative for *"not causing fatal brain damage to developers due to
-accidentally running infinite loops in their brain while trying to
-comprehend what the type system is doing"* has decided to disallow children
-of opaque types to be defining use sites.
+*「開発者の脳が型システムが何をしているのかを理解しようとして
+偶発的に無限ループを実行することによる致命的な脳損傷を引き起こさない」*
+という取り組みは、不透明型の子が定義使用サイトになることを禁止することを決定しました。
 
-### Associated opaque types
+### 関連不透明型
 
-Associated opaque types can be defined by any other associated item
-on the same trait `impl` or a child of these associated items. For instance:
+関連不透明型は、同じトレイト`impl`の他の関連アイテムまたは
+これらの関連アイテムの子によって定義できます。例えば：
 
 ```rust,ignore
 trait Baz {

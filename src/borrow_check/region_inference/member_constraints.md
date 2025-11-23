@@ -1,45 +1,30 @@
-# Member constraints
+# メンバー制約
 
-A member constraint `'m member of ['c_1..'c_N]` expresses that the
-region `'m` must be *equal* to some **choice regions** `'c_i` (for
-some `i`). These constraints cannot be expressed by users, but they
-arise from `impl Trait` due to its lifetime capture rules. Consider a
-function such as the following:
+メンバー制約 `'m member of ['c_1..'c_N]` は、領域 `'m` が何らかの**選択領域** `'c_i`（いくつかの `i` について）と*等しく*なければならないことを表現します。これらの制約はユーザーによって表現することはできませんが、ライフタイムキャプチャルールのため、`impl Trait` から生じます。次のような関数を考えてみましょう:
 
 ```rust,ignore
 fn make(a: &'a u32, b: &'b u32) -> impl Trait<'a, 'b> { .. }
 ```
 
-Here, the true return type (often called the "hidden type") is only
-permitted to capture the lifetimes `'a` or `'b`. You can kind of see
-this more clearly by desugaring that `impl Trait` return type into its
-more explicit form:
+ここで、真の戻り値型（しばしば「隠れた型」と呼ばれる）は、ライフタイム `'a` または `'b` のみをキャプチャすることが許可されます。`impl Trait` 戻り値型をより明示的な形式に脱糖することで、これをより明確に見ることができます:
 
 ```rust,ignore
 type MakeReturn<'x, 'y> = impl Trait<'x, 'y>;
 fn make(a: &'a u32, b: &'b u32) -> MakeReturn<'a, 'b> { .. }
 ```
 
-Here, the idea is that the hidden type must be some type that could
-have been written in place of the `impl Trait<'x, 'y>` -- but clearly
-such a type can only reference the regions `'x` or `'y` (or
-`'static`!), as those are the only names in scope. This limitation is
-then translated into a restriction to only access `'a` or `'b` because
-we are returning `MakeReturn<'a, 'b>`, where `'x` and `'y` have been
-replaced with `'a` and `'b` respectively.
+ここでのアイデアは、隠れた型は `impl Trait<'x, 'y>` の代わりに書かれた可能性のある型でなければならないということです -- しかし、そのような型はスコープ内にある名前である領域 `'x` または `'y`（または `'static`!）のみを参照できることは明らかです。この制限は、`'a` または `'b` のみにアクセスする制限に変換されます。なぜなら、`MakeReturn<'a, 'b>` を返しているため、`'x` と `'y` がそれぞれ `'a` と `'b` に置き換えられているからです。
 
-## Detailed example
+## 詳細な例
 
-To help us explain member constraints in more detail, let's spell out
-the `make` example in a bit more detail. First off, let's assume that
-you have some dummy trait:
+メンバー制約をより詳細に説明するために、`make` の例をもう少し詳しく説明しましょう。まず、いくつかのダミートレイトがあると仮定します:
 
 ```rust,ignore
 trait Trait<'a, 'b> { }
 impl<T> Trait<'_, '_> for T { }
 ```
 
-and this is the `make` function (in desugared form):
+そして、これが `make` 関数です（脱糖形式）:
 
 ```rust,ignore
 type MakeReturn<'x, 'y> = impl Trait<'x, 'y>;
@@ -48,9 +33,7 @@ fn make(a: &'a u32, b: &'b u32) -> MakeReturn<'a, 'b> {
 }
 ```
 
-What happens in this case is that the return type will be `(&'0 u32, &'1 u32)`,
-where `'0` and `'1` are fresh region variables. We will have the following
-region constraints:
+この場合に起こることは、戻り値型が `(&'0 u32, &'1 u32)` になることです。ここで、`'0` と `'1` は新しい領域変数です。次の領域制約があります:
 
 ```txt
 '0 live at {L}
@@ -61,131 +44,58 @@ region constraints:
 '1 member of ['a, 'b, 'static]
 ```
 
-Here the "liveness set" `{L}` corresponds to that subset of the body
-where `'0` and `'1` are live -- basically the point from where the
-return tuple is constructed to where it is returned (in fact, `'0` and
-`'1` might have slightly different liveness sets, but that's not very
-interesting to the point we are illustrating here).
+ここで、「生存性セット」`{L}` は、`'0` と `'1` が生きている本体のサブセットに対応します -- 基本的に、戻りタプルが構築されてから返されるまでのポイントです（実際には、`'0` と `'1` は若干異なる生存性セットを持つ可能性がありますが、ここで説明しているポイントにはあまり興味深くありません）。
 
-The `'a: '0` and `'b: '1` constraints arise from subtyping. When we
-construct the `(a, b)` value, it will be assigned type `(&'0 u32, &'1
-u32)` -- the region variables reflect that the lifetimes of these
-references could be made smaller. For this value to be created from
-`a` and `b`, however, we do require that:
+`'a: '0` と `'b: '1` 制約はサブタイピングから生じます。`(a, b)` 値を構築するとき、型 `(&'0 u32, &'1 u32)` が割り当てられます -- 領域変数は、これらの参照のライフタイムが小さくなる可能性があることを反映しています。この値が `a` と `b` から作成されるためには、次のことが必要です:
 
 ```txt
 (&'a u32, &'b u32) <: (&'0 u32, &'1 u32)
 ```
 
-which means in turn that `&'a u32 <: &'0 u32` and hence that `'a: '0`
-(and similarly that `&'b u32 <: &'1 u32`, `'b: '1`).
+これは、`&'a u32 <: &'0 u32` したがって `'a: '0` を意味します（同様に `&'b u32 <: &'1 u32`、`'b: '1`）。
 
-Note that if we ignore member constraints, the value of `'0` would be
-inferred to some subset of the function body (from the liveness
-constraints, which we did not write explicitly). It would never become
-`'a`, because there is no need for it too -- we have a constraint that
-`'a: '0`, but that just puts a "cap" on how *large* `'0` can grow to
-become. Since we compute the *minimal* value that we can, we are happy
-to leave `'0` as being just equal to the liveness set. This is where
-member constraints come in.
+メンバー制約を無視すると、`'0` の値は生存性制約から関数本体のサブセットに推論されることに注意してください（これは明示的に書きませんでした）。`'a: '0` という制約があるだけで、`'0` がどれだけ*大きく*なることができるかについての「上限」を置くだけなので、`'a` になることはありません。*最小*の値を計算するので、`'0` を生存性セットと等しいままにしておくことで満足です。ここでメンバー制約が登場します。
 
-## Choices are always lifetime parameters
+## 選択は常にライフタイムパラメータです
 
-At present, the "choice" regions from a member constraint are always lifetime
-parameters from the current function. As of <!-- date-check --> October 2021,
-this falls out from the placement of impl Trait, though in the future it may not
-be the case. We take some advantage of this fact, as it simplifies the current
-code. In particular, we don't have to consider a case like `'0 member of ['1,
-'static]`, in which the value of both `'0` and `'1` are being inferred and hence
-changing. See [rust-lang/rust#61773][#61773] for more information.
+現在、メンバー制約からの「選択」領域は常に現在の関数からのライフタイムパラメータです。<!-- date-check --> 2021 年 10 月の時点で、これは impl Trait の配置から生じますが、将来的にはそうではないかもしれません。現在のコードを単純化するため、この事実をある程度利用しています。特に、`'0 member of ['1, 'static]` のようなケースを考慮する必要はありません。ここで、`'0` と `'1` の両方の値が推論され、変化しています。詳細については、[rust-lang/rust#61773][#61773] を参照してください。
 
 [#61773]: https://github.com/rust-lang/rust/issues/61773
 
-## Applying member constraints
+## メンバー制約の適用
 
-Member constraints are a bit more complex than other forms of
-constraints. This is because they have a "or" quality to them -- that
-is, they describe multiple choices that we must select from. E.g., in
-our example constraint `'0 member of ['a, 'b, 'static]`, it might be
-that `'0` is equal to `'a`, `'b`, *or* `'static`. How can we pick the
-correct one?  What we currently do is to look for a *minimal choice*
--- if we find one, then we will grow `'0` to be equal to that minimal
-choice. To find that minimal choice, we take two factors into
-consideration: lower and upper bounds.
+メンバー制約は他の形式の制約よりも少し複雑です。これは、それらに「または」の性質があるためです -- つまり、選択する必要がある複数の選択肢を記述しています。例えば、例の制約 `'0 member of ['a, 'b, 'static]` では、`'0` は `'a`、`'b`、*または* `'static` と等しい可能性があります。正しいものをどのように選択できますか？現在行っていることは、*最小の選択*を探すことです -- 見つかった場合、`'0` をその最小の選択と等しくなるように拡大します。その最小の選択を見つけるために、2 つの要素を考慮に入れます: 下限と上限。
 
-### Lower bounds
+### 下限
 
-The *lower bounds* are those lifetimes that `'0` *must outlive* --
-i.e., that `'0` must be larger than. In fact, when it comes time to
-apply member constraints, we've already *computed* the lower bounds of
-`'0` because we computed its minimal value (or at least, the lower
-bounds considering everything but member constraints).
+*下限*は、`'0` が*生存しなければならない*ライフタイム -- つまり、`'0` がより大きくなければならないライフタイムです。実際、メンバー制約を適用する時点で、`'0` の下限を既に*計算*しています。なぜなら、その最小値を計算したからです（または少なくとも、メンバー制約以外のすべてを考慮した下限）。
 
-Let `LB` be the current value of `'0`. We know then that `'0: LB` must
-hold, whatever the final value of `'0` is. Therefore, we can rule out
-any choice `'choice` where `'choice: LB` does not hold.
+`LB` を `'0` の現在の値とします。`'0` の最終値が何であれ、`'0: LB` が成立しなければならないことがわかります。したがって、`'choice: LB` が成立しない選択 `'choice` を除外できます。
 
-Unfortunately, in our example, this is not very helpful. The lower
-bound for `'0` will just be the liveness set `{L}`, and we know that
-all the lifetime parameters outlive that set. So we are left with the
-same set of choices here. (But in other examples, particularly those
-with different variance, lower bound constraints may be relevant.)
+残念ながら、この例では、これはあまり役に立ちません。`'0` の下限は生存性セット `{L}` だけで、すべてのライフタイムパラメータがそのセットを生存することがわかっています。したがって、ここでは同じ選択肢のセットが残ります。（しかし、他の例、特に異なる分散を持つ例では、下限制約が関連する可能性があります。）
 
-### Upper bounds
+### 上限
 
-The *upper bounds* are those lifetimes that *must outlive* `'0` --
-i.e., that `'0` must be *smaller* than. In our example, this would be
-`'a`, because we have the constraint that `'a: '0`. In more complex
-examples, the chain may be more indirect.
+*上限*は、`'0` を*生存しなければならない*ライフタイム -- つまり、`'0` が*小さく*なければならないライフタイムです。この例では、`'a: '0` という制約があるため、これは `'a` になります。より複雑な例では、チェーンはより間接的である可能性があります。
 
-We can use upper bounds to rule out members in a very similar way to
-lower bounds. If UB is some upper bound, then we know that `UB:
-'0` must hold, so we can rule out any choice `'choice` where `UB:
-'choice` does not hold.
+下限と非常に似た方法で上限を使用して、メンバーを除外できます。UB がある上限である場合、`UB: '0` が成立しなければならないことがわかっているため、`UB: 'choice` が成立しない選択 `'choice` を除外できます。
 
-In our example, we would be able to reduce our choice set from `['a,
-'b, 'static]` to just `['a]`. This is because `'0` has an upper bound
-of `'a`, and neither `'a: 'b` nor `'a: 'static` is known to hold.
+この例では、選択セットを `['a, 'b, 'static]` から `['a]` だけに減らすことができます。これは、`'0` の上限が `'a` であり、`'a: 'b` も `'a: 'static` も成立することが知られていないためです。
 
-(For notes on how we collect upper bounds in the implementation, see
-[the section below](#collecting).)
+（実装で上限を収集する方法に関する注意事項については、[以下のセクション](#collecting) を参照してください。）
 
-### Minimal choice
+### 最小の選択
 
-After applying lower and upper bounds, we can still sometimes have
-multiple possibilities. For example, imagine a variant of our example
-using types with the opposite variance. In that case, we would have
-the constraint `'0: 'a` instead of `'a: '0`. Hence the current value
-of `'0` would be `{L, 'a}`. Using this as a lower bound, we would be
-able to narrow down the member choices to `['a, 'static]` because `'b:
-'a` is not known to hold (but `'a: 'a` and `'static: 'a` do hold). We
-would not have any upper bounds, so that would be our final set of choices.
+下限と上限を適用した後も、複数の可能性が残っている場合があります。例えば、反対の分散を持つ型を使用した例のバリアントを想像してください。その場合、`'a: '0` の代わりに制約 `'0: 'a` があります。したがって、`'0` の現在の値は `{L, 'a}` になります。これを下限として使用すると、メンバーの選択肢を `['a, 'static]` に絞り込むことができます。なぜなら、`'b: 'a` が成立することは知られていないからです（しかし、`'a: 'a` と `'static: 'a` は成立します）。上限はないため、それが最終的な選択肢のセットになります。
 
-In that case, we apply the **minimal choice** rule -- basically, if
-one of our choices if smaller than the others, we can use that. In
-this case, we would opt for `'a` (and not `'static`).
+その場合、**最小の選択**ルールを適用します -- 基本的に、選択肢の 1 つが他のものより小さい場合、それを使用できます。この場合、`'a`（`'static` ではなく）を選択します。
 
-This choice is consistent with the general 'flow' of region
-propagation, which always aims to compute a minimal value for the
-region being inferred. However, it is somewhat arbitrary.
+この選択は、常に推論される領域の最小値を計算することを目指す領域伝播の一般的な「フロー」と一致しています。ただし、それは多少恣意的です。
 
 <a id="collecting"></a>
 
-### Collecting upper bounds in the implementation
+### 実装での上限の収集
 
-In practice, computing upper bounds is a bit inconvenient, because our
-data structures are setup for the opposite. What we do is to compute
-the **reverse SCC graph** (we do this lazily and cache the result) --
-that is, a graph where `'a: 'b` induces an edge `SCC('b) ->
-SCC('a)`. Like the normal SCC graph, this is a DAG. We can then do a
-depth-first search starting from `SCC('0)` in this graph. This will
-take us to all the SCCs that must outlive `'0`.
+実際には、上限を計算するのは少し不便です。なぜなら、データ構造が反対に設定されているためです。行うことは、**逆 SCC グラフ**を計算することです（これを遅延的に行い、結果をキャッシュします） -- つまり、`'a: 'b` がエッジ `SCC('b) -> SCC('a)` を誘導するグラフです。通常の SCC グラフと同様に、これは DAG です。次に、このグラフで `SCC('0)` から開始して深さ優先検索を実行できます。これにより、`'0` を生存しなければならないすべての SCC に移動します。
 
-One wrinkle is that, as we walk the "upper bound" SCCs, their values
-will not yet have been fully computed. However, we **have** already
-applied their liveness constraints, so we have some information about
-their value. In particular, for any regions representing lifetime
-parameters, their value will contain themselves (i.e., the initial
-value for `'a` includes `'a` and the value for `'b` contains `'b`). So
-we can collect all of the lifetime parameters that are reachable,
-which is precisely what we are interested in.
+1 つのしわは、「上限」SCC を歩くとき、それらの値はまだ完全に計算されていないことです。ただし、生存性制約を**既に**適用しているため、その値に関するいくつかの情報があります。特に、ライフタイムパラメータを表す領域については、その値は自分自身を含みます（つまり、`'a` の初期値は `'a` を含み、`'b` の値は `'b` を含みます）。したがって、到達可能なすべてのライフタイムパラメータを収集できます。これは、まさに関心のあるものです。

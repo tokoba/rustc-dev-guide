@@ -1,80 +1,79 @@
-# Profiling with perf
+# perfを使ったプロファイリング
 
-This is a guide for how to profile rustc with [perf](https://perf.wiki.kernel.org/index.php/Main_Page).
+これは[perf](https://perf.wiki.kernel.org/index.php/Main_Page)を使ってrustcをプロファイリングする方法のガイドです。
 
-## Initial steps
+## 初期手順
 
-- Get a clean checkout of rust-lang/rust
-- Set the following settings in your `bootstrap.toml`:
-  - `rust.debuginfo-level = 1` - enables line debuginfo
-  - `rust.jemalloc = false` - lets you do memory use profiling with valgrind
-  - leave everything else the defaults
-- Run `./x build` to get a full build
-- Make a rustup toolchain pointing to that result
-  - see [the "build and run" section for instructions][b-a-r]
+- rust-lang/rustのクリーンなチェックアウトを取得します
+- `bootstrap.toml`で以下の設定を行います:
+  - `rust.debuginfo-level = 1` - 行デバッグ情報を有効にします
+  - `rust.jemalloc = false` - valgrindでメモリ使用量のプロファイリングができるようになります
+  - それ以外はすべてデフォルトのままにします
+- `./x build`を実行してフルビルドを取得します
+- その結果を指すrustupツールチェーンを作成します
+  - 手順については[「ビルドと実行」セクション][b-a-r]を参照してください
 
 [b-a-r]: ../building/how-to-build-and-run.html#toolchain
 
-## Gathering a perf profile
+## perfプロファイルの収集
 
-perf is an excellent tool on linux that can be used to gather and
-analyze all kinds of information. Mostly it is used to figure out
-where a program spends its time. It can also be used for other sorts
-of events, though, like cache misses and so forth.
+perfは、あらゆる種類の情報を収集および分析するために使用できるLinux上の優れたツールです。
+主にプログラムがどこで時間を費やしているかを把握するために使用されます。
+ただし、キャッシュミスなどの他の種類のイベントにも使用できます。
 
-### The basics
+### 基本
 
-The basic `perf` command is this:
+基本的な`perf`コマンドは次のとおりです:
 
 ```bash
 perf record -F99 --call-graph dwarf XXX
 ```
 
-The `-F99` tells perf to sample at 99 Hz, which avoids generating too
-much data for longer runs (why 99 Hz you ask? It is often chosen
-because it is unlikely to be in lockstep with other periodic
-activity). The `--call-graph dwarf` tells perf to get call-graph
-information from debuginfo, which is accurate. The `XXX` is the
-command you want to profile. So, for example, you might do:
+`-F99`はperfに99Hzでサンプリングするように指示します。これにより、
+長時間の実行で大量のデータを生成することを避けられます
+(なぜ99Hzなのかって? これは他の周期的な活動とロックステップになる可能性が低いため、
+よく選ばれます)。`--call-graph dwarf`はperfにデバッグ情報から
+コールグラフ情報を取得するように指示します。これは正確です。`XXX`は
+プロファイリングしたいコマンドです。例えば、次のようにします:
 
 ```bash
 perf record -F99 --call-graph dwarf cargo +<toolchain> rustc
 ```
 
-to run `cargo` -- here `<toolchain>` should be the name of the toolchain
-you made in the beginning. But there are some things to be aware of:
+`cargo`を実行します -- ここで`<toolchain>`は最初に作成したツールチェーンの名前です。
+ただし、注意すべき点がいくつかあります:
 
-- You probably don't want to profile the time spend building
-  dependencies. So something like `cargo build; cargo clean -p $C` may
-  be helpful (where `$C` is the crate name)
-    - Though usually I just do `touch src/lib.rs` and rebuild instead. =)
-- You probably don't want incremental messing about with your
-  profile. So something like `CARGO_INCREMENTAL=0` can be helpful.
+- 依存関係のビルドに費やされる時間をプロファイリングしたくないでしょう。
+  そのため、`cargo build; cargo clean -p $C`のようなものが役立つかもしれません
+  (`$C`はクレート名です)
+    - ただし、通常は`touch src/lib.rs`を実行して代わりに再ビルドします。=)
+- インクリメンタルがプロファイルに干渉しないようにしたいでしょう。
+  そのため、`CARGO_INCREMENTAL=0`のようなものが役立ちます。
 
-In case to avoid the issue of `addr2line xxx/elf: could not read first record` when reading
-collected data from `cargo`, you may need use the latest version of `addr2line`:
+`cargo`から収集したデータを読み取るときに`addr2line xxx/elf: could not read first record`
+の問題を回避するには、最新バージョンの`addr2line`を使用する必要がある場合があります:
 
 ```bash
 cargo install addr2line --features="bin"
 ```
 
-### Gathering a perf profile from a `perf.rust-lang.org` test
+### `perf.rust-lang.org`テストからのperfプロファイルの収集
 
-Often we want to analyze a specific test from `perf.rust-lang.org`.
-The easiest way to do that is to use the [rustc-perf][rustc-perf]
-benchmarking suite, this approach is described [here](with_rustc_perf.md).
+多くの場合、`perf.rust-lang.org`の特定のテストを分析したいと思います。
+これを行う最も簡単な方法は、[rustc-perf][rustc-perf]
+ベンチマークスイートを使用することです。このアプローチは[こちら](with_rustc_perf.md)で説明されています。
 
-Instead of using the benchmark suite CLI, you can also profile the benchmarks manually. First,
-you need to clone the [rustc-perf][rustc-perf] repository:
+ベンチマークスイートCLIを使用する代わりに、ベンチマークを手動でプロファイリングすることもできます。まず、
+[rustc-perf][rustc-perf]リポジトリをクローンする必要があります:
 
 ```bash
 $ git clone https://github.com/rust-lang/rustc-perf
 ```
 
-and then find the source code of the test that you want to profile. Sources for the tests
-are found in [the `collector/compile-benchmarks` directory][compile-time dir]
-and [the `collector/runtime-benchmarks` directory][runtime dir]. So let's
-go into the directory of a specific test; we'll use `clap-rs` as an example:
+次に、プロファイリングしたいテストのソースコードを見つけます。テストのソースは
+[`collector/compile-benchmarks`ディレクトリ][compile-time dir]と
+[`collector/runtime-benchmarks`ディレクトリ][runtime dir]にあります。
+では、特定のテストのディレクトリに移動しましょう; 例として`clap-rs`を使用します:
 
 [rustc-perf]: https://github.com/rust-lang/rustc-perf
 [compile-time dir]: https://github.com/rust-lang/rustc-perf/tree/master/collector/compile-benchmarks
@@ -84,53 +83,50 @@ go into the directory of a specific test; we'll use `clap-rs` as an example:
 cd collector/compile-benchmarks/clap-3.1.6
 ```
 
-In this case, let's say we want to profile the `cargo check`
-performance. In that case, I would first run some basic commands to
-build the dependencies:
+この場合、`cargo check`のパフォーマンスをプロファイリングしたいとしましょう。
+その場合、まず依存関係をビルドするための基本的なコマンドを実行します:
 
 ```bash
-# Setup: first clean out any old results and build the dependencies:
+# セットアップ: まず古い結果をクリーンアップし、依存関係をビルドします:
 cargo +<toolchain> clean
 CARGO_INCREMENTAL=0 cargo +<toolchain> check
 ```
 
-(Again, `<toolchain>` should be replaced with the name of the
-toolchain we made in the first step.)
+(ここでも、`<toolchain>`は最初の手順で作成したツールチェーンの名前に置き換える必要があります。)
 
-Next: we want record the execution time for *just* the clap-rs crate,
-running cargo check. I tend to use `cargo rustc` for this, since it
-also allows me to add explicit flags, which we'll do later on.
+次に: clap-rsクレート*のみ*の実行時間を記録し、cargo checkを実行します。
+私は通常、このために`cargo rustc`を使用します。これにより、明示的なフラグを追加することもできます。
+これは後で行います。
 
 ```bash
 touch src/lib.rs
 CARGO_INCREMENTAL=0 perf record -F99 --call-graph dwarf cargo rustc --profile check --lib
 ```
 
-Note that final command: it's a doozy! It uses the `cargo rustc`
-command, which executes rustc with (potentially) additional options;
-the `--profile check` and `--lib` options specify that we are doing a
-`cargo check` execution, and that this is a library (not a binary).
+最後のコマンドに注目してください: これは大変です! `cargo rustc`
+コマンドを使用しています。これは(潜在的に)追加オプションを指定してrustcを実行します。
+`--profile check`と`--lib`オプションは、`cargo check`の実行であり、
+これがライブラリ(バイナリではない)であることを指定します。
 
-At this point, we can use `perf` tooling to analyze the results. For example:
+この時点で、`perf`ツールを使用して結果を分析できます。例えば:
 
 ```bash
 perf report
 ```
 
-will open up an interactive TUI program. In simple cases, that can be
-helpful. For more detailed examination, the [`perf-focus` tool][pf]
-can be helpful; it is covered below.
+これにより、インタラクティブなTUIプログラムが開きます。単純なケースでは、
+これが役立つことがあります。より詳細な調査には、[`perf-focus`ツール][pf]
+が役立ちます。これについては以下で説明します。
 
-**A note of caution.** Each of the rustc-perf tests is its own special
-  snowflake. In particular, some of them are not libraries, in which
-  case you would want to do `touch src/main.rs` and avoid passing
-  `--lib`. I'm not sure how best to tell which test is which to be
-  honest.
+**注意。** rustc-perfテストはそれぞれ特別な雪の結晶です。特に、
+一部はライブラリではないため、`touch src/main.rs`を実行し、
+`--lib`を渡さないようにします。どのテストがどれであるかを
+最適に判断する方法はわかりません。
 
-### Gathering NLL data
+### NLLデータの収集
 
-If you want to profile an NLL run, you can just pass extra options to
-the `cargo rustc` command, like so:
+NLL実行をプロファイリングしたい場合は、次のように`cargo rustc`コマンドに
+追加のオプションを渡すだけです:
 
 ```bash
 touch src/lib.rs
@@ -139,40 +135,38 @@ CARGO_INCREMENTAL=0 perf record -F99 --call-graph dwarf cargo rustc --profile ch
 
 [pf]: https://github.com/nikomatsakis/perf-focus
 
-## Analyzing a perf profile with `perf focus`
+## `perf focus`でperfプロファイルを分析する
 
-Once you've gathered a perf profile, we want to get some information
-about it. For this, I personally use [perf focus][pf]. It's a kind of
-simple but useful tool that lets you answer queries like:
+perfプロファイルを収集したら、それについての情報を取得したいと思います。
+このために、私は個人的に[perf focus][pf]を使用しています。これは
+シンプルですが便利なツールで、次のようなクエリに答えることができます:
 
-- "how much time was spent in function F" (no matter where it was called from)
-- "how much time was spent in function F when it was called from G"
-- "how much time was spent in function F *excluding* time spent in G"
-- "what functions does F call and how much time does it spend in them"
+- 「関数Fでどれだけの時間が費やされたか」(どこから呼び出されたかに関係なく)
+- 「Gから呼び出されたときに関数Fでどれだけの時間が費やされたか」
+- 「Gで費やされた時間を*除いた*関数Fでどれだけの時間が費やされたか」
+- 「Fはどの関数を呼び出し、それらでどれだけの時間を費やしているか」
 
-To understand how it works, you have to know just a bit about
-perf. Basically, perf works by *sampling* your process on a regular
-basis (or whenever some event occurs). For each sample, perf gathers a
-backtrace. `perf focus` lets you write a regular expression that tests
-which functions appear in that backtrace, and then tells you which
-percentage of samples had a backtrace that met the regular
-expression. It's probably easiest to explain by walking through how I
-would analyze NLL performance.
+仕組みを理解するには、perfについて少しだけ知っておく必要があります。
+基本的に、perfは定期的に(または何らかのイベントが発生したときに)
+プロセスを*サンプリング*することで機能します。各サンプルについて、
+perfはバックトレースを収集します。`perf focus`を使用すると、
+バックトレースに表示される関数をテストする正規表現を記述でき、
+その正規表現を満たすバックトレースを持つサンプルの割合を示します。
+NLLパフォーマンスの分析方法を説明することで、おそらく最も簡単に説明できます。
 
-### Installing `perf-focus`
+### `perf-focus`のインストール
 
-You can install perf-focus using `cargo install`:
+`cargo install`を使用してperf-focusをインストールできます:
 
 ```bash
 cargo install perf-focus
 ```
 
-### Example: How much time is spent in MIR borrowck?
+### 例: MIR借用チェックでどれだけの時間が費やされているか?
 
-Let's say we've gathered the NLL data for a test. We'd like to know
-how much time it is spending in the MIR borrow-checker. The "main"
-function of the MIR borrowck is called `do_mir_borrowck`, so we can do
-this command:
+テスト用のNLLデータを収集したとしましょう。MIR借用チェッカーで
+どれだけの時間が費やされているかを知りたいとします。MIR borrowckの「メイン」
+関数は`do_mir_borrowck`と呼ばれるので、次のコマンドを実行できます:
 
 ```bash
 $ perf focus '{do_mir_borrowck}'
@@ -182,38 +176,37 @@ Not Matches: 542
 Percentage : 29%
 ```
 
-The `'{do_mir_borrowck}'` argument is called the **matcher**. It
-specifies the test to be applied on the backtrace. In this case, the
-`{X}` indicates that there must be *some* function on the backtrace
-that meets the regular expression `X`. In this case, that regex is
-just the name of the function we want (in fact, it's a subset of the name;
-the full name includes a bunch of other stuff, like the module
-path). In this mode, perf-focus just prints out the percentage of
-samples where `do_mir_borrowck` was on the stack: in this case, 29%.
+`'{do_mir_borrowck}'`引数は**マッチャー**と呼ばれます。これは
+バックトレースに適用されるテストを指定します。この場合、
+`{X}`は、バックトレースに正規表現`X`を満たす*何らかの*関数が
+存在する必要があることを示します。この場合、そのregexは
+必要な関数の名前だけです(実際には、名前のサブセットです;
+完全な名前には、モジュールパスなど他の多くのものが含まれます)。
+このモードでは、perf-focusは`do_mir_borrowck`がスタックにあった
+サンプルの割合を出力します: この場合、29%です。
 
-**A note about c++filt.** To get the data from `perf`, `perf focus`
-  currently executes `perf script` (perhaps there is a better
-  way...). I've sometimes found that `perf script` outputs C++ mangled
-  names. This is annoying. You can tell by running `perf script |
-  head` yourself — if you see names like `5rustc6middle` instead of
-  `rustc::middle`, then you have the same problem. You can solve this
-  by doing:
+**c++filtに関する注意。** `perf`からデータを取得するために、`perf focus`は
+現在`perf script`を実行しています(おそらくより良い方法があるでしょう...)。
+`perf script`がC++のマングル名を出力することがあることがわかりました。
+これは煩わしいです。`perf script | head`を自分で実行することで確認できます
+-- `rustc::middle`の代わりに`5rustc6middle`のような名前が表示される場合、
+同じ問題があります。これは次のようにして解決できます:
 
 ```bash
 perf script | c++filt | perf focus --from-stdin ...
 ```
 
-This will pipe the output from `perf script` through `c++filt` and
-should mostly convert those names into a more friendly format. The
-`--from-stdin` flag to `perf focus` tells it to get its data from
-stdin, rather than executing `perf focus`. We should make this more
-convenient (at worst, maybe add a `c++filt` option to `perf focus`, or
-just always use it — it's pretty harmless).
+これにより、`perf script`の出力が`c++filt`を通してパイプされ、
+それらの名前がより親しみやすい形式にほぼ変換されるはずです。
+`perf focus`への`--from-stdin`フラグは、`perf focus`を実行する代わりに、
+stdinからデータを取得するように指示します。これをより
+便利にする必要があります(最悪の場合、`perf focus`に`c++filt`オプションを追加するか、
+常に使用するようにするかもしれません -- これはかなり無害です)。
 
-### Example: How much time does MIR borrowck spend solving traits?
+### 例: MIR borrowckはトレイトの解決にどれだけの時間を費やしているか?
 
-Perhaps we'd like to know how much time MIR borrowck spends in the
-trait checker. We can ask this using a more complex regex:
+おそらく、MIR borrowckがトレイトチェッカーでどれだけの時間を費やしているかを
+知りたいと思うでしょう。より複雑な正規表現を使用してこれを尋ねることができます:
 
 ```bash
 $ perf focus '{do_mir_borrowck}..{^rustc::traits}'
@@ -223,25 +216,25 @@ Not Matches: 1311
 Percentage : 0%
 ```
 
-Here we used the `..` operator to ask "how often do we have
-`do_mir_borrowck` on the stack and then, later, some function whose
-name begins with `rustc::traits`?" (basically, code in that module). It
-turns out the answer is "almost never" — only 12 samples fit that
-description (if you ever see *no* samples, that often indicates your
-query is messed up).
+ここでは`..`演算子を使用して、「`do_mir_borrowck`がスタックにあり、
+その後、名前が`rustc::traits`で始まる何らかの関数がある頻度は?」と尋ねました
+(基本的に、そのモジュールのコード)。答えは「ほとんどない」ことがわかります
+-- この説明に当てはまるサンプルは12個だけです(サンプルが*まったく*ない場合は、
+クエリが間違っていることを示すことがよくあります)。
 
-If you're curious, you can find out exactly which samples by using the
-`--print-match` option. This will print out the full backtrace for
-each sample. The `|` at the front of the line indicates the part that
-the regular expression matched.
+興味があれば、`--print-match`オプションを使用して、
+どのサンプルかを正確に見つけることができます。これにより、
+各サンプルの完全なバックトレースが出力されます。行の先頭の`|`は、
+正規表現が一致した部分を示します。
 
-### Example: Where does MIR borrowck spend its time?
+### 例: MIR borrowckはどこで時間を費やしているか?
 
-Often we want to do more "explorational" queries. Like, we know that
-MIR borrowck is 29% of the time, but where does that time get spent?
-For that, the `--tree-callees` option is often the best tool. You
-usually also want to give `--tree-min-percent` or
-`--tree-max-depth`. The result looks like this:
+多くの場合、より「探索的な」クエリを実行したいと思います。例えば、
+MIR borrowckが29%の時間を占めていることはわかっていますが、
+その時間はどこで費やされているのでしょうか?
+そのためには、`--tree-callees`オプションが最適なツールであることがよくあります。
+通常、`--tree-min-percent`または`--tree-max-depth`も指定したいでしょう。
+結果は次のようになります:
 
 ```bash
 $ perf focus '{do_mir_borrowck}' --tree-callees --tree-min-percent 3
@@ -262,37 +255,33 @@ Tree
 : | rustc_mir_dataflow::do_dataflow (3% total, 0% self)
 ```
 
-What happens with `--tree-callees` is that
+`--tree-callees`で何が起こるかというと:
 
-- we find each sample matching the regular expression
-- we look at the code that occurs *after* the regex match and try
-  to build up a call tree
+- 正規表現に一致する各サンプルを見つけます
+- 正規表現マッチの*後*に発生するコードを見て、
+  コールツリーを構築しようとします
 
-The `--tree-min-percent 3` option says "only show me things that take
-more than 3% of the time". Without this, the tree often gets really
-noisy and includes random stuff like the innards of
-malloc. `--tree-max-depth` can be useful too, it just limits how many
-levels we print.
+`--tree-min-percent 3`オプションは、「時間の3%以上を占めるものだけを表示する」
+という意味です。これがないと、ツリーは非常にノイズが多くなり、
+mallocの内部のようなランダムなものが含まれることがよくあります。
+`--tree-max-depth`も便利です。これは単に印刷するレベル数を制限します。
 
-For each line, we display the percent of time in that function
-altogether ("total") and the percent of time spent in **just that
-function and not some callee of that function** (self). Usually
-"total" is the more interesting number, but not always.
+各行について、その関数での全体的な時間の割合(「total」)と、
+**その関数だけで費やされ、その関数の呼び出し先では費やされていない**時間の割合(self)を
+表示します。通常、「total」がより興味深い数値ですが、常にそうとは限りません。
 
-### Relative percentages
+### 相対的なパーセンテージ
 
-By default, all in perf-focus are relative to the **total program
-execution**. This is useful to help you keep perspective — often as
-we drill down to find hot spots, we can lose sight of the fact that,
-in terms of overall program execution, this "hot spot" is actually not
-important. It also ensures that percentages between different queries
-are easily compared against one another.
+デフォルトでは、perf-focusのすべては**プログラム全体の実行**に対して相対的です。
+これは、視点を保つのに役立ちます -- ホットスポットを見つけるために掘り下げていくと、
+プログラム全体の実行という観点から見れば、この「ホットスポット」は実際には
+重要ではないという事実を見失うことがよくあります。また、
+異なるクエリ間のパーセンテージを簡単に比較できるようにします。
 
-That said, sometimes it's useful to get relative percentages, so `perf
-focus` offers a `--relative` option. In this case, the percentages are
-listed only for samples that match (vs all samples). So for example we
-could get our percentages relative to the borrowck itself
-like so:
+とはいえ、相対的なパーセンテージが役立つこともあるため、`perf
+focus`には`--relative`オプションがあります。この場合、パーセンテージは
+一致するサンプル(すべてのサンプルに対して)についてのみリストされます。
+たとえば、borrowck自体に対する相対的なパーセンテージを次のように取得できます:
 
 ```bash
 $ perf focus '{do_mir_borrowck}' --tree-callees --relative --tree-max-depth 1 --tree-min-percent 5
@@ -309,7 +298,7 @@ Tree
 : | rustc_mir_dataflow::do_dataflow (8% total, 1% self) [...]
 ```
 
-Here you see that `compute_regions` came up as "47% total" — that
-means that 47% of `do_mir_borrowck` is spent in that function. Before,
-we saw 20% — that's because `do_mir_borrowck` itself is only 43% of
-the total time (and `.47 * .43 = .20`).
+ここで、`compute_regions`が「47% total」として表示されていることがわかります
+-- これは、`do_mir_borrowck`の47%がその関数で費やされていることを意味します。
+以前は20%でした -- これは`do_mir_borrowck`自体が全体時間の43%に過ぎないためです
+(そして`.47 * .43 = .20`)。

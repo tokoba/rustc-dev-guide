@@ -1,24 +1,14 @@
-# Bootstrapping the compiler
+# コンパイラのブートストラップ
 
-[*Bootstrapping*][boot] is the process of using a compiler to compile itself.
-More accurately, it means using an older compiler to compile a newer version
-of the same compiler.
+[*ブートストラップ*][boot] とは、コンパイラを使用してそれ自身をコンパイルするプロセスです。より正確には、古いコンパイラを使用して同じコンパイラの新しいバージョンをコンパイルすることを意味します。
 
-This raises a chicken-and-egg paradox: where did the first compiler come from?
-It must have been written in a different language. In Rust's case it was
-[written in OCaml][ocaml-compiler]. However, it was abandoned long ago, and the
-only way to build a modern version of rustc is with a slightly less modern
-version.
+これは鶏と卵のパラドックスを引き起こします：最初のコンパイラはどこから来たのでしょうか？それは異なる言語で書かれたに違いありません。Rust の場合、それは [OCaml で書かれました][ocaml-compiler]。しかし、それは遥か昔に放棄され、現代のバージョンの rustc をビルドする唯一の方法は、少し古いバージョンを使用することです。
 
-This is exactly how `x.py` works: it downloads the current beta release of
-rustc, then uses it to compile the new compiler.
+これはまさに `x.py` が行うことです：現在のベータリリースの rustc をダウンロードし、それを使用して新しいコンパイラをコンパイルします。
 
-In this section, we give a high-level overview of
-[what Bootstrap does](./what-bootstrapping-does.md), followed by a high-level
-introduction to [how Bootstrap does it](./how-bootstrap-does-it.md).
+このセクションでは、[ブートストラップが何をするか](./what-bootstrapping-does.md) の高レベルな概要を示し、続いて [ブートストラップがどのように動作するか](./how-bootstrap-does-it.md) の高レベルな紹介を行います。
 
-Additionally, see [debugging bootstrap](./debugging-bootstrap.md) to learn
-about debugging methods.
+さらに、デバッグ方法について学ぶには、[ブートストラップのデバッグ](./debugging-bootstrap.md) をご覧ください。
 
 [boot]: https://en.wikipedia.org/wiki/Bootstrapping_(compilers)
 [ocaml-compiler]: https://github.com/rust-lang/rust/tree/ef75860a0a72f79f97216f8aaa5b388d98da6480/src/boot

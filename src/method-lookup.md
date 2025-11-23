@@ -1,115 +1,106 @@
-# Method lookup
+# メソッド検索
 
-Method lookup can be rather complex due to the interaction of a number
-of factors, such as self types, autoderef, trait lookup, etc. This
-file provides an overview of the process. More detailed notes are in
-the code itself, naturally.
+メソッド検索は、セルフ型、自動参照外し、トレイト検索など、
+いくつかの要因の相互作用により、かなり複雑になる可能性があります。
+このファイルは、プロセスの概要を提供します。より詳細な注意事項は、
+当然ながらコード自体にあります。
 
-One way to think of method lookup is that we convert an expression of
-the form `receiver.method(...)` into a more explicit [fully-qualified syntax][]
-(formerly called [UFCS][]):
+メソッド検索を考える1つの方法は、`receiver.method(...)`という形式の式を、
+より明示的な[完全修飾構文][]（以前は[UFCS][]と呼ばれていました）に変換することです。
 
-- `Trait::method(ADJ(receiver), ...)` for a trait call
-- `ReceiverType::method(ADJ(receiver), ...)` for an inherent method call
+- トレイト呼び出しの場合は`Trait::method(ADJ(receiver), ...)`
+- 固有メソッド呼び出しの場合は`ReceiverType::method(ADJ(receiver), ...)`
 
-Here `ADJ` is some kind of adjustment, which is typically a series of
-autoderefs and then possibly an autoref (e.g., `&**receiver`). However
-we sometimes do other adjustments and coercions along the way, in
-particular unsizing (e.g., converting from `[T; n]` to `[T]`).
+ここで`ADJ`は何らかの調整であり、通常は一連の
+自動参照外しと、その後場合によっては自動参照（例：`&**receiver`）です。
+ただし、他の調整や型強制を行うこともあります。
+特に、サイズ変更（例：`[T; n]`から`[T]`への変換）を行います。
 
-Method lookup is divided into two major phases:
+メソッド検索は、2つの主要なフェーズに分かれています。
 
-1. Probing ([`probe.rs`][probe]). The probe phase is when we decide what method
-   to call and how to adjust the receiver.
-2. Confirmation ([`confirm.rs`][confirm]). The confirmation phase "applies"
-   this selection, updating the side-tables, unifying type variables, and
-   otherwise doing side-effectful things.
+1. プロービング（[`probe.rs`][probe]）。プロービングフェーズは、呼び出すメソッドと
+   レシーバーの調整方法を決定するときです。
+2. 確認（[`confirm.rs`][confirm]）。確認フェーズは、この選択を「適用」し、
+   サイドテーブルを更新し、型変数を統合し、
+   その他の副作用のあることを行います。
 
-One reason for this division is to be more amenable to caching.  The
-probe phase produces a "pick" (`probe::Pick`), which is designed to be
-cacheable across method-call sites. Therefore, it does not include
-inference variables or other information.
+この分割の理由の1つは、キャッシュにより適しているためです。
+プロービングフェーズは、「pick」（`probe::Pick`）を生成します。
+これは、メソッド呼び出しサイト全体でキャッシュ可能になるように設計されています。
+したがって、推論変数やその他の情報は含まれません。
 
 [fully-qualified syntax]: https://doc.rust-lang.org/nightly/book/ch19-03-advanced-traits.html#fully-qualified-syntax-for-disambiguation-calling-methods-with-the-same-name
 [UFCS]: https://github.com/rust-lang/rfcs/blob/master/text/0132-ufcs.md
 [probe]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir_typeck/method/probe/
 [confirm]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir_typeck/method/confirm/
 
-## The Probe phase
+## プロービングフェーズ
 
-### Steps
+### ステップ
 
-The first thing that the probe phase does is to create a series of
-*steps*. This is done by progressively dereferencing the receiver type
-until it cannot be deref'd anymore, as well as applying an optional
-"unsize" step. So if the receiver has type `Rc<Box<[T; 3]>>`, this
-might yield:
+プロービングフェーズが最初に行うことは、一連の*ステップ*を作成することです。
+これは、レシーバー型を参照外しできなくなるまで段階的に参照外しし、
+オプションの「サイズ変更」ステップを適用することによって行われます。
+したがって、レシーバーが型`Rc<Box<[T; 3]>>`を持つ場合、次のようになります。
 
 1. `Rc<Box<[T; 3]>>`
 2. `Box<[T; 3]>`
 3. `[T; 3]`
 4. `[T]`
 
-### Candidate assembly
+### 候補アセンブリ
 
-We then search along those steps to create a list of *candidates*. A
-`Candidate` is a method item that might plausibly be the method being
-invoked. For each candidate, we'll derive a "transformed self type"
-that takes into account explicit self.
+次に、これらのステップに沿って検索して、*候補*のリストを作成します。
+`Candidate`は、おそらく呼び出されているメソッドであるメソッドアイテムです。
+各候補について、明示的なセルフを考慮した「変換されたセルフ型」を導出します。
 
-Candidates are grouped into two kinds, inherent and extension.
+候補は、固有と拡張の2種類にグループ化されます。
 
-**Inherent candidates** are those that are derived from the
-type of the receiver itself.  So, if you have a receiver of some
-nominal type `Foo` (e.g., a struct), any methods defined within an
-impl like `impl Foo` are inherent methods.  Nothing needs to be
-imported to use an inherent method, they are associated with the type
-itself (note that inherent impls can only be defined in the same
-crate as the type itself).
+**固有候補**は、レシーバー自体の型から派生したものです。
+したがって、名義型`Foo`（例：構造体）のレシーバーがある場合、
+`impl Foo`のような impl 内で定義されたメソッドはすべて固有メソッドです。
+固有メソッドを使用するためにインポートする必要はありません。
+これらは型自体に関連付けられています
+（固有implは、型自体と同じクレートでのみ定義できることに注意してください）。
 
 <!--
-FIXME: Inherent candidates are not always derived from impls.  If you
-have a trait object, such as a value of type `Box<ToString>`, then the
-trait methods (`to_string()`, in this case) are inherently associated
-with it. Another case is type parameters, in which case the methods of
-their bounds are inherent. However, this part of the rules is subject
-to change: when DST's "impl Trait for Trait" is complete, trait object
-dispatch could be subsumed into trait matching, and the type parameter
-behavior should be reconsidered in light of where clauses.
+FIXME: 固有候補は常にimplから派生するとは限りません。トレイトオブジェクトがある場合、
+たとえば型`Box<ToString>`の値など、トレイトメソッド（この場合は`to_string()`）は
+本質的にそれに関連付けられています。もう1つのケースは型パラメータであり、
+その場合、境界のメソッドは固有です。ただし、ルールのこの部分は変更される可能性があります。
+DSTの「impl Trait for Trait」が完了すると、トレイトオブジェクトディスパッチは
+トレイト一致に組み込まれる可能性があり、型パラメータの動作は、where句に照らして再考する必要があります。
 
-Is this still accurate?
+これはまだ正確ですか？
 -->
 
-**Extension candidates** are derived from imported traits.  If I have
-the trait `ToString` imported, and I call `to_string()` as a method,
-then we will list the `to_string()` definition in each impl of
-`ToString` as a candidate. These kinds of method calls are called
-"extension methods".
+**拡張候補**は、インポートされたトレイトから派生します。`ToString`トレイトをインポートし、
+メソッドとして`to_string()`を呼び出す場合、
+`ToString`の各implの`to_string()`定義を候補としてリストします。
+これらの種類のメソッド呼び出しは、「拡張メソッド」と呼ばれます。
 
-So, let's continue our example. Imagine that we were calling a method
-`foo` with the receiver `Rc<Box<[T; 3]>>` and there is a trait `Foo`
-that defines it with `&self` for the type `Rc<U>` as well as a method
-on the type `Box` that defines `foo` but with `&mut self`. Then we
-might have two candidates:
+それでは、例を続けましょう。レシーバー`Rc<Box<[T; 3]>>`でメソッド`foo`を呼び出しており、
+`Rc<U>`型の`&self`で定義するトレイト`Foo`と、
+`foo`を定義するが`&mut self`で定義する型`Box`のメソッドがあるとします。
+次に、2つの候補があるかもしれません。
 
-- `&Rc<U>` as an extension candidate
-- `&mut Box<U>` as an inherent candidate
+- 拡張候補としての`&Rc<U>`
+- 固有候補としての`&mut Box<U>`
 
-### Candidate search
+### 候補検索
 
-Finally, to actually pick the method, we will search down the steps,
-trying to match the receiver type against the candidate types. At
-each step, we also consider an auto-ref and auto-mut-ref to see whether
-that makes any of the candidates match. For each resulting receiver
-type, we consider inherent candidates before extension candidates.
-If there are multiple matching candidates in a group, we report an
-error, except that multiple impls of the same trait are treated as a
-single match. Otherwise we pick the first match we find.
+最後に、実際にメソッドを選択するために、ステップを下に検索し、
+レシーバー型を候補型と照合しようとします。各ステップで、
+候補のいずれかが一致するかどうかを確認するために、自動参照と自動ミュータブル参照も考慮します。
+結果として得られる各レシーバー型について、拡張候補の前に固有候補を考慮します。
+グループ内に複数の一致する候補がある場合はエラーを報告しますが、
+同じトレイトの複数のimplは単一の一致として扱われます。そうでなければ、
+見つかった最初の一致を選択します。
 
-In the case of our example, the first step is `Rc<Box<[T; 3]>>`,
-which does not itself match any candidate. But when we autoref it, we
-get the type `&Rc<Box<[T; 3]>>` which matches `&Rc<U>`. We would then
-recursively consider all where-clauses that appear on the impl: if
-those match (or we cannot rule out that they do), then this is the
-method we would pick. Otherwise, we would continue down the series of
-steps.
+この例の場合、最初のステップは`Rc<Box<[T; 3]>>`であり、
+それ自体はどの候補とも一致しません。しかし、それを自動参照すると、
+型`&Rc<Box<[T; 3]>>`が得られ、これは`&Rc<U>`と一致します。次に、
+impl に表示されるすべてのwhere句を再帰的に考慮します。
+それらが一致する場合（または一致しないと判断できない場合）、
+これが選択するメソッドです。そうでない場合は、
+一連のステップを下に続けます。

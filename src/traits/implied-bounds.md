@@ -1,29 +1,31 @@
-# Implied bounds
+# 暗黙の境界
 
-We currently add implied region bounds to avoid explicit annotations. e.g.
-`fn foo<'a, T>(x: &'a T)` can freely assume that `T: 'a` holds without specifying it.
+明示的なアノテーションを避けるために、現在、暗黙の領域境界を追加しています。
+例えば、`fn foo<'a, T>(x: &'a T)` は、それを指定しなくても `T: 'a` が
+成り立つことを自由に仮定できます。
 
-There are two kinds of implied bounds: explicit and implicit. Explicit implied bounds
-get added to the `fn predicates_of` of the relevant item while implicit ones are
-handled... well... implicitly.
+暗黙の境界には2つの種類があります：明示的と暗黙的です。明示的な暗黙の境界は
+関連アイテムの `fn predicates_of` に追加されますが、暗黙的なものは...
+まあ...暗黙的に処理されます。
 
-## explicit implied bounds
+## 明示的な暗黙の境界
 
-The explicit implied bounds are computed in [`fn inferred_outlives_of`]. Only ADTs and
-lazy type aliases have explicit implied bounds which are computed via a fixpoint algorithm
-in the [`fn inferred_outlives_crate`] query.
+明示的な暗黙の境界は [`fn inferred_outlives_of`] で計算されます。ADT と
+遅延型エイリアスのみが明示的な暗黙の境界を持ち、これらは
+[`fn inferred_outlives_crate`] クエリの不動点アルゴリズムを介して計算されます。
 
-We use [`fn insert_required_predicates_to_be_wf`] on all fields of all ADTs in the crate.
-This function computes the outlives bounds for each component of the field using a
-separate implementation.
+クレート内のすべての ADT のすべてのフィールドに対して
+[`fn insert_required_predicates_to_be_wf`] を使用します。この関数は、
+別の実装を使用して、フィールドの各コンポーネントの outlives 境界を計算します。
 
-For ADTs, trait objects, and associated types the initially required predicates are
-computed in [`fn check_explicit_predicates`]. This simply uses `fn explicit_predicates_of`
-without elaborating them.
+ADT、トレイトオブジェクト、および関連型の場合、最初に必要な述語は
+[`fn check_explicit_predicates`] で計算されます。これは単に
+`fn explicit_predicates_of` を精緻化せずに使用します。
 
-Region predicates are added via [`fn insert_outlives_predicate`]. This function takes
-an outlives predicate, decomposes it and adds the components as explicit predicates only
-if the outlived region is a region parameter. [It does not add `'static` requirements][nostatic].
+領域述語は [`fn insert_outlives_predicate`] を介して追加されます。この関数は
+outlives 述語を受け取り、それを分解し、outlived 領域が領域パラメータである
+場合にのみ、コンポーネントを明示的な述語として追加します。
+[`'static` 要件は追加しません][nostatic]。
 
  [`fn inferred_outlives_of`]: https://github.com/rust-lang/rust/blob/5b8bc568d28b2e922290c9a966b3231d0ce9398b/compiler/rustc_hir_analysis/src/outlives/mod.rs#L20
  [`fn inferred_outlives_crate`]: https://github.com/rust-lang/rust/blob/5b8bc568d28b2e922290c9a966b3231d0ce9398b/compiler/rustc_hir_analysis/src/outlives/mod.rs#L83
@@ -32,28 +34,28 @@ if the outlived region is a region parameter. [It does not add `'static` require
  [`fn insert_outlives_predicate`]: https://github.com/rust-lang/rust/blob/5b8bc568d28b2e922290c9a966b3231d0ce9398b/compiler/rustc_hir_analysis/src/outlives/utils.rs#L15
  [nostatic]: https://github.com/rust-lang/rust/blob/5b8bc568d28b2e922290c9a966b3231d0ce9398b/compiler/rustc_hir_analysis/src/outlives/utils.rs#L159-L165
 
-## implicit implied bounds
+## 暗黙的な暗黙の境界
 
-As we are unable to handle implications in binders yet, we cannot simply add the outlives
-requirements of impls and functions as explicit predicates.
+バインダー内の含意をまだ処理できないため、impl や関数の outlives 要件を
+明示的な述語として単純に追加することはできません。
 
-### using implicit implied bounds as assumptions
+### 仮定として暗黙的な暗黙の境界を使用する
 
-These bounds are not added to the `ParamEnv` of the affected item itself. For lexical
-region resolution they are added using [`fn OutlivesEnvironment::from_normalized_bounds`].
-Similarly, during MIR borrowck we add them using
-[`fn UniversalRegionRelationsBuilder::add_implied_bounds`].
+これらの境界は、影響を受けるアイテム自体の `ParamEnv` には追加されません。
+字句領域解決の場合、[`fn OutlivesEnvironment::from_normalized_bounds`] を
+使用して追加されます。同様に、MIR borrowck 中は、
+[`fn UniversalRegionRelationsBuilder::add_implied_bounds`] を使用して追加します。
 
-[We add implied bounds for the function signature and impl header in MIR borrowck][mir].
-Outside of MIR borrowck we add the outlives requirements for the types returned by the
-[`fn assumed_wf_types`] query.
+[MIR borrowck では関数シグネチャと impl ヘッダーの暗黙の境界を追加します][mir]。
+MIR borrowck 以外では、[`fn assumed_wf_types`] クエリによって返される型の
+outlives 要件を追加します。
 
-The assumed outlives constraints for implicit bounds are computed using the
-[`fn implied_outlives_bounds`] query. This directly
-[extracts the required outlives bounds from `fn wf::obligations`][boundsfromty].
+暗黙の境界に対する仮定された outlives 制約は、
+[`fn implied_outlives_bounds`] クエリを使用して計算されます。これは直接
+[`fn wf::obligations` から必要な outlives 境界を抽出します][boundsfromty]。
 
-MIR borrowck adds the outlives constraints for both the normalized and unnormalized types,
-lexical region resolution [only uses the unnormalized types][notnorm].
+MIR borrowck は正規化された型と正規化されていない型の両方の outlives 制約を
+追加しますが、字句領域解決は[正規化されていない型のみを使用します][notnorm]。
 
 [`fn OutlivesEnvironment::from_normalized_bounds`]: https://github.com/rust-lang/rust/blob/8239a37f9c0951a037cfc51763ea52a20e71e6bd/compiler/rustc_infer/src/infer/outlives/env.rs#L50-L55
 [`fn UniversalRegionRelationsBuilder::add_implied_bounds`]: https://github.com/rust-lang/rust/blob/5b8bc568d28b2e922290c9a966b3231d0ce9398b/compiler/rustc_borrowck/src/type_check/free_region_relations.rs#L316
@@ -63,21 +65,23 @@ lexical region resolution [only uses the unnormalized types][notnorm].
 [boundsfromty]: https://github.com/rust-lang/rust/blob/5b8bc568d28b2e922290c9a966b3231d0ce9398b/compiler/rustc_trait_selection/src/traits/query/type_op/implied_outlives_bounds.rs#L95-L96
 [notnorm]: https://github.com/rust-lang/rust/blob/91cae1dcdcf1a31bd8a92e4a63793d65cfe289bb/compiler/rustc_trait_selection/src/traits/engine.rs#L227-L250
 
-### proving implicit implied bounds
+### 暗黙的な暗黙の境界を証明する
 
-As the implicit implied bounds are not included in `fn predicates_of` we have to
-separately make sure they actually hold. We generally handle this by checking that
-all used types are well formed by emitting `WellFormed` predicates.
+暗黙的な暗黙の境界は `fn predicates_of` に含まれていないため、
+それらが実際に成り立つことを別途確認する必要があります。一般的には、
+`WellFormed` 述語を発行することで、使用されるすべての型が整形式であることを
+チェックすることでこれを処理します。
 
-We cannot emit `WellFormed` predicates when instantiating impls, as this would result
-in - currently often inductive - trait solver cycles. We also do not emit constraints
-involving higher ranked regions as we're lacking the implied bounds from their binder.
+impl をインスタンス化するときに `WellFormed` 述語を発行することはできません。
+これは、現在しばしば帰納的なトレイトソルバーサイクルになるからです。
+また、それらのバインダーからの暗黙の境界が不足しているため、高階領域を
+含む制約も発行しません。
 
-This results in multiple unsoundnesses:
-- by using subtyping: [#25860]
-- by using super trait upcasting for a higher ranked trait bound: [#84591]
-- by being able to normalize a projection when using an impl while not being able
-  to normalize it when checking the impl: [#100051]
+これにより、複数の健全性の問題が発生します：
+- サブタイピングを使用することによる：[#25860]
+- 高階トレイト境界のスーパートレイトアップキャスティングを使用することによる：[#84591]
+- impl を使用するときに射影を正規化できるが、impl をチェックするときには
+  正規化できないことによる：[#100051]
 
 [#25860]: https://github.com/rust-lang/rust/issues/25860
 [#84591]: https://github.com/rust-lang/rust/issues/84591

@@ -1,72 +1,72 @@
-# Reporting backend crashes
+# バックエンドクラッシュの報告
 
-If after a compilation failure you are greeted by a large amount of llvm-ir code, then our enzyme backend likely failed to compile your code. These cases are harder to debug, so your help is highly appreciated. Please also keep in mind that release builds are usually much more likely to work at the moment.
+コンパイル失敗後に大量のllvm-irコードが表示される場合、enzymeバックエンドがコードのコンパイルに失敗した可能性があります。このようなケースはデバッグが困難なため、ご協力いただけると大変ありがたいです。また、現時点ではリリースビルドの方がうまく動作する可能性が高いことにご注意ください。
 
-The final goal here is to reproduce your bug in the enzyme [compiler explorer](https://enzyme.mit.edu/explorer/), in order to create a bug report in the [Enzyme](https://github.com/enzymead/enzyme/issues) repository.
+ここでの最終目標は、enzyme [compiler explorer](https://enzyme.mit.edu/explorer/)でバグを再現し、[Enzyme](https://github.com/enzymead/enzyme/issues)リポジトリにバグレポートを作成することです。
 
-We have an `autodiff` flag which you can pass to `rustflags` to help with this. it will print the whole llvm-ir module, along with some `__enzyme_fwddiff` or `__enzyme_autodiff` calls. A potential workflow on linux could look like:  
+`rustflags`に渡すことができる`autodiff`フラグがあり、これを使うことでこの作業を支援できます。これにより、`__enzyme_fwddiff`や`__enzyme_autodiff`の呼び出しとともに、llvm-irモジュール全体が出力されます。Linuxでの潜在的なワークフローは次のようになります：
 
-## Controlling llvm-ir generation
+## llvm-ir生成の制御
 
-Before generating the llvm-ir, keep in mind two techniques that can help ensure the relevant rust code is visible for debugging:
+llvm-irを生成する前に、デバッグのために関連するrustコードを表示するのに役立つ2つのテクニックを覚えておいてください：
 
-- **`std::hint::black_box`**: wrap rust variables or expressions in `std::hint::black_box()` to prevent rust and llvm from optimizing them away. This is useful when you need to inspect or manually manipulate specific values in the llvm-ir.
-- **`extern "rust"` or `extern "c"`**: if you want to see how a specific function declaration is lowered to llvm-ir, you can declare it as `extern "rust"` or `extern "c"`. You can also look for existing `__enzyme_autodiff` or similar declarations within the generated module for examples.
+- **`std::hint::black_box`**：rustの変数や式を`std::hint::black_box()`でラップすることで、rustとllvmが最適化で削除するのを防ぎます。llvm-irで特定の値を検査したり手動で操作したりする必要がある場合に便利です。
+- **`extern "rust"`または`extern "c"`**：特定の関数宣言がllvm-irにどのように変換されるかを確認したい場合は、`extern "rust"`または`extern "c"`として宣言できます。また、生成されたモジュール内の既存の`__enzyme_autodiff`や類似の宣言を例として探すこともできます。
 
-## 1) Generate an llvm-ir reproducer
+## 1) llvm-irリプロデューサーを生成する
 
 ```sh
-RUSTFLAGS="-Z autodiff=Enable,PrintModbefore" cargo +enzyme build --release &> out.ll 
+RUSTFLAGS="-Z autodiff=Enable,PrintModbefore" cargo +enzyme build --release &> out.ll
 ```
 
-This also captures a few warnings and info messages above and below your module. open out.ll and remove every line above `; moduleid = <somehash>`. Now look at the end of the file and remove everything that's not part of llvm-ir, i.e. remove errors and warnings. The last line of your llvm-ir should now start with `!<somenumber> = `, i.e. `!40831 = !{i32 0, i32 1037508, i32 1037538, i32 1037559}` or `!43760 = !dilocation(line: 297, column: 5, scope: !43746)`.
+これにより、モジュールの前後にいくつかの警告と情報メッセージも取り込まれます。out.llを開き、`; moduleid = <somehash>`より上の行をすべて削除してください。次に、ファイルの末尾を確認し、llvm-irの一部ではないものをすべて削除します。つまり、エラーと警告を削除します。llvm-irの最後の行は、`!<somenumber> = `で始まるはずです。例えば、`!40831 = !{i32 0, i32 1037508, i32 1037538, i32 1037559}`や`!43760 = !dilocation(line: 297, column: 5, scope: !43746)`などです。
 
-The actual numbers will depend on your code.  
+実際の数値はコードによって異なります。
 
-## 2) Check your llvm-ir reproducer
+## 2) llvm-irリプロデューサーを確認する
 
-To confirm that your previous step worked, we will use llvm's `opt` tool. Find your path to the opt binary, with a path similar to `<some_dir>/rust/build/<x86/arm/...-target-triple>/ci-llvm/bin/opt`. If you build LLVM from source, you'll likely need to replace `ci-llvm` with `build`. Also find `llvmenzyme-21.<so/dll/dylib>` path, similar to `/rust/build/target-triple/enzyme/build/enzyme/llvmenzyme-21`. Please keep in mind that llvm frequently updates it's llvm backend, so the version number might be higher (20, 21, ...). Once you have both, run the following command:
+前のステップが機能したことを確認するために、llvmの`opt`ツールを使用します。optバイナリへのパスを見つけてください。`<some_dir>/rust/build/<x86/arm/...-target-triple>/ci-llvm/bin/opt`のようなパスになります。LLVMをソースからビルドした場合は、`ci-llvm`を`build`に置き換える必要があるでしょう。また、`llvmenzyme-21.<so/dll/dylib>`のパスも見つけてください。`/rust/build/target-triple/enzyme/build/enzyme/llvmenzyme-21`のようなパスです。llvmは頻繁にllvmバックエンドを更新するため、バージョン番号が高くなる可能性があることに留意してください（20、21、...）。両方が揃ったら、次のコマンドを実行します：
 
 ```sh
 <path/to/opt> out.ll -load-pass-plugin=/path/to/build/<target-triple>/stage1/lib/libEnzyme-21.so -passes="enzyme" -enzyme-strict-aliasing=0  -s
 ```
-This command might fail for future versions or on your system, in which case you should replace libEnzyme-21.so with LLVMEnzyme-21.so. Look at the Enzyme docs for instructions on how to build it. You might need to also adjust how to build your LLVM version.
+このコマンドは将来のバージョンやシステムで失敗する可能性があります。その場合は、libEnzyme-21.soをLLVMEnzyme-21.soに置き換えてください。ビルド方法についてはEnzymeのドキュメントを参照してください。LLVMバージョンのビルド方法も調整する必要があるかもしれません。
 
-If the previous step succeeded, you are going to see the same error that you saw when compiling your rust code with cargo. 
+前のステップが成功した場合、cargoでrustコードをコンパイルした時と同じエラーが表示されます。
 
-If you fail to get the same error, please open an issue in the rust repository. If you succeed, congrats! the file is still huge, so let's automatically minimize it.
+同じエラーを再現できない場合は、rustリポジトリにissueを開いてください。成功した場合は、おめでとうございます！ただし、ファイルはまだ巨大なので、自動的に最小化しましょう。
 
-## 3) Minimize your llvm-ir reproducer
+## 3) llvm-irリプロデューサーを最小化する
 
-First find your `llvm-extract` binary, it's in the same folder as your opt binary. then run:
+まず、`llvm-extract`バイナリを見つけてください。これはoptバイナリと同じフォルダにあります。次に、以下を実行します：
 
 ```sh
-<path/to/llvm-extract> -s --func=<name> --recursive --rfunc="enzyme_autodiff*" --rfunc="enzyme_fwddiff*" --rfunc=<fnc_called_by_enzyme> out.ll -o mwe.ll 
+<path/to/llvm-extract> -s --func=<name> --recursive --rfunc="enzyme_autodiff*" --rfunc="enzyme_fwddiff*" --rfunc=<fnc_called_by_enzyme> out.ll -o mwe.ll
 ```
 
-This command creates `mwe.ll`, a minimal working example.
+このコマンドは、最小動作例である`mwe.ll`を作成します。
 
-Please adjust the name passed with the last `--func` flag. You can either apply the `#[no_mangle]` attribute to the function you differentiate, then you can replace it with the rust name. otherwise you will need to look up the mangled function name. To do that, open `out.ll` and search for `__enzyme_fwddiff` or `__enzyme_autodiff`. the first string in that function call is the name of your function. example:
+最後の`--func`フラグで渡す名前を調整してください。微分する関数に`#[no_mangle]`属性を適用すると、rustの名前で置き換えることができます。そうでない場合は、マングルされた関数名を検索する必要があります。そのためには、`out.ll`を開いて`__enzyme_fwddiff`または`__enzyme_autodiff`を検索してください。その関数呼び出しの最初の文字列が関数の名前です。例：
 
-```llvm-ir 
+```llvm-ir
 define double @enzyme_opt_helper_0(ptr %0, i64 %1, double %2) {
   %4 = call double (...) @__enzyme_fwddiff(ptr @_zn2ad3_f217h3b3b1800bd39fde3e, metadata !"enzyme_const", ptr %0, metadata !"enzyme_const", i64 %1, metadata !"enzyme_dup", double %2, double %2)
   ret double %4
 }
 ```
 
-Here, `_zn2ad3_f217h3b3b1800bd39fde3e` is the correct name. make sure to not copy the leading `@`. redo step 2) by running the `opt` command again, but this time passing `mwe.ll` as the input file instead of `out.ll`. Check if this minimized example still reproduces the crash.
+ここで、`_zn2ad3_f217h3b3b1800bd39fde3e`が正しい名前です。先頭の`@`をコピーしないように注意してください。ステップ2)を再度実行しますが、今回は`out.ll`の代わりに`mwe.ll`を入力ファイルとして渡して`opt`コマンドを実行してください。この最小化された例でも引き続きクラッシュが再現されるか確認してください。
 
-## 4) (Optional) Minimize your llvm-ir reproducer further.
+## 4) (オプション) llvm-irリプロデューサーをさらに最小化する
 
-After the previous step you should have an `mwe.ll` file with ~5k loc. let's try to get it down to 50. find your `llvm-reduce` binary next to `opt` and `llvm-extract`. Copy the first line of your error message, an example could be:
+前のステップの後、約5k行の`mwe.ll`ファイルができているはずです。これを50行まで削減してみましょう。`opt`と`llvm-extract`の隣にある`llvm-reduce`バイナリを見つけてください。エラーメッセージの最初の行をコピーします。例えば：
 
 ```sh
 opt: /home/manuel/prog/rust/src/llvm-project/llvm/lib/ir/instructions.cpp:686: void llvm::callinst::init(llvm::functiontype*, llvm::value*, llvm::arrayref<llvm::value*>, llvm::arrayref<llvm::operandbundledeft<llvm::value*> >, const llvm::twine&): assertion `(args.size() == fty->getnumparams() || (fty->isvararg() && args.size() > fty->getnumparams())) && "calling a function with bad signature!"' failed.
 ```
 
-If you just get a `segfault` there is no sensible error message and not much to do automatically, so continue to 5).  
-otherwise, create a `script.sh` file containing
+`segfault`だけが表示される場合は、意味のあるエラーメッセージがなく、自動的にできることも多くないため、5)に進んでください。
+それ以外の場合は、以下の内容を含む`script.sh`ファイルを作成します。
 
 ```sh
 #!/bin/bash
@@ -74,41 +74,41 @@ otherwise, create a `script.sh` file containing
     |& grep "/some/path.cpp:686: void llvm::callinst::init"
 ```
 
-Experiment a bit with which error message you pass to grep. it should be long enough to make sure that the error is unique. However, for longer errors including `(` or `)` you will need to escape them correctly which can become annoying. Run
+grepに渡すエラーメッセージを少し試してみてください。エラーが一意であることを確認できるように十分長くする必要があります。ただし、`(`または`)`を含む長いエラーの場合は、正しくエスケープする必要があり、面倒になることがあります。次を実行します：
 
-```sh 
-<path/to/llvm-reduce> --test=script.sh mwe.ll 
+```sh
+<path/to/llvm-reduce> --test=script.sh mwe.ll
 ```
 
-If you see `input isn't interesting! verify interesting-ness test`, you got the error message in script.sh wrong, you need to make sure that grep matches your actual error. If all works out, you will see a lot of iterations, ending with a new `reduced.ll` file. Verify with `opt` that you still get the same error.
+`input isn't interesting! verify interesting-ness test`と表示された場合は、script.shのエラーメッセージが間違っています。grepが実際のエラーに一致することを確認する必要があります。すべてうまくいけば、多くの反復処理が表示され、最後に新しい`reduced.ll`ファイルができます。`opt`で同じエラーが引き続き発生することを確認してください。
 
-### Advanced debugging: manual llvm-ir investigation
+### 高度なデバッグ：手動llvm-ir調査
 
-Once you have a minimized reproducer (`mwe.ll` or `reduced.ll`), you can delve deeper:
+最小化されたリプロデューサー（`mwe.ll`または`reduced.ll`）ができたら、さらに深く掘り下げることができます：
 
-- **manual editing:** try manually rewriting the llvm-ir. for certain issues, like those involving indirect calls, you might investigate enzyme-specific intrinsics like `__enzyme_virtualreverse`. Understanding how to use these might require consulting enzyme's documentation or source code.
-- **enzyme test cases:** look for relevant test cases within the [enzyme repository](https://github.com/enzymead/enzyme/tree/main/enzyme/test) that might demonstrate the correct usage of features or intrinsics related to your problem.
+- **手動編集：** llvm-irを手動で書き換えてみてください。間接呼び出しに関する問題など、特定の問題については、`__enzyme_virtualreverse`のようなenzyme固有のイントリンシックを調査する必要があるかもしれません。これらの使用方法を理解するには、enzymeのドキュメントやソースコードを参照する必要があるかもしれません。
+- **enzymeテストケース：** 問題に関連する機能やイントリンシックの正しい使用方法を示す可能性のある関連テストケースを[enzymeリポジトリ](https://github.com/enzymead/enzyme/tree/main/enzyme/test)で探してください。
 
-## 5) Report your bug.
+## 5) バグを報告する
 
-Afterwards, you should be able to copy and paste your `mwe.ll` (or `reduced.ll`) example into our [compiler explorer](https://enzyme.mit.edu/explorer/).
+その後、`mwe.ll`（または`reduced.ll`）の例を[compiler explorer](https://enzyme.mit.edu/explorer/)にコピー＆ペーストできるはずです。
 
-- Select `llvm ir` as language and `opt 20` as compiler.
-- Replace the field to the right of your compiler with `-passes="enzyme"`, if it is not already set.
-- Hopefully, you will see once again your now familiar error.
-- Please use the share button to copy links to them.
-- Please create an issue on [https://github.com/enzymead/enzyme/issues](https://github.com/enzymead/enzyme/issues) and share `mwe.ll` and (if you have it) `reduced.ll`, as well as links to the compiler explorer. Please feel free to also add your rust code or a link to it.
+- 言語として`llvm ir`を選択し、コンパイラとして`opt 20`を選択します。
+- コンパイラの右側のフィールドを`-passes="enzyme"`に置き換えます（まだ設定されていない場合）。
+- うまくいけば、すでに馴染みのあるエラーが再び表示されます。
+- 共有ボタンを使用してリンクをコピーしてください。
+- [https://github.com/enzymead/enzyme/issues](https://github.com/enzymead/enzyme/issues)にissueを作成し、`mwe.ll`と（ある場合は）`reduced.ll`、およびcompiler explorerへのリンクを共有してください。rustコードやそのリンクも自由に追加してください。
 
-#### Documenting findings
+#### 調査結果の文書化
 
-some enzyme errors, like `"attempting to call an indirect active function whose runtime value is inactive"`, have historically caused confusion. If you investigate such an issue, even if you don't find a complete solution, please consider documenting your findings. If the insights are general to enzyme and not specific to its rust usage, contributing them to the main [enzyme documentation](https://github.com/enzymead/www) is often the best first step. You can also mention your findings in the relevant enzyme github issue or propose updates to these docs if appropriate. This helps prevent others from starting from scratch.
+`"attempting to call an indirect active function whose runtime value is inactive"`のような一部のenzymeエラーは、歴史的に混乱を引き起こしてきました。このような問題を調査する場合、完全な解決策を見つけられなくても、調査結果を文書化することを検討してください。洞察がenzymeに一般的であり、rustでの使用に固有でない場合、メインの[enzymeドキュメント](https://github.com/enzymead/www)に貢献することが最良の第一歩であることが多いです。また、関連するenzyme githubのissueで調査結果を言及したり、必要に応じてこれらのドキュメントへの更新を提案したりすることもできます。これにより、他の人がゼロから始める必要がなくなります。
 
-With a clear reproducer and documentation, hopefully an enzyme developer will be able to fix your bug. Once that happens, the enzyme submodule inside the rust compiler will be updated, which should allow you to differentiate your rust code. Thanks for helping us to improve rust-ad.
+明確なリプロデューサーとドキュメントがあれば、enzyme開発者がバグを修正できることを期待できます。それが起こると、rustコンパイラ内のenzymeサブモジュールが更新され、rustコードを微分できるようになります。rust-adの改善にご協力いただきありがとうございます。
 
-# Minimize rust code
+# rustコードの最小化
 
-Beyond having a minimal llvm-ir reproducer, it is also helpful to have a minimal rust reproducer without dependencies. This allows us to add it as a test case to ci once we fix it, which avoids regressions for the future.
+最小限のllvm-irリプロデューサーを用意するだけでなく、依存関係のない最小限のrustリプロデューサーを用意することも役立ちます。これにより、修正後にテストケースとしてciに追加できるため、将来のリグレッションを回避できます。
 
-There are a few solutions to help you with minimizing the rust reproducer. This is probably the most simple automated approach: [cargo-minimize](https://github.com/nilstrieb/cargo-minimize).
+rustリプロデューサーの最小化を支援するソリューションがいくつかあります。これがおそらく最も簡単な自動化されたアプローチです：[cargo-minimize](https://github.com/nilstrieb/cargo-minimize)。
 
-Otherwise we have various alternatives, including [`treereduce`](https://github.com/langston-barrett/treereduce), [`halfempty`](https://github.com/googleprojectzero/halfempty), or [`picireny`](https://github.com/renatahodovan/picireny), potentially also [`creduce`](https://github.com/csmith-project/creduce).
+それ以外にも、[`treereduce`](https://github.com/langston-barrett/treereduce)、[`halfempty`](https://github.com/googleprojectzero/halfempty)、[`picireny`](https://github.com/renatahodovan/picireny)、場合によっては[`creduce`](https://github.com/csmith-project/creduce)など、さまざまな代替手段があります。

@@ -1,58 +1,35 @@
-# Variance of type and lifetime parameters
+# 型とライフタイムパラメータの分散
 
-For a more general background on variance, see the [background] appendix.
+より一般的な分散の背景については、[背景][background]付録を参照してください。
 
 [background]: ./appendix/background.html
 
-During type checking we must infer the variance of type and lifetime
-parameters. The algorithm is taken from Section 4 of the paper ["Taming the
-Wildcards: Combining Definition- and Use-Site Variance"][pldi11] published in
-PLDI'11 and written by Altidor et al., and hereafter referred to as The Paper.
+型チェック中に、型とライフタイムパラメータの分散を推論する必要があります。アルゴリズムは、PLDI'11で発表されたAltidorらによる論文["Taming the Wildcards: Combining Definition- and Use-Site Variance"][pldi11]のセクション4から取られており、以降「論文」と呼びます。
 
 [pldi11]: https://people.cs.umass.edu/~yannis/variance-extended2011.pdf
 
-This inference is explicitly designed *not* to consider the uses of
-types within code. To determine the variance of type parameters
-defined on type `X`, we only consider the definition of the type `X`
-and the definitions of any types it references.
+この推論は、コード内で型を使用することを考慮*しない*ように明示的に設計されています。型`X`で定義された型パラメータの分散を決定するには、型`X`の定義とそれが参照する型の定義のみを考慮します。
 
-We only infer variance for type parameters found on *data types*
-like structs and enums. In these cases, there is a fairly straightforward
-explanation for what variance means. The variance of the type
-or lifetime parameters defines whether `T<A>` is a subtype of `T<B>`
-(resp. `T<'a>` and `T<'b>`) based on the relationship of `A` and `B`
-(resp. `'a` and `'b`).
+*データ型*（構造体やenumなど）で見つかった型パラメータの分散のみを推論します。これらの場合、分散が何を意味するかについてかなり簡単な説明があります。型またはライフタイムパラメータの分散は、`T<A>`が`T<B>`のサブタイプであるか（それぞれ`T<'a>`と`T<'b>`）を、`A`と`B`の関係（それぞれ`'a`と`'b`）に基づいて定義します。
 
-We do not infer variance for type parameters found on traits, functions,
-or impls. Variance on trait parameters can indeed make sense
-(and we used to compute it) but it is actually rather subtle in
-meaning and not that useful in practice, so we removed it. See the
-[addendum] for some details. Variances on function/impl parameters, on the
-other hand, doesn't make sense because these parameters are instantiated and
-then forgotten, they don't persist in types or compiled byproducts.
+トレイト、関数、またはimplで見つかった型パラメータの分散は推論しません。トレイトパラメータの分散は確かに意味があります（そして以前は計算していました）が、実際には意味がかなり微妙で、実際にはそれほど有用ではないため、削除しました。詳細については、[補遺][addendum]を参照してください。一方、関数/implパラメータの分散は意味がありません。なぜなら、これらのパラメータはインスタンス化されてから忘れられ、型やコンパイルされた副産物に永続化されないからです。
 
 [addendum]: #addendum
 
-> **Notation**
+> **表記法**
 >
-> We use the notation of The Paper throughout this chapter:
+> この章全体で論文の表記法を使用します：
 >
-> - `+` is _covariance_.
-> - `-` is _contravariance_.
-> - `*` is _bivariance_.
-> - `o` is _invariance_.
+> - `+`は_共変_です。
+> - `-`は_反変_です。
+> - `*`は_双変_です。
+> - `o`は_不変_です。
 
-## The algorithm
+## アルゴリズム
 
-The basic idea is quite straightforward. We iterate over the types
-defined and, for each use of a type parameter `X`, accumulate a
-constraint indicating that the variance of `X` must be valid for the
-variance of that use site. We then iteratively refine the variance of
-`X` until all constraints are met. There is *always* a solution, because at
-the limit we can declare all type parameters to be invariant and all
-constraints will be satisfied.
+基本的なアイデアは非常に簡単です。定義された型を反復し、型パラメータ`X`の使用ごとに、その使用サイトの分散が`X`の分散に対して有効である必要があることを示す制約を蓄積します。次に、すべての制約が満たされるまで、`X`の分散を繰り返し洗練します。*常に*解決策があります。なぜなら、限界として、すべての型パラメータを不変と宣言でき、すべての制約が満たされるからです。
 
-As a simple example, consider:
+簡単な例として、次を考えてみましょう：
 
 ```rust,ignore
 enum Option<A> { Some(A), None }
@@ -60,7 +37,7 @@ enum OptionalFn<B> { Some(|B|), None }
 enum OptionalMap<C> { Some(|C| -> C), None }
 ```
 
-Here, we will generate the constraints:
+ここで、次の制約を生成します：
 
 ```text
 1. V(A) <= +
@@ -69,112 +46,63 @@ Here, we will generate the constraints:
 4. V(C) <= -
 ```
 
-These indicate that (1) the variance of A must be at most covariant;
-(2) the variance of B must be at most contravariant; and (3, 4) the
-variance of C must be at most covariant *and* contravariant. All of these
-results are based on a variance lattice defined as follows:
+これらは、（1）Aの分散は最大でも共変である必要があること、（2）Bの分散は最大でも反変である必要があること、（3、4）Cの分散は最大でも共変*かつ*反変である必要があることを示しています。これらのすべての結果は、次のように定義された分散格子に基づいています：
 
 ```text
-   *      Top (bivariant)
+   *      頂点（双変）
 -     +
-   o      Bottom (invariant)
+   o      底（不変）
 ```
 
-Based on this lattice, the solution `V(A)=+`, `V(B)=-`, `V(C)=o` is the
-optimal solution. Note that there is always a naive solution which
-just declares all variables to be invariant.
+この格子に基づいて、解`V(A)=+`、`V(B)=-`、`V(C)=o`が最適解です。すべての変数を不変と宣言する素朴な解決策が常にあることに注意してください。
 
-You may be wondering why fixed-point iteration is required. The reason
-is that the variance of a use site may itself be a function of the
-variance of other type parameters. In full generality, our constraints
-take the form:
+固定点反復が必要な理由を不思議に思うかもしれません。理由は、使用サイトの分散自体が他の型パラメータの分散の関数である可能性があるためです。完全な一般性では、制約は次の形式を取ります：
 
 ```text
 V(X) <= Term
 Term := + | - | * | o | V(X) | Term x Term
 ```
 
-Here the notation `V(X)` indicates the variance of a type/region
-parameter `X` with respect to its defining class. `Term x Term`
-represents the "variance transform" as defined in the paper:
+ここで、表記`V(X)`は、その定義クラスに対する型/リージョンパラメータ`X`の分散を示します。`Term x Term`は、論文で定義されている「分散変換」を表します：
 
->  If the variance of a type variable `X` in type expression `E` is `V2`
-  and the definition-site variance of the corresponding type parameter
-  of a class `C` is `V1`, then the variance of `X` in the type expression
-  `C<E>` is `V3 = V1.xform(V2)`.
+>  型変数`X`の型式`E`での分散が`V2`であり、クラス`C`の対応する型パラメータの定義サイト分散が`V1`である場合、型式`C<E>`での`X`の分散は`V3 = V1.xform(V2)`です。
 
-## Constraints
+## 制約
 
-If I have a struct or enum with where clauses:
+where句を持つ構造体やenumがある場合：
 
 ```rust,ignore
 struct Foo<T: Bar> { ... }
 ```
 
-you might wonder whether the variance of `T` with respect to `Bar` affects the
-variance `T` with respect to `Foo`. I claim no.  The reason: assume that `T` is
-invariant with respect to `Bar` but covariant with respect to `Foo`. And then
-we have a `Foo<X>` that is upcast to `Foo<Y>`, where `X <: Y`. However, while
-`X : Bar`, `Y : Bar` does not hold.  In that case, the upcast will be illegal,
-but not because of a variance failure, but rather because the target type
-`Foo<Y>` is itself just not well-formed. Basically we get to assume
-well-formedness of all types involved before considering variance.
+`Bar`に対する`T`の分散が`Foo`に対する`T`の分散に影響するかどうか疑問に思うかもしれません。そうではないと主張します。理由：`T`が`Bar`に対して不変であるが`Foo`に対して共変であると仮定しましょう。次に、`Foo<X>`があり、`Foo<Y>`にアップキャストされ、`X <: Y`です。ただし、`X : Bar`である一方、`Y : Bar`は成立しません。その場合、アップキャストは違法になりますが、分散の失敗のためではなく、むしろターゲット型`Foo<Y>`自体が整形式でないためです。基本的に、分散を考慮する前に、関与するすべての型の整形式性を仮定できます。
 
-### Dependency graph management
+### 依存関係グラフ管理
 
-Because variance is a whole-crate inference, its dependency graph
-can become quite muddled if we are not careful. To resolve this, we refactor
-into two queries:
+分散はクレート全体の推論であるため、注意しないと依存関係グラフがかなり混乱する可能性があります。これを解決するために、2つのクエリにリファクタリングします：
 
-- `crate_variances` computes the variance for all items in the current crate.
-- `variances_of` accesses the variance for an individual reading; it
-  works by requesting `crate_variances` and extracting the relevant data.
+- `crate_variances`は、現在のクレート内のすべてのアイテムの分散を計算します。
+- `variances_of`は、個々の読み取りの分散にアクセスします。`crate_variances`をリクエストし、関連するデータを抽出することによって機能します。
 
-If you limit yourself to reading `variances_of`, your code will only
-depend then on the inference of that particular item.
+`variances_of`の読み取りに制限すると、コードはその特定のアイテムの推論にのみ依存します。
 
-Ultimately, this setup relies on the [red-green algorithm][rga]. In particular,
-every variance query effectively depends on all type definitions in the entire
-crate (through `crate_variances`), but since most changes will not result in a
-change to the actual results from variance inference, the `variances_of` query
-will wind up being considered green after it is re-evaluated.
+最終的に、このセットアップは[red-greenアルゴリズム][rga]に依存しています。特に、すべての分散クエリは、クレート全体のすべての型定義に実質的に依存しますが（`crate_variances`を介して）、ほとんどの変更は分散推論からの実際の結果の変更にはつながらないため、`variances_of`クエリは再評価後に緑と見なされます。
 
 [rga]: ./queries/incremental-compilation.html
 
 <a id="addendum"></a>
 
-## Addendum: Variance on traits
+## 補遺：トレイトの分散
 
-As mentioned above, we used to permit variance on traits. This was
-computed based on the appearance of trait type parameters in
-method signatures and was used to represent the compatibility of
-vtables in trait objects (and also "virtual" vtables or dictionary
-in trait bounds). One complication was that variance for
-associated types is less obvious, since they can be projected out
-and put to myriad uses, so it's not clear when it is safe to allow
-`X<A>::Bar` to vary (or indeed just what that means). Moreover (as
-covered below) all inputs on any trait with an associated type had
-to be invariant, limiting the applicability. Finally, the
-annotations (`MarkerTrait`, `PhantomFn`) needed to ensure that all
-trait type parameters had a variance were confusing and annoying
-for little benefit.
+上記で述べたように、以前はトレイトの分散を許可していました。これは、トレイトメソッドシグネチャでのトレイト型パラメータの出現に基づいて計算され、トレイトオブジェクトのvtablesの互換性（およびトレイト境界の「仮想」vtablesまたは辞書）を表すために使用されていました。1つの複雑さは、関連型の分散がそれほど明白ではないことです。なぜなら、それらは投影され、さまざまな用途に使用される可能性があるため、`X<A>::Bar`を変化させることが安全である場合が明確ではないからです（実際、それが何を意味するのかさえ）。さらに（以下でカバーされているように）、関連型を持つすべてのトレイトへのすべての入力は不変でなければならず、適用性を制限していました。最後に、すべてのトレイト型パラメータに分散があることを保証するために必要な注釈（`MarkerTrait`、`PhantomFn`）は、わずかな利益のために混乱し、迷惑でした。
 
-Just for historical reference, I am going to preserve some text indicating how
-one could interpret variance and trait matching.
+歴史的参考のために、分散とトレイトマッチングをどのように解釈できるかを示すテキストを保存します。
 
-### Variance and object types
+### 分散とオブジェクト型
 
-Just as with structs and enums, we can decide the subtyping
-relationship between two object types `&Trait<A>` and `&Trait<B>`
-based on the relationship of `A` and `B`. Note that for object
-types we ignore the `Self` type parameter – it is unknown, and
-the nature of dynamic dispatch ensures that we will always call a
-function that is expected the appropriate `Self` type. However, we
-must be careful with the other type parameters, or else we could
-end up calling a function that is expecting one type but provided
-another.
+構造体やenumと同様に、2つのオブジェクト型`&Trait<A>`と`&Trait<B>`間のサブタイピング関係を、`A`と`B`の関係に基づいて決定できます。オブジェクト型の場合、`Self`型パラメータを無視することに注意してください。それは未知であり、動的ディスパッチの性質により、適切な`Self`型を期待する関数を常に呼び出すことが保証されます。ただし、他の型パラメータには注意する必要があります。さもないと、ある型を期待しているが別の型が提供された関数を呼び出す可能性があります。
 
-To see what I mean, consider a trait like so:
+私が言っていることを理解するために、次のようなトレイトを考えてみましょう：
 
 ```rust
 trait ConvertTo<A> {
@@ -182,87 +110,53 @@ trait ConvertTo<A> {
 }
 ```
 
-Intuitively, If we had one object `O=&ConvertTo<Object>` and another
-`S=&ConvertTo<String>`, then `S <: O` because `String <: Object`
-(presuming Java-like "string" and "object" types, my go to examples
-for subtyping). The actual algorithm would be to compare the
-(explicit) type parameters pairwise respecting their variance: here,
-the type parameter A is covariant (it appears only in a return
-position), and hence we require that `String <: Object`.
+直感的に、`O=&ConvertTo<Object>`というオブジェクトと`S=&ConvertTo<String>`という別のオブジェクトがある場合、`String <: Object`であるため、`S <: O`です（Javaのような「string」と「object」型を想定しています。これは私のサブタイピングの例としてよく使っています）。実際のアルゴリズムは、（明示的な）型パラメータを分散を尊重してペアワイズで比較することです：ここで、型パラメータAは共変です（戻り位置にのみ現れるため）、したがって`String <: Object`が必要です。
 
-You'll note though that we did not consider the binding for the
-(implicit) `Self` type parameter: in fact, it is unknown, so that's
-good. The reason we can ignore that parameter is precisely because we
-don't need to know its value until a call occurs, and at that time (as
-you said) the dynamic nature of virtual dispatch means the code we run
-will be correct for whatever value `Self` happens to be bound to for
-the particular object whose method we called. `Self` is thus different
-from `A`, because the caller requires that `A` be known in order to
-know the return type of the method `convertTo()`. (As an aside, we
-have rules preventing methods where `Self` appears outside of the
-receiver position from being called via an object.)
+（暗黙的な）`Self`型パラメータのバインディングを考慮しなかったことに気づくでしょう：実際、それは未知なので、それは良いことです。呼び出しが発生するまでその値を知る必要がない理由は、正確には、仮想ディスパッチの動的な性質により、実行するコードが`Self`が何にバインドされていても、呼び出されたオブジェクトの特定の方法に対して正しいからです。したがって、`Self`は`A`とは異なります。なぜなら、呼び出し側は`convertTo()`メソッドの戻り値の型を知るために`A`が既知である必要があるからです。（ついでに、`Self`が受信者の位置の外に現れるメソッドをオブジェクトを介して呼び出すことを防ぐルールがあります。）
 
-### Trait variance and vtable resolution
+### トレイト分散とvtable解決
 
-But traits aren't only used with objects. They're also used when
-deciding whether a given impl satisfies a given trait bound. To set the
-scene here, imagine I had a function:
+しかし、トレイトはオブジェクトとだけ使用されるわけではありません。特定のimplが特定のトレイト境界を満たすかどうかを決定するときにも使用されます。ここでシーンを設定するために、関数があると想像してください：
 
 ```rust,ignore
 fn convertAll<A,T:ConvertTo<A>>(v: &[T]) { ... }
 ```
 
-Now imagine that I have an implementation of `ConvertTo` for `Object`:
+次に、`Object`に対する`ConvertTo`の実装があると想像してください：
 
 ```rust,ignore
 impl ConvertTo<i32> for Object { ... }
 ```
 
-And I want to call `convertAll` on an array of strings. Suppose
-further that for whatever reason I specifically supply the value of
-`String` for the type parameter `T`:
+そして、何らかの理由で、型パラメータ`T`に`String`の値を具体的に提供して、文字列の配列で`convertAll`を呼び出したいとします：
 
 ```rust,ignore
 let mut vector = vec!["string", ...];
 convertAll::<i32, String>(vector);
 ```
 
-Is this legal? To put another way, can we apply the `impl` for
-`Object` to the type `String`? The answer is yes, but to see why
-we have to expand out what will happen:
+これは合法ですか？言い換えれば、`Object`用の`impl`を型`String`に適用できますか？答えはイエスですが、その理由を見るには、何が起こるかを展開する必要があります：
 
-- `convertAll` will create a pointer to one of the entries in the
-  vector, which will have type `&String`
-- It will then call the impl of `convertTo()` that is intended
-  for use with objects. This has the type `fn(self: &Object) -> i32`.
+- `convertAll`はベクトル内のエントリの1つへのポインタを作成します。これは型`&String`を持ちます
+- 次に、Objectsと一緒に使用することを意図した`convertTo()`のimplを呼び出します。これは型`fn(self: &Object) -> i32`を持ちます。
 
-  It is OK to provide a value for `self` of type `&String` because
-  `&String <: &Object`.
+  `self`に型`&String`の値を提供することは問題ありません。なぜなら、`&String <: &Object`だからです。
 
-OK, so intuitively we want this to be legal, so let's bring this back
-to variance and see whether we are computing the correct result. We
-must first figure out how to phrase the question "is an impl for
-`Object,i32` usable where an impl for `String,i32` is expected?"
+わかりました、直感的には、これが合法であることを望んでいるので、これを分散に戻して、正しい結果を計算しているかどうかを見てみましょう。質問「`String,i32`に対するimplが期待される場所で、`Object,i32`に対するimplが使用可能か？」をどのように表現するかをまず理解する必要があります。
 
-Maybe it's helpful to think of a dictionary-passing implementation of
-type classes. In that case, `convertAll()` takes an implicit parameter
-representing the impl. In short, we *have* an impl of type:
+型クラスの辞書渡し実装を考えると役立つかもしれません。その場合、`convertAll()`は、implを表す暗黙的なパラメータを取ります。要するに、次の型のimplを*持っています*：
 
 ```text
 V_O = ConvertTo<i32> for Object
 ```
 
-and the function prototype expects an impl of type:
+そして、関数プロトタイプは次の型のimplを期待します：
 
 ```text
 V_S = ConvertTo<i32> for String
 ```
 
-As with any argument, this is legal if the type of the value given
-(`V_O`) is a subtype of the type expected (`V_S`). So is `V_O <: V_S`?
-The answer will depend on the variance of the various parameters. In
-this case, because the `Self` parameter is contravariant and `A` is
-covariant, it means that:
+任意の引数と同様に、与えられた値の型（`V_O`）が期待される型（`V_S`）のサブタイプである場合、これは合法です。したがって、`V_O <: V_S`ですか？答えはさまざまなパラメータの分散に依存します。この場合、`Self`パラメータは反変で、`A`は共変であるため、次のことを意味します：
 
 ```text
 V_O <: V_S iff
@@ -270,47 +164,33 @@ V_O <: V_S iff
     String <: Object
 ```
 
-These conditions are satisfied and so we are happy.
+これらの条件は満たされているので、私たちは満足です。
 
-### Variance and associated types
+### 分散と関連型
 
-Traits with associated types – or at minimum projection
-expressions – must be invariant with respect to all of their
-inputs. To see why this makes sense, consider what subtyping for a
-trait reference means:
+関連型を持つトレイト、または最低でも投影式は、そのすべての入力に対して不変でなければなりません。トレイト参照のサブタイピングが何を意味するかを考えると、これが理にかなっている理由がわかります：
 
 ```text
 <T as Trait> <: <U as Trait>
 ```
 
-means that if I know that `T as Trait`, I also know that `U as
-Trait`. Moreover, if you think of it as dictionary passing style,
-it means that a dictionary for `<T as Trait>` is safe to use where
-a dictionary for `<U as Trait>` is expected.
+これは、`T as Trait`を知っている場合、`U as Trait`も知っていることを意味します。さらに、辞書渡しスタイルとして考えると、`<T as Trait>`の辞書は、`<U as Trait>`の辞書が期待される場所で使用しても安全であることを意味します。
 
-The problem is that when you can project types out from `<T as
-Trait>`, the relationship to types projected out of `<U as Trait>`
-is completely unknown unless `T==U` (see #21726 for more
-details). Making `Trait` invariant ensures that this is true.
+問題は、`<T as Trait>`から型を投影できる場合、`<U as Trait>`から投影された型との関係が、`T==U`でない限り完全に不明であるということです（詳細については#21726を参照）。`Trait`を不変にすることで、これが真であることが保証されます。
 
-Another related reason is that if we didn't make traits with
-associated types invariant, then projection is no longer a
-function with a single result. Consider:
+もう1つの関連する理由は、関連型を持つトレイトを不変にしなかった場合、投影はもはや単一の結果を持つ関数ではなくなることです。次を考えてみましょう：
 
 ```rust,ignore
 trait Identity { type Out; fn foo(&self); }
 impl<T> Identity for T { type Out = T; ... }
 ```
 
-Now if I have `<&'static () as Identity>::Out`, this can be
-validly derived as `&'a ()` for any `'a`:
+`<&'static () as Identity>::Out`がある場合、これは任意の`'a`に対して`&'a ()`として有効に導出できます：
 
 ```text
 <&'a () as Identity> <: <&'static () as Identity>
-if &'static () < : &'a ()   -- Identity is contravariant in Self
-if 'static : 'a             -- Subtyping rules for relations
+if &'static () < : &'a ()   -- Identityはselfに対して反変
+if 'static : 'a             -- 関係のサブタイピングルール
 ```
 
-This change otoh means that `<'static () as Identity>::Out` is
-always `&'static ()` (which might then be upcast to `'a ()`,
-separately). This was helpful in solving #21750.
+一方、この変更は、`<'static () as Identity>::Out`が常に`&'static ()`であることを意味します（その後、別々に`'a ()`にアップキャストされる可能性があります）。これは#21750の解決に役立ちました。

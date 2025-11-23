@@ -1,68 +1,41 @@
-# MIR queries and passes
+# MIRクエリとパス
 
-If you would like to get the MIR:
+MIRを取得したい場合：
 
-- for a function - you can use the `optimized_mir` query (typically used by codegen) or the `mir_for_ctfe` query (typically used by compile time function evaluation, i.e., *CTFE*);
-- for a promoted - you can use the `promoted_mir` query.
+- 関数の場合 - `optimized_mir`クエリ（通常はコード生成で使用）または`mir_for_ctfe`クエリ（通常はコンパイル時関数評価、つまり*CTFE*で使用）を使用できます。
+- 昇格の場合 - `promoted_mir`クエリを使用できます。
 
-These will give you back the final, optimized MIR. For foreign def-ids, we simply read the MIR
-from the other crate's metadata. But for local def-ids, the query will
-construct the optimized MIR by requesting a pipeline of upstream queries[^query].
-Each query will contain a series of passes.
-This section describes how those queries and passes work and how you can extend them.
+これらは、最終的な最適化されたMIRを返します。外部def-idの場合、単に他のクレートのメタデータからMIRを読み取ります。ただし、ローカルdef-idの場合、クエリは上流クエリ[^query]のパイプラインを要求して最適化されたMIRを構築します。各クエリには、一連のパスが含まれます。このセクションでは、これらのクエリとパスがどのように機能し、どのように拡張できるかについて説明します。
 
-To produce the optimized MIR for a given def-id `D`, `optimized_mir(D)`
-goes through several suites of passes, each grouped by a
-query. Each suite consists of passes which perform linting, analysis, transformation or
-optimization. Each query represent a useful intermediate point
-where we can access the MIR dialect for type checking or other purposes:
+指定されたdef-id `D`に対する最適化されたMIRを生成するために、`optimized_mir(D)`はいくつかのパススイートを経ます。各スイートはクエリによってグループ化されます。各スイートは、リント、解析、変換、または最適化を実行するパスで構成されます。各クエリは、型チェックやその他の目的でMIR方言にアクセスできる有用な中間点を表します：
 
-- `mir_built(D)` – it gives the initial MIR just after it's built;
-- `mir_const(D)` – it applies some simple transformation passes to make MIR ready for
-  const qualification;
-- `mir_promoted(D)` - it extracts promotable temps into separate MIR bodies, and also makes MIR
-  ready for borrow checking;
-- `mir_drops_elaborated_and_const_checked(D)` - it performs borrow checking, runs major
-  transformation passes (such as drop elaboration) and makes MIR ready for optimization;
-- `optimized_mir(D)` – it performs all enabled optimizations and reaches the final state.
+- `mir_built(D)` – 構築直後の初期MIRを提供します。
+- `mir_const(D)` – MIRを定数修飾のために準備するために、いくつかの単純な変換パスを適用します。
+- `mir_promoted(D)` - 昇格可能な一時変数を個別のMIR本体に抽出し、MIRを借用チェックのために準備します。
+- `mir_drops_elaborated_and_const_checked(D)` - 借用チェックを実行し、主要な変換パス（ドロップ精緻化など）を実行し、MIRを最適化のために準備します。
+- `optimized_mir(D)` – すべての有効な最適化を実行し、最終状態に到達します。
 
-[^query]: See the [Queries](../query.md) chapter for the general concept of query.
+[^query]: クエリの一般的な概念については、[クエリ](../query.md)の章を参照してください。
 
-## Implementing and registering a pass
+## パスの実装と登録
 
-A `MirPass` is some bit of code that processes the MIR, typically transforming it along the way
-somehow. But it may also do other things like linting (e.g., [`CheckPackedRef`][lint1],
-[`CheckConstItemMutation`][lint2], [`FunctionItemReferences`][lint3], which implement `MirLint`) or
-optimization (e.g., [`SimplifyCfg`][opt1], [`RemoveUnneededDrops`][opt2]). While most MIR passes
-are defined in the [`rustc_mir_transform`][mirtransform] crate, the `MirPass` trait itself is
-[found][mirpass] in the `rustc_middle` crate, and it basically consists of one primary method,
-`run_pass`, that simply gets an `&mut Body` (along with the `tcx`).
-The MIR is therefore modified in place (which helps to keep things efficient).
+`MirPass`は、MIRを処理するコードの一部で、通常は何らかの方法で変換します。ただし、リント（例：[`CheckPackedRef`][lint1]、[`CheckConstItemMutation`][lint2]、[`FunctionItemReferences`][lint3]、これらは`MirLint`を実装します）や最適化（例：[`SimplifyCfg`][opt1]、[`RemoveUnneededDrops`][opt2]）のような他のことも行う可能性があります。ほとんどのMIRパスは[`rustc_mir_transform`][mirtransform]クレートで定義されていますが、`MirPass`トレイト自体は`rustc_middle`クレートで[見つかり][mirpass]、基本的には1つの主要なメソッド`run_pass`で構成されており、単に`&mut Body`（`tcx`とともに）を取得します。したがって、MIRはその場で変更されます（これにより、効率を保つのに役立ちます）。
 
-A basic example of a MIR pass is [`RemoveStorageMarkers`], which walks
-the MIR and removes all storage marks if they won't be emitted during codegen. As you
-can see from its source, a MIR pass is defined by first defining a
-dummy type, a struct with no fields:
+MIRパスの基本的な例は[`RemoveStorageMarkers`]です。これはMIRを歩き、コード生成中に発行されない場合はすべてのストレージマークを削除します。そのソースからわかるように、MIRパスは、最初にフィールドのないダミー型、構造体を定義することによって定義されます：
 
 ```rust
 pub struct RemoveStorageMarkers;
 ```
 
-for which we implement the `MirPass` trait. We can then insert
-this pass into the appropriate list of passes found in a query like
-`mir_built`, `optimized_mir`, etc. (If this is an optimization, it
-should go into the `optimized_mir` list.)
+その後、`MirPass`トレイトを実装できます。次に、このパスを、`mir_built`、`optimized_mir`などのクエリで見つかるパスの適切なリストに挿入できます。（これが最適化の場合は、`optimized_mir`リストに入れる必要があります。）
 
-Another example of a simple MIR pass is [`CleanupPostBorrowck`][cleanup-pass], which walks
-the MIR and removes all statements that are not relevant to code generation. As you can see from
-its [source][cleanup-source], it is defined by first defining a dummy type, a struct with no
-fields:
+MIRパスの別の例は[`CleanupPostBorrowck`][cleanup-pass]で、MIRを歩いてコード生成に関連しないすべてのステートメントを削除します。その[ソース][cleanup-source]からわかるように、最初にフィールドのないダミー型、構造体を定義することによって定義されます：
 
 ```rust
 pub struct CleanupPostBorrowck;
 ```
 
-for which we implement the `MirPass` trait:
+その後、`MirPass`トレイトを実装します：
 
 ```rust
 impl<'tcx> MirPass<'tcx> for CleanupPostBorrowck {
@@ -72,40 +45,23 @@ impl<'tcx> MirPass<'tcx> for CleanupPostBorrowck {
 }
 ```
 
-We [register][pass-register] this pass inside the `mir_drops_elaborated_and_const_checked` query.
-(If this is an optimization, it should go into the `optimized_mir` list.)
+このパスを`mir_drops_elaborated_and_const_checked`クエリ内に[登録][pass-register]します。（これが最適化の場合は、`optimized_mir`リストに入れる必要があります。）
 
-If you are writing a pass, there's a good chance that you are going to
-want to use a [MIR visitor]. MIR visitors are a handy way to walk all
-the parts of the MIR, either to search for something or to make small
-edits.
+パスを書いている場合、[MIRビジター]を使用したいと思う可能性が高いです。MIRビジターは、MIRのすべての部分を歩くための便利な方法で、何かを検索したり、小さな編集を行ったりするのに便利です。
 
-## Stealing
+## 盗み
 
-The intermediate queries `mir_const()` and `mir_promoted()` yield up
-a `&'tcx Steal<Body<'tcx>>`, allocated using `tcx.alloc_steal_mir()`.
-This indicates that the result may be **stolen** by a subsequent query – this is an
-optimization to avoid cloning the MIR. Attempting to use a stolen
-result will cause a panic in the compiler. Therefore, it is important
-that you do not accidentally read from these intermediate queries without
-the consideration of the dependency in the MIR processing pipeline.
+中間クエリ`mir_const()`と`mir_promoted()`は、`tcx.alloc_steal_mir()`を使用して割り当てられた`&'tcx Steal<Body<'tcx>>`を返します。これは、結果が後続のクエリによって**盗まれる**可能性があることを示します。これは、MIRのクローニングを避けるための最適化です。盗まれた結果を使用しようとすると、コンパイラでパニックが発生します。したがって、MIR処理パイプラインの依存関係を考慮せずに、これらの中間クエリから誤って読み取らないことが重要です。
 
-Because of this stealing mechanism, some care must be taken to
-ensure that, before the MIR at a particular phase in the processing
-pipeline is stolen, anyone who may want to read from it has already
-done so.
+この盗みメカニズムのために、特定のフェーズでのMIRが盗まれる前に、そこから読み取りたい可能性のあるすべての人がすでにそうしていることを確認するために、ある程度の注意を払う必要があります。
 
-Concretely, this means that if you have a query `foo(D)`
-that wants to access the result of `mir_promoted(D)`, you need to have `foo(D)`
-calling the `mir_const(D)` query first. This will force it
-to execute even though you don't directly require its result.
+具体的には、クエリ`foo(D)`が`mir_promoted(D)`の結果にアクセスしたい場合は、`foo(D)`が最初に`mir_const(D)`クエリを呼び出す必要があります。これにより、その結果を直接必要としなくても、それが強制的に実行されます。
 
-> This mechanism is a bit dodgy. There is a discussion of more elegant
-alternatives in [rust-lang/rust#41710].
+> このメカニズムは少し怪しいです。[rust-lang/rust#41710]には、よりエレガントな代替案の議論があります。
 
-### Overview
+### 概要
 
-Below is an overview of the stealing dependency in the MIR processing pipeline[^part]:
+以下は、MIR処理パイプライン[^part]における盗み依存関係の概要です：
 
 ```mermaid
 flowchart BT
@@ -136,36 +92,17 @@ flowchart BT
   style id5 fill:#bbf
 ```
 
-The stadium-shape queries (e.g., `mir_built`) with a deep color are the primary queries in the
-pipeline, while the rectangle-shape queries (e.g., `mir_const_qualif*`[^star]) with a shallow color
-are those subsequent queries that need to read the results from `&'tcx Steal<Body<'tcx>>`. With the
-stealing mechanism, the rectangle-shape queries must be performed before any stadium-shape queries,
-that have an equal or larger height in the dependency tree, ever do.
+深い色のスタジアム形状のクエリ（例：`mir_built`）はパイプラインの主要なクエリですが、浅い色の長方形形状のクエリ（例：`mir_const_qualif*`[^star]）は、`&'tcx Steal<Body<'tcx>>`から結果を読み取る必要がある後続のクエリです。盗みメカニズムにより、長方形形状のクエリは、依存関係ツリーで等しいまたはそれより大きい高さを持つスタジアム形状のクエリが実行される前に実行される必要があります。
 
-[^part]: The `mir_promoted` query will yield up a tuple
-`(&'tcx Steal<Body<'tcx>>, &'tcx Steal<IndexVec<Promoted, Body<'tcx>>>)`, `promoted_mir` will steal
-part 1 (`&'tcx Steal<IndexVec<Promoted, Body<'tcx>>>`) and `mir_drops_elaborated_and_const_checked`
-will steal part 0 (`&'tcx Steal<Body<'tcx>>`). And their stealing is irrelevant to each other,
-i.e., can be performed separately.
+[^part]: `mir_promoted`クエリは、タプル`(&'tcx Steal<Body<'tcx>>, &'tcx Steal<IndexVec<Promoted, Body<'tcx>>>)`を返します。`promoted_mir`はパート1（`&'tcx Steal<IndexVec<Promoted, Body<'tcx>>>`）を盗み、`mir_drops_elaborated_and_const_checked`はパート0（`&'tcx Steal<Body<'tcx>>`）を盗みます。そして、それらの盗みは互いに無関係です。つまり、個別に実行できます。
 
-[^star]: Note that the `*` suffix in the queries represent a set of queries with the same prefix.
-For example, `mir_borrowck*` represents `mir_borrowck`, `mir_borrowck_const_arg` and
-`mir_borrowck_opt_const_arg`.
+[^star]: クエリの`*`サフィックスは、同じプレフィックスを持つクエリのセットを表すことに注意してください。例えば、`mir_borrowck*`は`mir_borrowck`、`mir_borrowck_const_arg`、および`mir_borrowck_opt_const_arg`を表します。
 
-### Example
+### 例
 
-As an example, consider MIR const qualification. It wants to read the result produced by the
-`mir_const` query. However, that result will be **stolen** by the `mir_promoted` query at some
-time in the pipeline. Before `mir_promoted` is ever queried, calling the `mir_const_qualif` query
-will succeed since `mir_const` will produce (if queried the first time) or cache (if queried
-multiple times) the `Steal` result and the result is **not** stolen yet. After `mir_promoted` is
-queried, the result would be stolen and calling the `mir_const_qualif` query to read the result
-would cause a panic.
+例として、MIR定数修飾を考えてみましょう。これは、`mir_const`クエリによって生成された結果を読み取りたいと考えています。ただし、その結果は、パイプラインのある時点で`mir_promoted`クエリによって**盗まれます**。`mir_promoted`がクエリされる前に、`mir_const_qualif`クエリを呼び出すと成功します。なぜなら、`mir_const`は（初めてクエリされた場合）`Steal`結果を生成するか、（複数回クエリされた場合）キャッシュし、結果はまだ**盗まれていない**からです。`mir_promoted`がクエリされた後、結果は盗まれ、`mir_const_qualif`クエリを呼び出して結果を読み取ろうとするとパニックが発生します。
 
-Therefore, with this stealing mechanism, `mir_promoted` should guarantee any `mir_const_qualif*`
-queries are called before it actually steals, thus ensuring that the reads have already happened
-(remember that [queries are memoized](../query.html), so executing a query twice
-simply loads from a cache the second time).
+したがって、この盗みメカニズムにより、`mir_promoted`は、実際に盗む前にすべての`mir_const_qualif*`クエリが呼び出されることを保証する必要があります。これにより、読み取りがすでに発生していることが保証されます（[クエリはメモ化される](../query.html)ことを覚えておいてください。したがって、クエリを2回実行すると、2回目は単にキャッシュから読み込まれます）。
 
 [rust-lang/rust#41710]: https://github.com/rust-lang/rust/issues/41710
 [mirpass]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_transform/pass_manager/trait.MirPass.html
@@ -179,4 +116,4 @@ simply loads from a cache the second time).
 [cleanup-pass]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_transform/cleanup_post_borrowck/struct.CleanupPostBorrowck.html
 [cleanup-source]: https://github.com/rust-lang/rust/blob/e2b52ff73edc8b0b7c74bc28760d618187731fe8/compiler/rustc_mir_transform/src/cleanup_post_borrowck.rs#L27
 [pass-register]: https://github.com/rust-lang/rust/blob/e2b52ff73edc8b0b7c74bc28760d618187731fe8/compiler/rustc_mir_transform/src/lib.rs#L413
-[MIR visitor]: ./visitor.html
+[MIRビジター]: ./visitor.html

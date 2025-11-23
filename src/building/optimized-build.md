@@ -1,51 +1,40 @@
-# Optimized build of the compiler
+# コンパイラの最適化ビルド
 
-There are multiple additional build configuration options and techniques that can be used to compile a
-build of `rustc` that is as optimized as possible (for example when building `rustc` for a Linux
-distribution). The status of these configuration options for various Rust targets is tracked [here].
-This page describes how you can use these approaches when building `rustc` yourself.
+できるだけ最適化された `rustc` のビルドをコンパイルするために使用できる複数の追加のビルド設定オプションと技術があります（たとえば、Linux ディストリビューション用に `rustc` をビルドする場合）。さまざまな Rust ターゲットに対するこれらの設定オプションの状態は [こちら] で追跡されています。このページでは、`rustc` を自分でビルドする際にこれらのアプローチをどのように使用できるかを説明します。
 
-[here]: https://github.com/rust-lang/rust/issues/103595
+[こちら]: https://github.com/rust-lang/rust/issues/103595
 
-## Link-time optimization
+## リンク時最適化
 
-Link-time optimization is a powerful compiler technique that can increase program performance. To
-enable (Thin-)LTO when building `rustc`, set the `rust.lto` config option to `"thin"`
-in `bootstrap.toml`:
+リンク時最適化は、プログラムのパフォーマンスを向上させることができる強力なコンパイラ技術です。`rustc` をビルドする際に（Thin-）LTO を有効にするには、`bootstrap.toml` で `rust.lto` 設定オプションを `"thin"` に設定します：
 
 ```toml
 [rust]
 lto = "thin"
 ```
 
-> Note that LTO for `rustc` is currently supported and tested only for
-> the `x86_64-unknown-linux-gnu` target. Other targets *may* work, but no guarantees are provided.
-> Notably, LTO-optimized `rustc` currently produces [miscompilations] on Windows.
+> `rustc` の LTO は現在、`x86_64-unknown-linux-gnu` ターゲットに対してのみサポートされ、テストされていることに注意してください。他のターゲットは動作する *可能性がありますが*、保証はありません。特に、LTO 最適化された `rustc` は現在、Windows で [誤コンパイル] を生成します。
 
-[miscompilations]: https://github.com/rust-lang/rust/issues/109114
+[誤コンパイル]: https://github.com/rust-lang/rust/issues/109114
 
-Enabling LTO on Linux has [produced] speed-ups by up to 10%.
+Linux で LTO を有効にすると、最大 10% の高速化が [生成されました]。
 
-[produced]: https://github.com/rust-lang/rust/pull/101403#issuecomment-1288190019
+[生成されました]: https://github.com/rust-lang/rust/pull/101403#issuecomment-1288190019
 
-## Memory allocator
+## メモリアロケータ
 
-Using a different memory allocator for `rustc` can provide significant performance benefits. If you
-want to enable the `jemalloc` allocator, you can set the `rust.jemalloc` option to `true`
-in `bootstrap.toml`:
+`rustc` に異なるメモリアロケータを使用すると、大幅なパフォーマンス向上をもたらす可能性があります。`jemalloc` アロケータを有効にしたい場合は、`bootstrap.toml` で `rust.jemalloc` オプションを `true` に設定できます：
 
 ```toml
 [rust]
 jemalloc = true
 ```
 
-> Note that this option is currently only supported for Linux and macOS targets.
+> このオプションは現在、Linux および macOS ターゲットに対してのみサポートされていることに注意してください。
 
-## Codegen units
+## コードジェネレーションユニット
 
-Reducing the amount of codegen units per `rustc` crate can produce a faster build of the compiler.
-You can modify the number of codegen units for `rustc` and `libstd` in `bootstrap.toml` with the
-following options:
+`rustc` クレートごとのコードジェネレーションユニットの数を減らすと、コンパイラのビルドが高速になる可能性があります。`bootstrap.toml` で `rustc` と `libstd` のコードジェネレーションユニットの数を次のオプションで変更できます：
 
 ```toml
 [rust]
@@ -53,19 +42,15 @@ codegen-units = 1
 codegen-units-std = 1
 ```
 
-## Instruction set
+## 命令セット
 
-By default, `rustc` is compiled for a generic (and conservative) instruction set architecture
-(depending on the selected target), to make it support as many CPUs as possible. If you want to
-compile `rustc` for a specific instruction set architecture, you can set the `target_cpu` compiler
-option in `RUSTFLAGS`:
+デフォルトでは、`rustc` は汎用的な（保守的な）命令セットアーキテクチャ（選択されたターゲットに応じて）用にコンパイルされ、できるだけ多くの CPU をサポートします。特定の命令セットアーキテクチャ用に `rustc` をコンパイルしたい場合は、`RUSTFLAGS` で `target_cpu` コンパイラオプションを設定できます：
 
 ```bash
 RUSTFLAGS="-C target_cpu=x86-64-v3" ./x build ...
 ```
 
-If you also want to compile LLVM for a specific instruction set, you can set `llvm` flags
-in `bootstrap.toml`:
+LLVM も特定の命令セット用にコンパイルしたい場合は、`bootstrap.toml` で `llvm` フラグを設定できます：
 
 ```toml
 [llvm]
@@ -73,19 +58,11 @@ cxxflags = "-march=x86-64-v3"
 cflags = "-march=x86-64-v3"
 ```
 
-## Profile-guided optimization
+## プロファイルガイド最適化
 
-Applying profile-guided optimizations (or more generally, feedback-directed optimizations) can
-produce a large increase to `rustc` performance, by up to 15% ([1], [2]). However, these techniques
-are not simply enabled by a configuration option, but rather they require a complex build workflow
-that compiles `rustc` multiple times and profiles it on selected benchmarks.
+プロファイルガイド最適化（より一般的には、フィードバック指向最適化）を適用すると、最大 15% の `rustc` パフォーマンスの大幅な向上を生み出すことができます（[1]、[2]）。ただし、これらの技術は単純に設定オプションで有効にされるのではなく、`rustc` を複数回コンパイルし、選択されたベンチマークでプロファイリングする複雑なビルドワークフローが必要です。
 
-There is a tool called `opt-dist` that is used to optimize `rustc` with [PGO] (profile-guided
-optimizations) and [BOLT] (a post-link binary optimizer) for builds distributed to end users. You
-can examine the tool, which is located in `src/tools/opt-dist`, and build a custom PGO build
-workflow based on it, or try to use it directly. Note that the tool is currently quite hardcoded to
-the way we use it in Rust's continuous integration workflows, and it might require some custom
-changes to make it work in a different environment.
+エンドユーザーに配布される `rustc` を [PGO]（プロファイルガイド最適化）と [BOLT]（ポストリンクバイナリオプティマイザ）で最適化するために使用される `opt-dist` というツールがあります。`src/tools/opt-dist` にあるツールを調べて、それに基づいてカスタム PGO ビルドワークフローを構築するか、直接使用してみることができます。ツールは現在、Rust の継続的統合ワークフローで使用する方法にかなりハードコードされており、異なる環境で動作させるにはカスタム変更が必要になる可能性があることに注意してください。
 
 [1]: https://blog.rust-lang.org/inside-rust/2020/11/11/exploring-pgo-for-the-rust-compiler.html#final-numbers-and-a-benchmarking-plot-twist
 [2]: https://github.com/rust-lang/rust/pull/96978
@@ -94,39 +71,34 @@ changes to make it work in a different environment.
 
 [BOLT]: https://github.com/llvm/llvm-project/blob/main/bolt/README.md
 
-To use the tool, you will need to provide some external dependencies:
+ツールを使用するには、いくつかの外部依存関係を提供する必要があります：
 
-- A Python3 interpreter (for executing `x.py`).
-- Compiled LLVM toolchain, with the `llvm-profdata` binary. Optionally, if you want to use BOLT,
-  the `llvm-bolt` and
-  `merge-fdata` binaries have to be available in the toolchain.
+- Python3 インタープリタ（`x.py` を実行するため）。
+- コンパイルされた LLVM ツールチェーン、`llvm-profdata` バイナリを含む。オプションで、BOLT を使用したい場合は、`llvm-bolt` と `merge-fdata` バイナリがツールチェーンで利用可能である必要があります。
 
-These dependencies are provided to `opt-dist` by an implementation of the [`Environment`] struct.
-It specifies directories where will the PGO/BOLT pipeline take place, and also external dependencies
-like Python or LLVM.
+これらの依存関係は、[`Environment`] 構造体の実装によって `opt-dist` に提供されます。これは、PGO/BOLT パイプラインが行われるディレクトリと、Python や LLVM などの外部依存関係を指定します。
 
-Here is an example of how can `opt-dist` be used locally (outside of CI):
+以下は、`opt-dist` をローカル（CI 外）で使用する方法の例です：
 
-1. Enable metrics in your `bootstrap.toml` file, because `opt-dist` expects it to be enabled:
+1. `bootstrap.toml` ファイルでメトリクスを有効にします。`opt-dist` はそれが有効になっていることを期待しているためです：
     ```toml
    [build]
    metrics = true
    ```
-2. Build the tool with the following command:
+2. 次のコマンドでツールをビルドします：
     ```bash
     ./x build tools/opt-dist
     ```
-3. Run the tool with the `local` mode and provide necessary parameters:
+3. `local` モードでツールを実行し、必要なパラメータを提供します：
     ```bash
     ./build/host/stage1-tools-bin/opt-dist local \
-      --target-triple <target> \ # select target, e.g. "x86_64-unknown-linux-gnu"
-      --checkout-dir <path>    \ # path to rust checkout, e.g. "."
-      --llvm-dir <path>        \ # path to built LLVM toolchain, e.g. "/foo/bar/llvm/install"
-      -- python3 x.py dist       # pass the actual build command
+      --target-triple <target> \ # ターゲットを選択、例：「x86_64-unknown-linux-gnu」
+      --checkout-dir <path>    \ # rust チェックアウトへのパス、例：「.」
+      --llvm-dir <path>        \ # ビルドされた LLVM ツールチェーンへのパス、例：「/foo/bar/llvm/install」
+      -- python3 x.py dist       # 実際のビルドコマンドを渡す
     ```
-    You can run `--help` to see further parameters that you can modify.
+    変更できるさらなるパラメータを確認するには、`--help` を実行できます。
 
 [`Environment`]: https://github.com/rust-lang/rust/blob/ee451f8faccf3050c76cdcd82543c917b40c7962/src/tools/opt-dist/src/environment.rs#L5
 
-> Note: if you want to run the actual CI pipeline, instead of running `opt-dist` locally,
-> you can execute `cargo run --manifest-path src/ci/citool/Cargo.toml run-local dist-x86_64-linux`.
+> 注意：`opt-dist` をローカルで実行する代わりに実際の CI パイプラインを実行したい場合は、`cargo run --manifest-path src/ci/citool/Cargo.toml run-local dist-x86_64-linux` を実行できます。

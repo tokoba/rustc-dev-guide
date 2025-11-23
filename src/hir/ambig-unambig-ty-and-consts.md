@@ -1,56 +1,54 @@
-# Ambig/Unambig Types and Consts
+# 曖昧/非曖昧な型と定数
 
-Types and Consts args in the HIR can be in two kinds of positions ambiguous (ambig) or unambiguous (unambig). Ambig positions are where
-it would be valid to parse either a type or a const, unambig positions are where only one kind would be valid to
-parse.
+HIRにおける型と定数の引数は、曖昧(ambig)または非曖昧(unambig)という2種類の位置に配置される可能性があります。曖昧な位置とは、型または定数のいずれかとして解析することが有効な位置であり、非曖昧な位置とは、1種類のみが有効に解析される位置です。
 
 ```rust
 fn func<T, const N: usize>(arg: T) {
-    //                           ^ Unambig type position
-    let a: _ = arg; 
-    //     ^ Unambig type position
+    //                           ^ 非曖昧な型の位置
+    let a: _ = arg;
+    //     ^ 非曖昧な型の位置
 
     func::<T, N>(arg);
     //     ^  ^
-    //     ^^^^ Ambig position 
+    //     ^^^^ 曖昧な位置
 
     let _: [u8; 10];
-    //      ^^  ^^ Unambig const position
-    //      ^^ Unambig type position
+    //      ^^  ^^ 非曖昧な定数の位置
+    //      ^^ 非曖昧な型の位置
 }
 
 ```
 
-Most types/consts in ambig positions are able to be disambiguated as either a type or const during parsing. Single segment paths are always represented as types in the AST but may get resolved to a const parameter during name resolution, then lowered to a const argument during ast-lowering. The only generic arguments which remain ambiguous after lowering are inferred generic arguments (`_`) in path segments. For example, in `Foo<_>` it is not clear whether the `_` argument is an inferred type argument, or an inferred const argument.
+曖昧な位置にあるほとんどの型/定数は、パース中に型または定数として明確に区別することができます。単一セグメントのパスは常にASTでは型として表現されますが、名前解決中に定数パラメータとして解決され、その後ast-lowering中に定数引数に下げられる可能性があります。lowering後も曖昧なままであるジェネリック引数は、パスセグメント内の推論されたジェネリック引数(`_`)のみです。例えば、`Foo<_>`では、`_`引数が推論された型引数なのか、推論された定数引数なのかは明確ではありません。
 
-In unambig positions, inferred arguments are represented with [`hir::TyKind::Infer`][ty_infer] or [`hir::ConstArgKind::Infer`][const_infer] depending on whether it is a type or const position respectively.
-In ambig positions, inferred arguments are represented with `hir::GenericArg::Infer`.
+非曖昧な位置では、推論された引数は、それが型位置か定数位置かに応じて、[`hir::TyKind::Infer`][ty_infer]または[`hir::ConstArgKind::Infer`][const_infer]で表現されます。
+曖昧な位置では、推論された引数は`hir::GenericArg::Infer`で表現されます。
 
-A naive implementation of this would result in there being potentially 5 places where you might think an inferred type/const could be found in the HIR from looking at the structure of the HIR:
-1. In unambig type position as a `hir::TyKind::Infer`
-2. In unambig const arg position as a `hir::ConstArgKind::Infer`
-3. In an ambig position as a [`GenericArg::Type(TyKind::Infer)`][generic_arg_ty]
-4. In an ambig position as a [`GenericArg::Const(ConstArgKind::Infer)`][generic_arg_const]
-5. In an ambig position as a [`GenericArg::Infer`][generic_arg_infer]
+これを素朴に実装すると、HIRの構造から見て、HIRで推論された型/定数が見つかる可能性のある場所が5つあることになります：
+1. 非曖昧な型位置における`hir::TyKind::Infer`
+2. 非曖昧な定数引数位置における`hir::ConstArgKind::Infer`
+3. 曖昧な位置における[`GenericArg::Type(TyKind::Infer)`][generic_arg_ty]
+4. 曖昧な位置における[`GenericArg::Const(ConstArgKind::Infer)`][generic_arg_const]
+5. 曖昧な位置における[`GenericArg::Infer`][generic_arg_infer]
 
-Note that places 3 and 4 would never actually be possible to encounter as we always lower to `GenericArg::Infer` in generic arg position. 
+場所3と4は実際には遭遇することはありません。なぜなら、ジェネリック引数位置では常に`GenericArg::Infer`に下げるからです。
 
-This has a few failure modes:
-- People may write visitors which check for `GenericArg::Infer` but forget to check for `hir::TyKind/ConstArgKind::Infer`, only handling infers in ambig positions by accident.
-- People may write visitors which check for `hir::TyKind/ConstArgKind::Infer` but forget to check for `GenericArg::Infer`, only handling infers in unambig positions by accident.
-- People may write visitors which check for `GenericArg::Type/Const(TyKind/ConstArgKind::Infer)` and `GenericArg::Infer`, not realising that we never represent inferred types/consts in ambig positions as a `GenericArg::Type/Const`.
-- People may write visitors which check for *only* `TyKind::Infer` and not `ConstArgKind::Infer` forgetting that there are also inferred const arguments (and vice versa).
+これにはいくつかの失敗モードがあります：
+- `GenericArg::Infer`をチェックするビジターを書くが、`hir::TyKind/ConstArgKind::Infer`をチェックし忘れ、偶然にも曖昧な位置のinferのみを処理してしまう可能性がある。
+- `hir::TyKind/ConstArgKind::Infer`をチェックするビジターを書くが、`GenericArg::Infer`をチェックし忘れ、偶然にも非曖昧な位置のinferのみを処理してしまう可能性がある。
+- `GenericArg::Type/Const(TyKind/ConstArgKind::Infer)`と`GenericArg::Infer`をチェックするビジターを書くが、曖昧な位置で推論された型/定数を`GenericArg::Type/Const`として表現することは決してないことに気づかない可能性がある。
+- `TyKind::Infer`のみをチェックし、`ConstArgKind::Infer`をチェックしないビジターを書き、推論された定数引数もあることを忘れてしまう可能性がある(その逆も同様)。
 
-To make writing HIR visitors less error prone when caring about inferred types/consts we have a relatively complex system:
+推論された型/定数を扱う際にHIRビジターを書くのを容易にし、エラーを減らすために、比較的複雑なシステムを採用しています：
 
-1. We have different types in the compiler for when a type or const is in an unambig or ambig position, `hir::Ty<AmbigArg>` and `hir::Ty<()>`. [`AmbigArg`][ambig_arg] is an uninhabited type which we use in the `Infer` variant of `TyKind` and `ConstArgKind` to selectively "disable" it if we are in an ambig position.
+1. コンパイラには、型または定数が非曖昧または曖昧な位置にある場合の異なる型、`hir::Ty<AmbigArg>`と`hir::Ty<()>`があります。[`AmbigArg`][ambig_arg]は居住不可能な型で、`TyKind`と`ConstArgKind`の`Infer`バリアントで使用され、曖昧な位置にある場合に選択的に「無効化」します。
 
-2. The [`visit_ty`][visit_ty] and [`visit_const_arg`][visit_const_arg] methods on HIR visitors only accept the ambig position versions of types/consts. Unambig types/consts are implicitly converted to ambig types/consts during the visiting process, with the `Infer` variant handled by a dedicated [`visit_infer`][visit_infer] method.
+2. HIRビジターの[`visit_ty`][visit_ty]と[`visit_const_arg`][visit_const_arg]メソッドは、型/定数の曖昧な位置バージョンのみを受け入れます。非曖昧な型/定数は、訪問プロセス中に曖昧な型/定数に暗黙的に変換され、`Infer`バリアントは専用の[`visit_infer`][visit_infer]メソッドによって処理されます。
 
-This has a number of benefits:
-- It's clear that `GenericArg::Type/Const` cannot represent inferred type/const arguments
-- Implementors of `visit_ty` and `visit_const_arg` will never encounter inferred types/consts making it impossible to write a visitor that seems to work right but handles edge cases wrong 
-- The `visit_infer` method handles *all* cases of inferred type/consts in the HIR making it easy for visitors to handle inferred type/consts in one dedicated place and not forget cases
+これには多くの利点があります：
+- `GenericArg::Type/Const`が推論された型/定数引数を表現できないことが明確である
+- `visit_ty`と`visit_const_arg`の実装者は、推論された型/定数に遭遇することが決してないため、正しく動作するように見えるが、エッジケースを誤って処理するビジターを書くことが不可能になる
+- `visit_infer`メソッドは、HIRにおける推論された型/定数の*すべて*のケースを処理するため、ビジターが専用の1つの場所で推論された型/定数を処理し、ケースを忘れないようにすることが容易になる
 
 [ty_infer]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/hir/enum.TyKind.html#variant.Infer
 [const_infer]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/hir/enum.ConstArgKind.html#variant.Infer

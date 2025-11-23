@@ -1,114 +1,109 @@
-# Lints
+# リント
 
-This page documents some of the machinery around lint registration and how we
-run lints in the compiler.
+このページでは、リント登録に関する機構と、
+コンパイラでリントを実行する方法に関するいくつかのドキュメントを提供します。
 
-The [`LintStore`] is the central piece of infrastructure, around which
-everything rotates. The `LintStore` is held as part of the [`Session`], and it
-gets populated with the list of lints shortly after the `Session` is created.
+[`LintStore`]は、すべてが回転する中心的なインフラストラクチャです。
+`LintStore`は[`Session`]の一部として保持され、
+`Session`が作成された直後にリントのリストが入力されます。
 
-## Lints vs. lint passes
+## リント対リントパス
 
-There are two parts to the linting mechanism within the compiler: lints and
-lint passes. Unfortunately, a lot of the documentation we have refers to both
-of these as just "lints."
+コンパイラ内のリント機構には2つの部分があります：リントと
+リントパス。残念ながら、私たちが持っているドキュメントの多くは、
+両方を単に「リント」と呼んでいます。
 
-First, we have the lint declarations themselves,
-and this is where the name and default lint level and other metadata come from.
-These are normally defined by way of the [`declare_lint!`] macro,
-which boils down to a static with type [`&rustc_lint_defs::Lint`]
-(although this may change in the future,
-as the macro is somewhat unwieldy to add new fields to,
-like all macros).
+まず、リント宣言自体があり、
+ここに名前とデフォルトのリントレベルおよび他のメタデータが含まれます。
+これらは通常、[`declare_lint!`]マクロによって定義されます。
+これは、型[`&rustc_lint_defs::Lint`]の静的変数に要約されます
+（ただし、これは将来変更される可能性があります。
+マクロは、新しいフィールドを追加するのがやや扱いにくいためです。
+すべてのマクロのように）。
 
-As of <!-- date-check --> Aug 2022,
-we lint against direct declarations without the use of the macro.
+<!-- date-check --> 2022年8月現在、
+マクロを使用しない直接宣言に対してリントしています。
 
-Lint declarations don't carry any "state" - they are merely global identifiers
-and descriptions of lints. We assert at runtime that they are not registered
-twice (by lint name).
+リント宣言は「状態」を持ちません - それらは単にグローバルな識別子と
+リントの説明です。実行時に2回登録されないことをアサートします
+（リント名によって）。
 
-Lint passes are the meat of any lint. Notably, there is not a one-to-one
-relationship between lints and lint passes; a lint might not have any lint pass
-that emits it, it could have many, or just one -- the compiler doesn't track
-whether a pass is in any way associated with a particular lint, and frequently
-lints are emitted as part of other work (e.g., type checking, etc.).
+リントパスは、任意のリントの本質です。特に、
+リントとリントパスの間に一対一の関係はありません；リントは、それを出力する
+リントパスを持たない可能性があり、多くを持つ可能性があり、または1つだけを持つ可能性があります -- コンパイラは、
+パスが特定のリントと何らかの形で関連しているかどうかを追跡しません。また、
+リントは、他の作業の一部として頻繁に出力されます（例：型チェックなど）。
 
-## Registration
+## 登録
 
-### High-level overview
+### 高レベルの概要
 
-In [`rustc_interface::run_compiler`],
-the [`LintStore`] is created,
-and all lints are registered.
+[`rustc_interface::run_compiler`]では、
+[`LintStore`]が作成され、
+すべてのリントが登録されます。
 
-There are three 'sources' of lints:
+リントには3つの「ソース」があります：
 
-* internal lints: lints only used by the rustc codebase
-* builtin lints: lints built into the compiler and not provided by some outside
-  source
-* `rustc_interface::Config`[`register_lints`]: lints passed into the compiler
-  during construction
+* 内部リント：rustcコードベースでのみ使用されるリント
+* 組み込みリント：コンパイラに組み込まれており、外部ソースから提供されないリント
+* `rustc_interface::Config`[`register_lints`]：構築中にコンパイラに渡されるリント
 
-Lints are registered via the [`LintStore::register_lint`] function. This should
-happen just once for any lint, or an ICE will occur.
+リントは、[`LintStore::register_lint`]関数を介して登録されます。これは、
+任意のリントに対して一度だけ行うべきです。そうでないと、ICEが発生します。
 
-Once the registration is complete, we "freeze" the lint store by placing it in
-an `Arc`.
+登録が完了すると、`Arc`に配置することで、リントストアを「フリーズ」します。
 
-Lint passes are registered separately into one of the categories
-(pre-expansion, early, late, late module). Passes are registered as a closure
--- i.e., `impl Fn() -> Box<dyn X>`, where `dyn X` is either an early or late
-lint pass trait object. When we run the lint passes, we run the closure and
-then invoke the lint pass methods. The lint pass methods take `&mut self` so
-they can keep track of state internally.
+リントパスは、カテゴリの1つ（展開前、早期、後期、後期モジュール）に
+別々に登録されます。パスはクロージャとして登録されます --
+つまり、`impl Fn() -> Box<dyn X>`。ここで、`dyn X`は早期または後期の
+リントパストレイトオブジェクトです。リントパスを実行するとき、クロージャを実行し、
+次にリントパスメソッドを呼び出します。リントパスメソッドは`&mut self`を取るため、
+内部状態を追跡できます。
 
-#### Internal lints
+#### 内部リント
 
-These are lints used just by the compiler or drivers like `clippy`. They can be
-found in [`rustc_lint::internal`].
+これらは、コンパイラまたは`clippy`のようなドライバーだけが使用するリントです。
+[`rustc_lint::internal`]にあります。
 
-An example of such a lint is the check that lint passes are implemented using
-the `declare_lint_pass!` macro and not by hand. This is accomplished with the
-`LINT_PASS_IMPL_WITHOUT_MACRO` lint.
+このようなリントの例は、リントパスが`declare_lint_pass!`マクロを使用して実装されており、
+手動で実装されていないことをチェックするものです。これは
+`LINT_PASS_IMPL_WITHOUT_MACRO`リントで実現されています。
 
-Registration of these lints happens in the [`rustc_lint::register_internals`]
-function which is called when constructing a new lint store inside
-[`rustc_lint::new_lint_store`].
+これらのリントの登録は、[`rustc_lint::new_lint_store`]内で呼び出される
+[`rustc_lint::register_internals`]関数で行われます。
 
-#### Builtin Lints
+#### 組み込みリント
 
-These are primarily described in two places,
-`rustc_lint_defs::builtin` and `rustc_lint::builtin`.
-Often the first provides the definitions for the lints themselves,
-and the latter provides the lint pass definitions (and implementations),
-but this is not always true.
+これらは主に2つの場所で説明されています。
+`rustc_lint_defs::builtin`と`rustc_lint::builtin`。
+多くの場合、最初のものはリント自体の定義を提供し、
+後者はリントパスの定義（および実装）を提供しますが、
+これは常に真実ではありません。
 
-The builtin lint registration happens in
-the [`rustc_lint::register_builtins`] function.
-Just like with internal lints,
-this happens inside of [`rustc_lint::new_lint_store`].
+組み込みリントの登録は、
+[`rustc_lint::register_builtins`]関数で行われます。
+内部リントと同様に、
+これは[`rustc_lint::new_lint_store`]内で行われます。
 
-#### Driver lints
+#### ドライバーリント
 
-These are the lints provided by drivers via the `rustc_interface::Config`
-[`register_lints`] field, which is a callback. Drivers should, if finding it
-already set, call the function currently set within the callback they add. The
-best way for drivers to get access to this is by overriding the
-`Callbacks::config` function which gives them direct access to the `Config`
-structure.
+これらは、`rustc_interface::Config`[`register_lints`]フィールドを介して
+ドライバーによって提供されるリントです。これはコールバックです。ドライバーは、
+既に設定されている場合、追加するコールバック内で現在設定されている関数を呼び出すべきです。
+ドライバーがこれにアクセスするための最良の方法は、`Callbacks::config`関数を
+オーバーライドすることです。これにより、`Config`構造体への直接アクセスが得られます。
 
-## Compiler lint passes are combined into one pass
+## コンパイラリントパスは1つのパスに結合されます
 
-Within the compiler, for performance reasons, we usually do not register dozens
-of lint passes. Instead, we have a single lint pass of each variety (e.g.,
-`BuiltinCombinedModuleLateLintPass`) which will internally call all of the
-individual lint passes; this is because then we get the benefits of static over
-dynamic dispatch for each of the (often empty) trait methods.
+コンパイラ内では、パフォーマンス上の理由から、通常、数十の
+リントパスを登録しません。代わりに、各種類の単一のリントパスがあります（例：
+`BuiltinCombinedModuleLateLintPass`）。これは内部的にすべての
+個々のリントパスを呼び出します；これは、（多くの場合空の）トレイトメソッドの
+それぞれに対して動的ディスパッチではなく静的ディスパッチの利点を得るためです。
 
-Ideally, we'd not have to do this, since it adds to the complexity of
-understanding the code. However, with the current type-erased lint store
-approach, it is beneficial to do so for performance reasons.
+理想的には、これを行う必要はないでしょう。コードの理解の複雑さが増すためです。
+ただし、現在の型消去されたリントストアアプローチでは、
+パフォーマンス上の理由から有益です。
 
 [`LintStore`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_lint/struct.LintStore.html
 [`LintStore::register_lint`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_lint/struct.LintStore.html#method.register_lints

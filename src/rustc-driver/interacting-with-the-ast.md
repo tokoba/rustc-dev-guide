@@ -1,10 +1,10 @@
-# Example: Type checking through `rustc_driver`
+# 例：`rustc_driver`を使用した型チェック
 
-[`rustc_driver`] allows you to interact with Rust code at various stages of compilation.
+[`rustc_driver`]を使用すると、コンパイルのさまざまな段階でRustコードとやり取りすることができます。
 
-## Getting the type of an expression
+## 式の型を取得する
 
-To get the type of an expression, use the [`after_analysis`] callback to get a [`TyCtxt`].
+式の型を取得するには、[`after_analysis`]コールバックを使用して[`TyCtxt`]を取得します。
 
 ```rust
 {{#include ../../examples/rustc-driver-interacting-with-the-ast.rs}}

@@ -1,9 +1,8 @@
 # std::offload
 
-This module is under active development. Once upstream, it should allow Rust developers to run Rust code on GPUs.
-We aim to develop a `rusty` GPU programming interface, which is safe, convenient and sufficiently fast by default.
-This includes automatic data movement to and from the GPU, in a efficient way. We will (later)
-also offer more advanced, possibly unsafe, interfaces which allow a higher degree of control.
+このモジュールは活発に開発中です。アップストリームされると、Rust開発者がGPU上でRustコードを実行できるようになります。
+私たちは、安全で便利で、デフォルトで十分に高速な`rusty`なGPUプログラミングインターフェースの開発を目指しています。
+これには、効率的な方法でのGPUへの、およびGPUからの自動データ移動が含まれます。後に、より高度な制御を可能にする、おそらくunsafeなインターフェースも提供する予定です。
 
-The implementation is based on LLVM's "offload" project, which is already used by OpenMP to run Fortran or C++ code on GPUs.
-While the project is under development, users will need to call other compilers like clang to finish the compilation process.
+実装は、OpenMPがFortranまたはC++コードをGPU上で実行するために既に使用しているLLVMの「offload」プロジェクトに基づいています。
+プロジェクトが開発中の間、ユーザーはコンパイルプロセスを完了するためにclangのような他のコンパイラを呼び出す必要があります。

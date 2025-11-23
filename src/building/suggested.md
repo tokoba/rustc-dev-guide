@@ -1,33 +1,22 @@
-# Suggested workflows
+# 推奨ワークフロー
 
-The full bootstrapping process takes quite a while. Here are some suggestions to
-make your life easier.
+完全なブートストラッププロセスにはかなりの時間がかかります。ここでは、生活を楽にするためのいくつかの提案があります。
 
-## Installing a pre-push hook
+## pre-push フックのインストール
 
-CI will automatically fail your build if it doesn't pass `tidy`, our internal
-tool for ensuring code quality. If you'd like, you can install a [Git
-hook](https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks) that will
-automatically run `./x test tidy` on each push, to ensure your code is up to
-par. If the hook fails then run `./x test tidy --bless` and commit the changes.
-If you decide later that the pre-push behavior is undesirable, you can delete
-the `pre-push` file in `.git/hooks`.
+コードの品質を保証する内部ツールである `tidy` に合格しない場合、CI は自動的にビルドを失敗させます。必要に応じて、各プッシュで `./x test tidy` を自動的に実行する [Git フック](https://git-scm.com/book/en/v2/Customizing-Git-Git-Hooks) をインストールして、コードが標準に達していることを確認できます。フックが失敗した場合は、`./x test tidy --bless` を実行し、変更をコミットします。後で pre-push 動作が望ましくないと判断した場合は、`.git/hooks` の `pre-push` ファイルを削除できます。
 
-A prebuilt git hook lives at [`src/etc/pre-push.sh`].  It can be copied into
-your `.git/hooks` folder as `pre-push` (without the `.sh` extension!).
+事前ビルドされた git フックは [`src/etc/pre-push.sh`] にあります。これは、`.git/hooks` フォルダに `pre-push`（`.sh` 拡張子なし！）としてコピーできます。
 
-You can also install the hook as a step of running `./x setup`!
+`./x setup` を実行する手順の一環として、フックをインストールすることもできます！
 
-## Config extensions
+## 設定拡張
 
-When working on different tasks, you might need to switch between different bootstrap configurations.
-Sometimes you may want to keep an old configuration for future use. But saving raw config values in
-random files and manually copying and pasting them can quickly become messy, especially if you have a
-long history of different configurations.
+異なるタスクで作業する際、異なるブートストラップ設定を切り替える必要がある場合があります。将来の使用のために古い設定を保持したい場合があります。しかし、ランダムなファイルに生の設定値を保存し、手動でコピーアンドペーストすると、特に長い設定履歴がある場合、すぐに乱雑になります。
 
-To simplify managing multiple configurations, you can create config extensions.
+複数の設定の管理を簡素化するために、設定拡張を作成できます。
 
-For example, you can create a simple config file named `cross.toml`:
+たとえば、`cross.toml` という名前のシンプルな設定ファイルを作成できます：
 
 ```toml
 [build]
@@ -43,80 +32,48 @@ download-ci-llvm = false
 llvm-config = "/path/to/llvm-19/bin/llvm-config"
 ```
 
-Then, include this in your `bootstrap.toml`:
+次に、これを `bootstrap.toml` に含めます：
 
 ```toml
 include = ["cross.toml"]
 ```
 
-You can also include extensions within extensions recursively.
+拡張内に拡張を再帰的に含めることもできます。
 
-**Note:** In the `include` field, the overriding logic follows a right-to-left order. For example,
-in `include = ["a.toml", "b.toml"]`, extension `b.toml` overrides `a.toml`. Also, parent extensions
-always overrides the inner ones.
+**注意**: `include` フィールドでは、オーバーライドロジックは右から左の順序に従います。たとえば、`include = ["a.toml", "b.toml"]` では、拡張 `b.toml` が `a.toml` をオーバーライドします。また、親拡張は常に内部のものをオーバーライドします。
 
-## Configuring `rust-analyzer` for `rustc`
+## `rustc` 用の `rust-analyzer` の設定
 
-### Checking the "library" tree
+### 「library」ツリーのチェック
 
-Checking the "library" tree requires a stage1 compiler, which can be a heavy process on some computers.
-For this reason, bootstrap has a flag called `--skip-std-check-if-no-download-rustc` that skips checking the
-"library" tree if `rust.download-rustc` isn't available. If you want to avoid putting a heavy load on your computer
-with `rust-analyzer`, you can add the `--skip-std-check-if-no-download-rustc` flag to your `./x check` command in
-the `rust-analyzer` configuration.
+「library」ツリーのチェックには stage1 コンパイラが必要で、一部のコンピュータでは負荷の高いプロセスになる可能性があります。このため、ブートストラップには `--skip-std-check-if-no-download-rustc` というフラグがあり、`rust.download-rustc` が利用できない場合は「library」ツリーのチェックをスキップします。`rust-analyzer` でコンピュータに重い負荷をかけたくない場合は、`rust-analyzer` 設定の `./x check` コマンドに `--skip-std-check-if-no-download-rustc` フラグを追加できます。
 
-### Project-local rust-analyzer setup
+### プロジェクトローカル rust-analyzer セットアップ
 
-`rust-analyzer` can help you check and format your code whenever you save a
-file. By default, `rust-analyzer` runs the `cargo check` and `rustfmt` commands,
-but you can override these commands to use more adapted versions of these tools
-when hacking on `rustc`. With custom setup, `rust-analyzer` can use `./x check`
-to check the sources, and the stage 0 rustfmt to format them.
+`rust-analyzer` は、ファイルを保存するたびにコードをチェックしてフォーマットするのに役立ちます。デフォルトでは、`rust-analyzer` は `cargo check` と `rustfmt` コマンドを実行しますが、`rustc` をハックする際に、これらのツールのより適応されたバージョンを使用するようにこれらのコマンドをオーバーライドできます。カスタムセットアップを使用すると、`rust-analyzer` は `./x check` を使用してソースをチェックし、stage 0 rustfmt を使用してフォーマットできます。
 
-The default `rust-analyzer.check.overrideCommand` command line will check all
-the crates and tools in the repository. If you are working on a specific part,
-you can override the command to only check the part you are working on to save
-checking time. For example, if you are working on the compiler, you can override
-the command to `x check compiler --json-output` to only check the compiler part.
-You can run `x check --help --verbose` to see the available parts.
+デフォルトの `rust-analyzer.check.overrideCommand` コマンドラインは、リポジトリ内のすべてのクレートとツールをチェックします。特定の部分で作業している場合は、チェック時間を節約するために、作業している部分のみをチェックするようにコマンドをオーバーライドできます。たとえば、コンパイラで作業している場合は、コンパイラ部分のみをチェックするために、コマンドを `x check compiler --json-output` にオーバーライドできます。利用可能な部分を確認するには、`x check --help --verbose` を実行できます。
 
-Running `./x setup editor` will prompt you to create a project-local LSP config
-file for one of the supported editors. You can also create the config file as a
-step of running `./x setup`.
+`./x setup editor` を実行すると、サポートされているエディタの1つに対してプロジェクトローカル LSP 設定ファイルを作成するよう求められます。`./x setup` を実行する手順の一環として設定ファイルを作成することもできます。
 
-### Using a separate build directory for rust-analyzer
+### rust-analyzer 用の別のビルドディレクトリの使用
 
-By default, when rust-analyzer runs a check or format command, it will share
-the same build directory as manual command-line builds. This can be inconvenient
-for two reasons:
-- Each build will lock the build directory and force the other to wait, so it
-  becomes impossible to run command-line builds while rust-analyzer is running
-  commands in the background.
-- There is an increased risk of one of the builds deleting previously-built
-  artifacts due to conflicting compiler flags or other settings, forcing
-  additional rebuilds in some cases.
+デフォルトでは、rust-analyzer がチェックまたはフォーマットコマンドを実行すると、手動のコマンドラインビルドと同じビルドディレクトリを共有します。これは2つの理由で不便です：
+- 各ビルドがビルドディレクトリをロックし、他方を待たせるため、rust-analyzer がバックグラウンドでコマンドを実行している間にコマンドラインビルドを実行することが不可能になります。
+- コンパイラフラグやその他の設定の競合により、ビルドの一方が以前にビルドされたアーティファクトを削除するリスクが高まり、場合によっては追加の再ビルドが強制されます。
 
-To avoid these problems:
-- Add `--build-dir=build/rust-analyzer` to all of the custom `x` commands in
-  your editor's rust-analyzer configuration.
-  (Feel free to choose a different directory name if desired.)
-- Modify the `rust-analyzer.rustfmt.overrideCommand` setting so that it points
-  to the copy of `rustfmt` in that other build directory.
-- Modify the `rust-analyzer.procMacro.server` setting so that it points to the
-  copy of `rust-analyzer-proc-macro-srv` in that other build directory.
+これらの問題を回避するには：
+- エディタの rust-analyzer 設定のすべてのカスタム `x` コマンドに `--build-dir=build/rust-analyzer` を追加します。（必要に応じて別のディレクトリ名を選択してください。）
+- `rust-analyzer.rustfmt.overrideCommand` 設定を変更して、その他のビルドディレクトリ内の `rustfmt` のコピーを指すようにします。
+- `rust-analyzer.procMacro.server` 設定を変更して、その他のビルドディレクトリ内の `rust-analyzer-proc-macro-srv` のコピーを指すようにします。
 
-Using separate build directories for command-line builds and rust-analyzer
-requires extra disk space.
+コマンドラインビルドと rust-analyzer に別々のビルドディレクトリを使用するには、追加のディスクスペースが必要です。
 
 ### Visual Studio Code
 
-Selecting `vscode` in `./x setup editor` will prompt you to create a
-`.vscode/settings.json` file which will configure Visual Studio code. The
-recommended `rust-analyzer` settings live at
-[`src/etc/rust_analyzer_settings.json`].
+`./x setup editor` で `vscode` を選択すると、Visual Studio Code を設定する `.vscode/settings.json` ファイルを作成するよう求められます。推奨される `rust-analyzer` 設定は [`src/etc/rust_analyzer_settings.json`] にあります。
 
-If running `./x check` on save is inconvenient, in VS Code you can use a [Build
-Task] instead:
+保存時に `./x check` を実行することが不便な場合、VS Code では代わりに [Build Task] を使用できます：
 
 ```JSON
 // .vscode/tasks.json
@@ -140,27 +97,14 @@ Task] instead:
 
 ### Neovim
 
-For Neovim users, there are a few options. The
-easiest way is by using [neoconf.nvim](https://github.com/folke/neoconf.nvim/),
-which allows for project-local configuration files with the native LSP. The
-steps for how to use it are below. Note that they require rust-analyzer to
-already be configured with Neovim. Steps for this can be [found
-here](https://rust-analyzer.github.io/manual.html#nvim-lsp).
+Neovim ユーザーには、いくつかのオプションがあります。最も簡単な方法は、[neoconf.nvim](https://github.com/folke/neoconf.nvim/) を使用することです。これにより、ネイティブ LSP でプロジェクトローカル設定ファイルが可能になります。使用方法の手順は以下のとおりです。これらには、rust-analyzer がすでに Neovim で設定されている必要があることに注意してください。これの手順は [こちら](https://rust-analyzer.github.io/manual.html#nvim-lsp) にあります。
 
-1. First install the plugin. This can be done by following the steps in the
-   README.
-2. Run `./x setup editor`, and select `vscode` to create a
-   `.vscode/settings.json` file. `neoconf` is able to read and update
-   rust-analyzer settings automatically when the project is opened when this
-   file is detected.
+1. まず、プラグインをインストールします。これは、README の手順に従って行うことができます。
+2. `./x setup editor` を実行し、`vscode` を選択して `.vscode/settings.json` ファイルを作成します。`neoconf` は、このファイルが検出されたときにプロジェクトが開かれたときに、rust-analyzer 設定を自動的に読み取って更新できます。
 
-If you're using `coc.nvim`, you can run `./x setup editor` and select `vim` to
-create a `.vim/coc-settings.json`. The settings can be edited with
-`:CocLocalConfig`. The recommended settings live at
-[`src/etc/rust_analyzer_settings.json`].
+`coc.nvim` を使用している場合は、`./x setup editor` を実行し、`vim` を選択して `.vim/coc-settings.json` を作成できます。設定は `:CocLocalConfig` で編集できます。推奨設定は [`src/etc/rust_analyzer_settings.json`] にあります。
 
-Another way is without a plugin, and creating your own logic in your
-configuration. The following code will work for any checkout of rust-lang/rust (newer than February 2025):
+別の方法は、プラグインなしで、設定に独自のロジックを作成することです。以下のコードは、rust-lang/rust の任意のチェックアウト（2025年2月以降）で機能します：
 
 ```lua
 local function expand_config_variables(option)
@@ -214,162 +158,89 @@ lspconfig.rust_analyzer.setup {
 }
 ```
 
-If you would like to use the build task that is described above, you may either
-make your own command in your config, or you can install a plugin such as
-[overseer.nvim](https://github.com/stevearc/overseer.nvim) that can [read
-VSCode's `task.json`
-files](https://github.com/stevearc/overseer.nvim/blob/master/doc/guides.md#vs-code-tasks),
-and follow the same instructions as above.
+上記で説明したビルドタスクを使用したい場合は、設定で独自のコマンドを作成するか、VSCode の `task.json` ファイルを [読み取れる](https://github.com/stevearc/overseer.nvim/blob/master/doc/guides.md#vs-code-tasks) [overseer.nvim](https://github.com/stevearc/overseer.nvim) などのプラグインをインストールして、上記と同じ手順に従うことができます。
 
 ### Emacs
 
-Emacs provides support for rust-analyzer with project-local configuration
-through [Eglot](https://www.gnu.org/software/emacs/manual/html_node/eglot/).
-Steps for setting up Eglot with rust-analyzer can be [found
-here](https://rust-analyzer.github.io/manual.html#eglot).
-Having set up Emacs & Eglot for Rust development in general, you can run
-`./x setup editor` and select `emacs`, which will prompt you to create
-`.dir-locals.el` with the recommended configuration for Eglot.
-The recommended settings live at [`src/etc/rust_analyzer_eglot.el`].
-For more information on project-specific Eglot configuration, consult [the
-manual](https://www.gnu.org/software/emacs/manual/html_node/eglot/Project_002dspecific-configuration.html).
+Emacs は、[Eglot](https://www.gnu.org/software/emacs/manual/html_node/eglot/) を介してプロジェクトローカル設定で rust-analyzer をサポートします。Eglot を rust-analyzer でセットアップする手順は [こちら](https://rust-analyzer.github.io/manual.html#eglot) にあります。一般的に Rust 開発用に Emacs と Eglot をセットアップしたら、`./x setup editor` を実行し、`emacs` を選択できます。これにより、Eglot の推奨設定で `.dir-locals.el` を作成するよう求められます。推奨設定は [`src/etc/rust_analyzer_eglot.el`] にあります。プロジェクト固有の Eglot 設定の詳細については、[マニュアル](https://www.gnu.org/software/emacs/manual/html_node/eglot/Project_002dspecific-configuration.html) を参照してください。
 
 ### Helix
 
-Helix comes with built-in LSP and rust-analyzer support.
-It can be configured through `languages.toml`, as described
-[here](https://docs.helix-editor.com/languages.html).
-You can run `./x setup editor` and select `helix`, which will prompt you to
-create `languages.toml` with the recommended configuration for Helix. The
-recommended settings live at [`src/etc/rust_analyzer_helix.toml`].
+Helix には、組み込みの LSP と rust-analyzer サポートが付属しています。[こちら](https://docs.helix-editor.com/languages.html) で説明されているように、`languages.toml` を介して設定できます。`./x setup editor` を実行し、`helix` を選択すると、Helix の推奨設定で `languages.toml` を作成するよう求められます。推奨設定は [`src/etc/rust_analyzer_helix.toml`] にあります。
 
 ### Zed
 
-Zed comes with built-in LSP and rust-analyzer support.
-It can be configured through `.zed/settings.json`, as described
-[here](https://zed.dev/docs/configuring-languages). Selecting `zed`
-in `./x setup editor` will prompt you to create a `.zed/settings.json`
-file which will configure Zed with the recommended configuration. The
-recommended `rust-analyzer` settings live
-at [`src/etc/rust_analyzer_zed.json`].
+Zed には、組み込みの LSP と rust-analyzer サポートが付属しています。[こちら](https://zed.dev/docs/configuring-languages) で説明されているように、`.zed/settings.json` を介して設定できます。`./x setup editor` で `zed` を選択すると、推奨設定で Zed を設定する `.zed/settings.json` ファイルを作成するよう求められます。推奨される `rust-analyzer` 設定は [`src/etc/rust_analyzer_zed.json`] にあります。
 
-## Check, check, and check again
+## Check、check、そして再び check
 
-When doing simple refactoring, it can be useful to run `./x check`
-continuously. If you set up `rust-analyzer` as described above, this will be
-done for you every time you save a file. Here you are just checking that the
-compiler can **build**, but often that is all you need (e.g., when renaming a
-method). You can then run `./x build` when you actually need to run tests.
+シンプルなリファクタリングを行う場合、`./x check` を継続的に実行すると便利です。上記のように `rust-analyzer` をセットアップした場合、ファイルを保存するたびにこれが自動的に実行されます。ここでは、コンパイラが **ビルド** できるかどうかをチェックしているだけですが、多くの場合それで十分です（たとえば、メソッドの名前を変更する場合）。実際にテストを実行する必要があるときに `./x build` を実行できます。
 
-In fact, it is sometimes useful to put off tests even when you are not 100% sure
-the code will work. You can then keep building up refactoring commits and only
-run the tests at some later time. You can then use `git bisect` to track down
-**precisely** which commit caused the problem. A nice side-effect of this style
-is that you are left with a fairly fine-grained set of commits at the end, all
-of which build and pass tests. This often helps reviewing.
+実際には、コードが 100% 機能することを確信していない場合でも、テストを延期することが有用な場合があります。次に、リファクタリングコミットを積み重ねて、後の時点でのみテストを実行できます。次に、`git bisect` を使用して、**正確に** どのコミットが問題を引き起こしたかを追跡できます。このスタイルの良い副作用は、最終的にかなり細かいコミットのセットが残り、すべてがビルドされてテストに合格することです。これはレビューに役立つことがよくあります。
 
-## Configuring `rustup` to use nightly
+## `rustup` を nightly を使用するように設定する
 
-Some parts of the bootstrap process uses pinned, nightly versions of tools like
-rustfmt. To make things like `cargo fmt` work correctly in your repo, run
+ブートストラッププロセスの一部は、rustfmt などのツールのピン留めされた nightly バージョンを使用します。リポジトリで `cargo fmt` などを正しく動作させるには、次を実行します
 
 ```console
 cd <path to rustc repo>
 rustup override set nightly
 ```
 
-after [installing a nightly toolchain] with `rustup`. Don't forget to do this
-for all directories you have [setup a worktree for]. You may need to use the
-pinned nightly version from `src/stage0`, but often the normal `nightly` channel
-will work.
+`rustup` で [nightly ツールチェーンをインストール] した後。[worktree をセットアップした] すべてのディレクトリに対してこれを行うことを忘れないでください。`src/stage0` からピン留めされた nightly バージョンを使用する必要がある場合がありますが、多くの場合、通常の `nightly` チャネルが機能します。
 
-**Note** see [the section on vscode] for how to configure it with this real
-rustfmt `x` uses, and [the section on rustup] for how to setup `rustup`
-toolchain for your bootstrapped compiler
+**注意** `x` が使用する実際の rustfmt でそれを設定する方法については、[vscode のセクション] を参照してください。ブートストラップされたコンパイラ用に `rustup` ツールチェーンをセットアップする方法については、[rustup のセクション] を参照してください
 
-**Note** This does _not_ allow you to build `rustc` with cargo directly. You
-still have to use `x` to work on the compiler or standard library, this just
-lets you use `cargo fmt`.
+**注意** これは、cargo で直接 `rustc` をビルドすることを許可するものでは _ありません_。コンパイラや標準ライブラリで作業するには、引き続き `x` を使用する必要があります。これは単に `cargo fmt` を使用できるようにするだけです。
 
-[installing a nightly toolchain]: https://rust-lang.github.io/rustup/concepts/channels.html?highlight=nightl#working-with-nightly-rust
-[setup a worktree for]: ./suggested.md#working-on-multiple-branches-at-the-same-time
-[the section on vscode]: suggested.md#configuring-rust-analyzer-for-rustc
-[the section on rustup]: how-to-build-and-run.md?highlight=rustup#creating-a-rustup-toolchain
+[nightly ツールチェーンをインストール]: https://rust-lang.github.io/rustup/concepts/channels.html?highlight=nightl#working-with-nightly-rust
+[worktree をセットアップした]: ./suggested.md#working-on-multiple-branches-at-the-same-time
+[vscode のセクション]: suggested.md#configuring-rust-analyzer-for-rustc
+[rustup のセクション]: how-to-build-and-run.md?highlight=rustup#creating-a-rustup-toolchain
 
-## Faster Builds with CI-rustc
+## CI-rustc でのより高速なビルド
 
-If you are not working on the compiler, you often don't need to build the compiler tree.
-For example, you can skip building the compiler and only build the `library` tree or the
-tools under `src/tools`. To achieve that, you have to enable this by setting the `download-rustc`
-option in your configuration. This tells bootstrap to use the latest nightly compiler for `stage > 0`
-steps, meaning it will have two precompiled compilers: stage0 compiler and `download-rustc` compiler
-for `stage > 0` steps. This way, it will never need to build the in-tree compiler. As a result, your
-build time will be significantly reduced by not building the in-tree compiler.
+コンパイラで作業していない場合、多くの場合、コンパイラツリーをビルドする必要はありません。たとえば、コンパイラのビルドをスキップして、`library` ツリーまたは `src/tools` 下のツールのみをビルドできます。これを実現するには、設定で `download-rustc` オプションを設定してこれを有効にする必要があります。これにより、ブートストラップは `stage > 0` ステップに最新の nightly コンパイラを使用するように指示されます。つまり、2つの事前コンパイルされたコンパイラ、stage0 コンパイラと `stage > 0` ステップ用の `download-rustc` コンパイラを持つことになります。このようにして、インツリーコンパイラをビルドする必要がなくなります。その結果、インツリーコンパイラをビルドしないことで、ビルド時間が大幅に短縮されます。
 
-## Faster rebuilds with `--keep-stage-std`
+## `--keep-stage-std` でのより高速な再ビルド
 
-Sometimes just checking whether the compiler builds is not enough. A common
-example is that you need to add a `debug!` statement to inspect the value of
-some state or better understand the problem. In that case, you don't really need
-a full build. By bypassing bootstrap's cache invalidation, you can often get
-these builds to complete very fast (e.g., around 30 seconds). The only catch is
-this requires a bit of fudging and may produce compilers that don't work (but
-that is easily detected and fixed).
+時には、コンパイラがビルドされるかどうかをチェックするだけでは十分ではありません。一般的な例は、状態の値を検査したり、問題をよりよく理解したりするために、`debug!` ステートメントを追加する必要がある場合です。その場合、実際には完全なビルドは必要ありません。ブートストラップのキャッシュ無効化をバイパスすることで、これらのビルドを非常に高速に（たとえば、約 30 秒で）完了させることができます。唯一の注意点は、これには少しのごまかしが必要で、機能しないコンパイラを生成する可能性があることです（ただし、それは簡単に検出して修正できます）。
 
-The sequence of commands you want is as follows:
+必要なコマンドのシーケンスは次のとおりです：
 
-- Initial build: `./x build library`
-- Subsequent builds: `./x build library --keep-stage-std=1`
-  - Note that we added the `--keep-stage-std=1` flag here
+- 初期ビルド：`./x build library`
+- 後続のビルド：`./x build library --keep-stage-std=1`
+  - ここで `--keep-stage-std=1` フラグを追加したことに注意してください
 
-As mentioned, the effect of `--keep-stage-std=1` is that we just _assume_ that the
-old standard library can be re-used. If you are editing the compiler, this is
-often true: you haven't changed the standard library, after all. But
-sometimes, it's not true: for example, if you are editing the "metadata" part of
-the compiler, which controls how the compiler encodes types and other states
-into the `rlib` files, or if you are editing things that wind up in the metadata
-(such as the definition of the MIR).
+前述のように、`--keep-stage-std=1` の効果は、古い標準ライブラリを再利用できると _仮定する_ だけです。コンパイラを編集している場合、これは多くの場合真実です：結局のところ、標準ライブラリを変更していません。しかし、時にはそうではありません：たとえば、コンパイラが型や他の状態を `rlib` ファイルにエンコードする方法を制御する「メタデータ」部分を編集している場合、またはメタデータに含まれるもの（MIR の定義など）を編集している場合です。
 
-**The TL;DR is that you might get weird behavior from a compile when using
-`--keep-stage-std=1`** -- for example, strange [ICEs](../appendix/glossary.html#ice)
-or other panics. In that case, you should simply remove the `--keep-stage-std=1`
-from the command and rebuild. That ought to fix the problem.
+**要するに、`--keep-stage-std=1` を使用してコンパイルすると、奇妙な動作が発生する可能性があります** -- たとえば、奇妙な [ICE](../appendix/glossary.html#ice) やその他のパニック。その場合は、単にコマンドから `--keep-stage-std=1` を削除して再ビルドすればよいでしょう。それで問題が解決するはずです。
 
-You can also use `--keep-stage-std=1` when running tests. Something like this:
+テストを実行する際にも `--keep-stage-std=1` を使用できます。次のようなものです：
 
-- Initial test run: `./x test tests/ui`
-- Subsequent test run: `./x test tests/ui --keep-stage-std=1`
+- 初期テスト実行：`./x test tests/ui`
+- 後続のテスト実行：`./x test tests/ui --keep-stage-std=1`
 
-## Using incremental compilation
+## インクリメンタルコンパイルの使用
 
-You can further enable the `--incremental` flag to save additional time in
-subsequent rebuilds:
+`--incremental` フラグをさらに有効にして、後続の再ビルドで追加の時間を節約できます：
 
 ```bash
 ./x test tests/ui --incremental --test-args issue-1234
 ```
 
-If you don't want to include the flag with every command, you can enable it in
-the `bootstrap.toml`:
+すべてのコマンドでフラグを含めたくない場合は、`bootstrap.toml` で有効にできます：
 
 ```toml
 [rust]
 incremental = true
 ```
 
-Note that incremental compilation will use more disk space than usual. If disk
-space is a concern for you, you might want to check the size of the `build`
-directory from time to time.
+インクリメンタルコンパイルは、通常よりも多くのディスクスペースを使用することに注意してください。ディスクスペースが懸念事項である場合は、時々 `build` ディレクトリのサイズを確認することをお勧めします。
 
-## Fine-tuning optimizations
+## 最適化の微調整
 
-Setting `optimize = false` makes the compiler too slow for tests. However, to
-improve the test cycle, you can disable optimizations selectively only for the
-crates you'll have to rebuild
-([source](https://rust-lang.zulipchat.com/#narrow/stream/131828-t-compiler/topic/incremental.20compilation.20question/near/202712165)).
-For example, when working on `rustc_mir_build`, the `rustc_mir_build` and
-`rustc_driver` crates take the most time to incrementally rebuild. You could
-therefore set the following in the root `Cargo.toml`:
+`optimize = false` を設定すると、コンパイラがテストには遅すぎます。ただし、テストサイクルを改善するために、再ビルドする必要があるクレートに対してのみ選択的に最適化を無効にできます（[ソース](https://rust-lang.zulipchat.com/#narrow/stream/131828-t-compiler/topic/incremental.20compilation.20question/near/202712165)）。たとえば、`rustc_mir_build` で作業している場合、`rustc_mir_build` と `rustc_driver` クレートがインクリメンタルに再ビルドするのに最も時間がかかります。したがって、ルート `Cargo.toml` に次のように設定できます：
 
 ```toml
 [profile.release.package.rustc_mir_build]
@@ -378,62 +249,47 @@ opt-level = 0
 opt-level = 0
 ```
 
-## Working on multiple branches at the same time
+## 同時に複数のブランチで作業する
 
-Working on multiple branches in parallel can be a little annoying, since
-building the compiler on one branch will cause the old build and the incremental
-compilation cache to be overwritten. One solution would be to have multiple
-clones of the repository, but that would mean storing the Git metadata multiple
-times, and having to update each clone individually.
+並行して複数のブランチで作業すると、少し面倒になる可能性があります。1つのブランチでコンパイラをビルドすると、古いビルドとインクリメンタルコンパイルキャッシュが上書きされるためです。1つの解決策は、リポジトリの複数のクローンを持つことですが、それは Git メタデータを複数回保存し、各クローンを個別に更新する必要があることを意味します。
 
-Fortunately, Git has a better solution called [worktrees]. This lets you create
-multiple "working trees", which all share the same Git database. Moreover,
-because all of the worktrees share the same object database, if you update a
-branch (e.g. `main`) in any of them, you can use the new commits from any of the
-worktrees. One caveat, though, is that submodules do not get shared. They will
-still be cloned multiple times.
+幸いなことに、Git には [worktrees] と呼ばれるより良いソリューションがあります。これにより、すべて同じ Git データベースを共有する複数の「作業ツリー」を作成できます。さらに、すべての worktree が同じオブジェクトデータベースを共有しているため、いずれかでブランチ（例：`main`）を更新すると、任意の worktree から新しいコミットを使用できます。ただし、1つの注意点は、サブモジュールは共有されないということです。それらは依然として複数回クローンされます。
 
 [worktrees]: https://git-scm.com/docs/git-worktree
 
-Given you are inside the root directory for your Rust repository, you can create
-a "linked working tree" in a new "rust2" directory by running the following
-command:
+Rust リポジトリのルートディレクトリ内にいる場合、次のコマンドを実行することで、新しい「rust2」ディレクトリに「リンクされた作業ツリー」を作成できます：
 
 ```bash
 git worktree add ../rust2
 ```
 
-Creating a new worktree for a new branch based on `main` looks like:
+`main` に基づく新しいブランチの新しい worktree を作成するには、次のようになります：
 
 ```bash
 git worktree add -b my-feature ../rust2 main
 ```
 
-You can then use that rust2 folder as a separate workspace for modifying and
-building `rustc`!
+次に、その rust2 フォルダを `rustc` を変更およびビルドするための別のワークスペースとして使用できます！
 
-## Working with nix
+## nix での作業
 
-Several nix configurations are defined in `src/tools/nix-dev-shell`.
+いくつかの nix 設定が `src/tools/nix-dev-shell` で定義されています。
 
-If you're using direnv, you can create a symbol link to `src/tools/nix-dev-shell/envrc-flake` or `src/tools/nix-dev-shell/envrc-shell`
+direnv を使用している場合は、`src/tools/nix-dev-shell/envrc-flake` または `src/tools/nix-dev-shell/envrc-shell` へのシンボリックリンクを作成できます
 
 ```bash
 ln -s ./src/tools/nix-dev-shell/envrc-flake ./.envrc # Use flake
 ```
-or
+または
 ```bash
 ln -s ./src/tools/nix-dev-shell/envrc-shell ./.envrc # Use nix-shell
 ```
 
-### Note
+### 注意
 
-Note that when using nix on a not-NixOS distribution, it may be necessary to set
-**`patch-binaries-for-nix = true` in `bootstrap.toml`**. Bootstrap tries to detect
-whether it's running in nix and enable patching automatically, but this
-detection can have false negatives.
+NixOS 以外のディストリビューションで nix を使用する場合、**`bootstrap.toml` で `patch-binaries-for-nix = true` を設定する** 必要がある場合があることに注意してください。ブートストラップは nix で実行されているかどうかを検出し、パッチ適用を自動的に有効にしようとしますが、この検出には誤検知がある可能性があります。
 
-You can also use your nix shell to manage `bootstrap.toml`:
+nix シェルを使用して `bootstrap.toml` を管理することもできます：
 
 ```nix
 let
@@ -447,16 +303,11 @@ pkgs.mkShell {
 }
 ```
 
-## Shell Completions
+## シェル補完
 
-If you use Bash, Zsh, Fish or PowerShell, you can find automatically-generated shell
-completion scripts for `x.py` in
-[`src/etc/completions`](https://github.com/rust-lang/rust/tree/HEAD/src/etc/completions).
+Bash、Zsh、Fish、または PowerShell を使用している場合、[`src/etc/completions`](https://github.com/rust-lang/rust/tree/HEAD/src/etc/completions) で `x.py` 用の自動生成されたシェル補完スクリプトを見つけることができます。
 
-You can use `source ./src/etc/completions/x.py.<extension>` to load completions
-for your shell of choice, or `& .\src\etc\completions\x.py.ps1` for PowerShell.
-Adding this to your shell's startup script (e.g. `.bashrc`) will automatically
-load this completion.
+`source ./src/etc/completions/x.py.<extension>` を使用して、選択したシェルの補完をロードできます。または、PowerShell の場合は `& .\src\etc\completions\x.py.ps1` を使用します。これをシェルのスタートアップスクリプト（例：`.bashrc`）に追加すると、この補完が自動的にロードされます。
 
 [`src/etc/rust_analyzer_settings.json`]: https://github.com/rust-lang/rust/blob/HEAD/src/etc/rust_analyzer_settings.json
 [`src/etc/rust_analyzer_eglot.el`]: https://github.com/rust-lang/rust/blob/HEAD/src/etc/rust_analyzer_eglot.el

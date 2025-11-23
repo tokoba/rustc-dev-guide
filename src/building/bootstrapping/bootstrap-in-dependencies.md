@@ -1,10 +1,10 @@
-# `cfg(bootstrap)` in compiler dependencies
+# コンパイラの依存関係における `cfg(bootstrap)`
 
-The rust compiler uses some external crates that can run into cyclic dependencies with the compiler itself: the compiler needs an updated crate to build, but the crate needs an updated compiler. This page describes how `#[cfg(bootstrap)]` can be used to break this cycle.
+Rustコンパイラは、コンパイラ自体と循環的な依存関係を持つ可能性のある外部クレートを使用しています。コンパイラはビルドするために更新されたクレートを必要としますが、そのクレートは更新されたコンパイラを必要とします。このページでは、`#[cfg(bootstrap)]` をどのように使用してこの循環を断ち切ることができるかについて説明します。
 
-## Enabling `#[cfg(bootstrap)]`
+## `#[cfg(bootstrap)]` の有効化
 
-Usually the use of `#[cfg(bootstrap)]` in an external crate causes a warning:
+通常、外部クレートで `#[cfg(bootstrap)]` を使用すると、警告が発生します：
 
 ```
 warning: unexpected `cfg` condition name: `bootstrap`
@@ -23,31 +23,31 @@ warning: unexpected `cfg` condition name: `bootstrap`
   = note: `#[warn(unexpected_cfgs)]` on by default
 ```
 
-This warning can be silenced by adding these lines to the project's `Cargo.toml`:
+この警告は、プロジェクトの `Cargo.toml` に以下の行を追加することで消すことができます：
 
 ```toml
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(bootstrap)'] }
 ```
 
-Now `#[cfg(bootstrap)]` can be used in the crate just like it can be in the compiler: when the bootstrap compiler is used, code annotated with `#[cfg(bootstrap)]` is compiled, otherwise code annotated with `#[cfg(not(bootstrap))]` is compiled.
+これで、`#[cfg(bootstrap)]` をコンパイラで使用できるのと同じように、クレート内で使用できるようになります。ブートストラップコンパイラが使用されている場合、`#[cfg(bootstrap)]` でアノテーションされたコードがコンパイルされ、それ以外の場合は `#[cfg(not(bootstrap))]` でアノテーションされたコードがコンパイルされます。
 
-## The update dance
+## 更新の手順
 
-As a concrete example we'll use a change where the `#[naked]` attribute was made into an unsafe attribute, which caused a cyclic dependency with the `compiler-builtins` crate.
+具体例として、`#[naked]` 属性を安全でない属性にした変更を使用します。これにより、`compiler-builtins` クレートとの循環依存が発生しました。
 
-### Step 1: accept the new behavior in the compiler ([#139797](https://github.com/rust-lang/rust/pull/139797))
+### ステップ1：コンパイラで新しい動作を受け入れる（[#139797](https://github.com/rust-lang/rust/pull/139797)）
 
-In this example it is possible to accept both the old and new behavior at the same time by disabling an error.
+この例では、エラーを無効化することで、古い動作と新しい動作の両方を同時に受け入れることが可能です。
 
-### Step 2: update the crate ([#821](https://github.com/rust-lang/compiler-builtins/pull/821))
+### ステップ2：クレートを更新する（[#821](https://github.com/rust-lang/compiler-builtins/pull/821)）
 
-Now in the crate, use `#[cfg(bootstrap)]` to use the old behavior, or `#[cfg(not(bootstrap))]` to use the new behavior.
+次にクレート内で、`#[cfg(bootstrap)]` を使用して古い動作を使用するか、`#[cfg(not(bootstrap))]` を使用して新しい動作を使用します。
 
-### Step 3: update the crate version used by the compiler ([#139934](https://github.com/rust-lang/rust/pull/139934))
+### ステップ3：コンパイラが使用するクレートバージョンを更新する（[#139934](https://github.com/rust-lang/rust/pull/139934)）
 
-For `compiler-builtins` this meant a version bump, in other cases it may be a git submodule update.
+`compiler-builtins` の場合、これはバージョンのバンプを意味し、他のケースでは git サブモジュールの更新になる可能性があります。
 
-### Step 4: remove the old behavior from the compiler ([#139753](https://github.com/rust-lang/rust/pull/139753))
+### ステップ4：コンパイラから古い動作を削除する（[#139753](https://github.com/rust-lang/rust/pull/139753)）
 
-The updated crate can now be used. In this example that meant that the old behavior could be removed.
+更新されたクレートが使用できるようになりました。この例では、古い動作を削除できることを意味しました。

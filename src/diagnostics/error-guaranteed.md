@@ -1,32 +1,28 @@
 # `ErrorGuaranteed`
-The previous sections have been about the error message that a user of the
-compiler sees. But emitting an error can also have a second important side
-effect within the compiler source code: it generates an
-[`ErrorGuaranteed`][errorguar].
+前のセクションでは、コンパイラのユーザーが見るエラーメッセージについて説明しました。
+しかし、エラーを出力することは、コンパイラソースコード内で2番目の重要な
+副作用を持つこともできます：それは[`ErrorGuaranteed`][errorguar]を生成します。
 
-`ErrorGuaranteed` is a zero-sized type that is unconstructable outside of the
-[`rustc_errors`][rerrors] crate. It is generated whenever an error is reported
-to the user, so that if your compiler code ever encounters a value of type
-`ErrorGuaranteed`, the compilation is _statically guaranteed to fail_. This is
-useful for avoiding unsoundness bugs because you can statically check that an
-error code path leads to a failure.
+`ErrorGuaranteed`は、[`rustc_errors`][rerrors]クレート外では構築不可能な
+ゼロサイズ型です。エラーがユーザーに報告されるたびに生成されるため、
+コンパイラコードが`ErrorGuaranteed`型の値に遭遇した場合、
+コンパイルが_静的に失敗することが保証_されます。これは、
+エラーコードパスが失敗につながることを静的にチェックできるため、
+不健全性バグを回避するのに役立ちます。
 
-There are some important considerations about the usage of `ErrorGuaranteed`:
+`ErrorGuaranteed`の使用に関するいくつかの重要な考慮事項があります：
 
-* It does _not_ convey information about the _kind_ of error. For example, the
-  error may be due (indirectly) to a delayed bug or other compiler error.
-  Thus, you should not rely on
-  `ErrorGuaranteed` when deciding whether to emit an error, or what kind of error
-  to emit.
-* `ErrorGuaranteed` should not be used to indicate that a compilation _will
-  emit_ an error in the future. It should be used to indicate that an error
-  _has already been_ emitted -- that is, the [`emit()`][emit] function has
-  already been called.  For example, if we detect that a future part of the
-  compiler will error, we _cannot_ use `ErrorGuaranteed` unless we first emit
-  an error or delayed bug ourselves.
+* エラーの_種類_に関する情報を伝えることは_ありません_。例えば、
+  エラーは（間接的に）遅延バグまたは他のコンパイラエラーによるものかもしれません。
+  したがって、エラーを出力するかどうか、またはどの種類のエラーを
+  出力するかを決定する際に、`ErrorGuaranteed`に依存すべきではありません。
+* `ErrorGuaranteed`は、コンパイルが将来エラーを_出力する_ことを示すために使用すべきではありません。
+  エラーが_既に出力された_ことを示すために使用すべきです -- つまり、[`emit()`][emit]関数が
+  既に呼び出されている必要があります。例えば、コンパイラの将来の部分がエラーを出力することを
+  検出した場合、最初にエラーまたは遅延バグ自体を出力しない限り、`ErrorGuaranteed`を使用_できません_。
 
-Thankfully, in most cases, it should be statically impossible to abuse
-`ErrorGuaranteed`.
+ありがたいことに、ほとんどの場合、`ErrorGuaranteed`を誤用することは
+静的に不可能であるべきです。
 
 [errorguar]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_errors/struct.ErrorGuaranteed.html
 [rerrors]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_errors/index.html

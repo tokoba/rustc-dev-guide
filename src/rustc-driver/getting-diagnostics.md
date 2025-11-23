@@ -1,13 +1,13 @@
-# Example: Getting diagnostic through `rustc_interface`
+# 例：`rustc_interface`を使用した診断情報の取得
 
-The [`rustc_interface`] allows you to intercept diagnostics that would
-otherwise be printed to stderr.
+[`rustc_interface`]を使用すると、通常stderrに出力される診断情報を
+インターセプトすることができます。
 
-## Getting diagnostics
+## 診断情報の取得
 
-To get diagnostics from the compiler,
-configure [`rustc_interface::Config`] to output diagnostic to a buffer,
-and run [`rustc_hir_typeck::typeck`] for each item.
+コンパイラから診断情報を取得するには、
+診断情報をバッファに出力するように[`rustc_interface::Config`]を設定し、
+各アイテムに対して[`rustc_hir_typeck::typeck`]を実行します。
 
 ```rust
 {{#include ../../examples/rustc-interface-getting-diagnostics.rs}}

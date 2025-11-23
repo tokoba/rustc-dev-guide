@@ -1,23 +1,17 @@
-# Type checking
+# 型チェック
 
-The [`hir_analysis`] crate contains the source for "type collection" as well
-as a bunch of related functionality.
-Checking the bodies of functions is implemented in the [`hir_typeck`] crate.
-These crates draw heavily on the [type inference] and [trait solving].
+[`hir_analysis`]クレートには、「型収集」のソース、および関連する機能の束が含まれています。関数の本体のチェックは[`hir_typeck`]クレートで実装されています。これらのクレートは、[型推論]と[トレイト解決]に大きく依存しています。
 
 [`hir_analysis`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir_analysis/index.html
 [`hir_typeck`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir_typeck/index.html
-[type inference]: ./type-inference.md
-[trait solving]: ./traits/resolution.md
+[型推論]: ./type-inference.md
+[トレイト解決]: ./traits/resolution.md
 
-## Type collection
+## 型収集
 
-Type "collection" is the process of converting the types found in the HIR
-(`hir::Ty`), which represent the syntactic things that the user wrote, into the
-**internal representation** used by the compiler (`Ty<'tcx>`) – we also do
-similar conversions for where-clauses and other bits of the function signature.
+型「収集」は、HIRで見つかった型（`hir::Ty`）を、ユーザーが書いた構文的なものを表すものから、コンパイラが使用する**内部表現**（`Ty<'tcx>`）に変換するプロセスです。同様の変換をwhere句や関数シグネチャの他の部分にも行います。
 
-To try and get a sense of the difference, consider this function:
+違いを理解するために、この関数を考えてみましょう：
 
 ```rust,ignore
 struct Foo { }
@@ -25,22 +19,13 @@ fn foo(x: Foo, y: self::Foo) { ... }
 //        ^^^     ^^^^^^^^^
 ```
 
-Those two parameters `x` and `y` each have the same type: but they will have
-distinct `hir::Ty` nodes. Those nodes will have different spans, and of course
-they encode the path somewhat differently. But once they are "collected" into
-`Ty<'tcx>` nodes, they will be represented by the exact same internal type.
+これら2つのパラメータ`x`と`y`は、それぞれ同じ型を持っていますが、異なる`hir::Ty`ノードを持ちます。これらのノードは異なるスパンを持ち、もちろんパスを多少異なるようにエンコードします。しかし、`Ty<'tcx>`ノードに「収集」されると、まったく同じ内部型によって表現されます。
 
-Collection is defined as a bundle of [queries] for computing information about
-the various functions, traits, and other items in the crate being compiled.
-Note that each of these queries is concerned with *interprocedural* things –
-for example, for a function definition, collection will figure out the type and
-signature of the function, but it will not visit the *body* of the function in
-any way, nor examine type annotations on local variables (that's the job of
-type *checking*).
+収集は、コンパイルされるクレート内のさまざまな関数、トレイト、およびその他のアイテムに関する情報を計算するための[クエリ]のバンドルとして定義されています。これらのクエリはそれぞれ、*プロシージャ間*のものに関係していることに注意してください。たとえば、関数定義の場合、収集は関数の型とシグネチャを解明しますが、関数の*本体*を何らかの方法で訪問したり、ローカル変数の型注釈を調べたりすることはありません（それは型*チェック*の仕事です）。
 
-For more details, see the [`collect`][collect] module.
+詳細については、[`collect`][collect]モジュールを参照してください。
 
-[queries]: ./query.md
+[クエリ]: ./query.md
 [collect]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir_analysis/collect/index.html
 
-**TODO**: actually talk about type checking... [#1161](https://github.com/rust-lang/rustc-dev-guide/issues/1161)
+**TODO**：実際に型チェックについて話す... [#1161](https://github.com/rust-lang/rustc-dev-guide/issues/1161)

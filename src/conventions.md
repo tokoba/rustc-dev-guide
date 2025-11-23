@@ -1,190 +1,148 @@
-# Coding conventions
+# コーディング規約
 
-This file offers some tips on the coding conventions for rustc. This
-chapter covers [formatting](#formatting), [coding for correctness](#cc),
-[using crates from crates.io](#cio), and some tips on
-[structuring your PR for easy review](#er).
+このファイルは、rustcのコーディング規約に関するいくつかのヒントを提供します。この章では、[フォーマット](#formatting)、[正確性のためのコーディング](#cc)、[crates.ioからのクレートの使用](#cio)、および簡単なレビューのために[PRを構成する](#er)ためのいくつかのヒントについて説明します。
 
 <a id="formatting"></a>
 
-## Formatting and the tidy script
+## フォーマットとtidyスクリプト
 
-rustc is moving towards the [Rust standard coding style][fmt].
+rustcは[Rust standard coding style][fmt]に向けて移行しています。
 
-However, for now we don't use stable `rustfmt`; we use a pinned version with a
-special config, so this may result in different style from normal [`rustfmt`].
-Therefore, formatting this repository using `cargo fmt` is not recommended.
+ただし、現時点では安定版の`rustfmt`を使用していません。特別な設定でピン留めされたバージョンを使用しているため、通常の[`rustfmt`]とは異なるスタイルになる可能性があります。
+したがって、`cargo fmt`を使用してこのリポジトリをフォーマットすることはお勧めしません。
 
-Instead, formatting should be done using `./x fmt`. It's a good habit to run
-`./x fmt` before every commit, as this reduces conflicts later.
+代わりに、`./x fmt`を使用してフォーマットする必要があります。コミットごとに`./x fmt`を実行するのは良い習慣です。これにより、後で競合が減ります。
 
-Formatting is checked by the `tidy` script. It runs automatically when you do
-`./x test` and can be run in isolation with `./x fmt --check`.
+フォーマットは`tidy`スクリプトによってチェックされます。`./x test`を実行すると自動的に実行され、`./x fmt --check`で単独で実行することもできます。
 
-If you want to use format-on-save in your editor, the pinned version of
-`rustfmt` is built under `build/<target>/stage0/bin/rustfmt`.
+エディタでformat-on-saveを使用したい場合、ピン留めされたバージョンの`rustfmt`は`build/<target>/stage0/bin/rustfmt`の下にビルドされます。
 
 [fmt]: https://github.com/rust-dev-tools/fmt-rfcs
 [`rustfmt`]:https://github.com/rust-lang/rustfmt
 
-### Formatting C++ code
+### C++コードのフォーマット
 
-The compiler contains some C++ code for interfacing with parts of LLVM that
-don't have a stable C API.
-When modifying that code, use this command to format it:
+コンパイラには、安定したC APIを持たないLLVMの一部とのインターフェース用のC++コードがいくつか含まれています。
+そのコードを変更する場合は、次のコマンドを使用してフォーマットしてください:
 
 ```console
 ./x test tidy --extra-checks cpp:fmt --bless
 ```
 
-This uses a pinned version of `clang-format`, to avoid relying on the local
-environment.
+これは、ローカル環境に依存しないように、ピン留めされたバージョンの`clang-format`を使用します。
 
-### Formatting and linting Python code
+### PythonコードのフォーマットとLint
 
-The Rust repository contains quite a lot of Python code. We try to keep
-it both linted and formatted by the [ruff] tool.
+Rustリポジトリには、かなりの量のPythonコードが含まれています。[ruff]ツールによってLintとフォーマットの両方を保つようにしています。
 
-When modifying Python code, use this command to format it:
+Pythonコードを変更する場合は、次のコマンドを使用してフォーマットしてください:
 
 ```console
 ./x test tidy --extra-checks py:fmt --bless
 ```
 
-And, the following command to run lints:
+そして、Lintを実行するには次のコマンドを使用してください:
 
 ```console
 ./x test tidy --extra-checks py:lint
 ```
 
-These use a pinned version of `ruff`, to avoid relying on the local environment.
+これらは、ローカル環境に依存しないように、ピン留めされたバージョンの`ruff`を使用します。
 
 [ruff]: https://github.com/astral-sh/ruff
 
 <a id="copyright"></a>
 
 <!-- REUSE-IgnoreStart -->
-<!-- Prevent REUSE from interpreting the heading as a copyright notice -->
-### Copyright notice
+<!-- REUSEが見出しを著作権表示として解釈するのを防ぎます -->
+### 著作権表示
 <!-- REUSE-IgnoreEnd -->
 
-In the past, files began with a copyright and license notice. Please **omit**
-this notice for new files licensed under the standard terms (dual
-MIT/Apache-2.0).
+過去には、ファイルは著作権とライセンス表示で始まっていました。標準条項(デュアルMIT/Apache-2.0)でライセンスされた新しいファイルについては、この表示を**省略**してください。
 
-All of the copyright notices should be gone by now, but if you come across one
-in the rust-lang/rust repo, feel free to open a PR to remove it.
+すべての著作権表示はもうなくなっているはずですが、rust-lang/rustリポジトリで見つけた場合は、削除するPRを開いてください。
 
-### Line length
+### 行の長さ
 
-Lines should be at most 100 characters. It's even better if you can
-keep things to 80.
+行は最大100文字にしてください。80文字以内に収めることができれば、さらに良いです。
 
-Sometimes, and particularly for tests, it can be necessary to exempt yourself from this limit.
-In that case, you can add a comment towards the top of the file like so:
+場合によっては、特にテストでは、この制限から除外する必要がある場合があります。
+その場合、ファイルの上部に次のようなコメントを追加できます:
 
 ```rust
 // ignore-tidy-linelength
 ```
 
-### Tabs vs spaces
+### タブとスペース
 
-Prefer 4-space indents.
+4スペースのインデントを優先してください。
 
 <a id="cc"></a>
 
-## Coding for correctness
+## 正確性のためのコーディング
 
-Beyond formatting, there are a few other tips that are worth
-following.
+フォーマット以外にも、従う価値のあるいくつかのヒントがあります。
 
-### Prefer exhaustive matches
+### 網羅的なマッチを優先する
 
-Using `_` in a match is convenient, but it means that when new
-variants are added to the enum, they may not get handled correctly.
-Ask yourself: if a new variant were added to this enum, what's the
-chance that it would want to use the `_` code, versus having some
-other treatment? Unless the answer is "low", then prefer an
-exhaustive match.
+マッチで`_`を使用するのは便利ですが、新しいバリアントが列挙型に追加されたときに正しく処理されない可能性があります。
+自問してください: この列挙型に新しいバリアントが追加された場合、`_`コードを使用する可能性はどのくらいありますか?それとも他の処理が必要ですか?答えが「低い」でない限り、網羅的なマッチを優先してください。
 
-The same advice applies to `if let` and `while let`,
-which are effectively tests for a single variant.
+同じアドバイスは、実質的に単一のバリアントのテストである`if let`と`while let`にも適用されます。
 
-### Use "TODO" comments for things you don't want to forget
+### 忘れたくないことには「TODO」コメントを使用する
 
-As a useful tool to yourself, you can insert a `// TODO` comment
-for something that you want to get back to before you land your PR:
+自分自身への便利なツールとして、PRをランドする前に戻りたいことについて`// TODO`コメントを挿入できます:
 
 ```rust,ignore
 fn do_something() {
     if something_else {
-        unimplemented!(); // TODO write this
+        unimplemented!(); // TODO これを書く
     }
 }
 ```
 
-The tidy script will report an error for a `// TODO` comment, so this
-code would not be able to land until the TODO is fixed (or removed).
+tidyスクリプトは`// TODO`コメントに対してエラーを報告するため、このコードはTODOが修正(または削除)されるまでランドできません。
 
-This can also be useful in a PR as a way to signal from one commit that you are
-leaving a bug that a later commit will fix:
+これは、PRでも、あるコミットでバグを残しており、後のコミットで修正することを知らせる方法として役立ちます:
 
 ```rust,ignore
 if foo {
-    return true; // TODO wrong, but will be fixed in a later commit
+    return true; // TODO 間違っているが、後のコミットで修正される
 }
 ```
 
 <a id="cio"></a>
 
-## Using crates from crates.io
+## crates.ioからのクレートの使用
 
-See the [crates.io dependencies][crates] section.
+[crates.io dependencies][crates]セクションを参照してください。
 
 <a id="er"></a>
 
-## How to structure your PR
+## PRの構成方法
 
-How you prepare the commits in your PR can make a big difference for the
-reviewer. Here are some tips.
+PRでコミットを準備する方法は、レビュアーにとって大きな違いを生む可能性があります。いくつかのヒントを以下に示します。
 
-**Isolate "pure refactorings" into their own commit.** For example, if
-you rename a method, then put that rename into its own commit, along
-with the renames of all the uses.
+**「純粋なリファクタリング」を独自のコミットに分離する。** たとえば、メソッドの名前を変更する場合は、その名前変更を、すべての使用箇所の名前変更と一緒に独自のコミットに入れてください。
 
-**More commits is usually better.** If you are doing a large change,
-it's almost always better to break it up into smaller steps that can
-be independently understood. The one thing to be aware of is that if
-you introduce some code following one strategy, then change it
-dramatically (versus adding to it) in a later commit, that
-'back-and-forth' can be confusing.
+**コミットは通常、多いほど良い。** 大きな変更を行っている場合、独立して理解できる小さなステップに分割する方が、ほとんどの場合良いです。注意すべき点は、ある戦略に従ってコードを導入し、後のコミットで劇的に変更する(追加するのではなく)場合、その「往復」が混乱を招く可能性があることです。
 
-**Format liberally.** While only the final commit of a PR must be correctly
-formatted, it is both easier to review and less noisy to format each commit
-individually using `./x fmt`.
+**自由にフォーマットする。** PRの最終コミットのみが正しくフォーマットされている必要がありますが、各コミットを個別に`./x fmt`でフォーマットする方が、レビューが簡単でノイズが少なくなります。
 
-**No merges.** We do not allow merge commits into our history, other
-than those by bors. If you get a merge conflict, rebase instead via a
-command like `git rebase --interactive rust-lang/main` (presuming you use the
-name `rust-lang` for your remote).
+**マージなし。** 履歴にマージコミットを許可していません。borsによるものを除きます。マージコンフリクトが発生した場合は、代わりにリベースしてください。`git rebase --interactive rust-lang/main`のようなコマンドを使用してください(`rust-lang`をリモートの名前として使用していると仮定します)。
 
-**Individual commits do not have to build (but it's nice).** We do not
-require that every intermediate commit successfully builds – we only
-expect to be able to bisect at a PR level. However, if you *can* make
-individual commits build, that is always helpful.
+**個々のコミットはビルドする必要はありません(ただし、それが良いです)。** すべての中間コミットが正常にビルドされることは要求していません - PRレベルでの二分探索のみを期待しています。ただし、個々のコミットがビルドできる場合は、常に役立ちます。
 
-## Naming conventions
+## 命名規則
 
-Apart from normal Rust style/naming conventions, there are also some specific
-to the compiler.
+通常のRustスタイル/命名規則の他に、コンパイラに固有のものもあります。
 
-- `cx` tends to be short for "context" and is often used as a suffix. For
-  example, `tcx` is a common name for the [Typing Context][tcx].
+- `cx`は「context」の略語であり、サフィックスとして使用されることがよくあります。たとえば、`tcx`は[Typing Context][tcx]の一般的な名前です。
 
-- [`'tcx`][tcx] is used as the lifetime name for the Typing Context.
+- [`'tcx`][tcx]は、Typing Contextのライフタイム名として使用されます。
 
-- Because `crate` is a keyword, if you need a variable to represent something
-  crate-related, often the spelling is changed to `krate`.
+- `crate`はキーワードであるため、クレート関連の何かを表す変数が必要な場合、多くの場合、スペルが`krate`に変更されます。
 
 [tcx]: ./ty.md
 

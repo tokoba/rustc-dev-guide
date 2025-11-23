@@ -1,39 +1,22 @@
-# Libraries and metadata
+# ライブラリとメタデータ
 
-When the compiler sees a reference to an external crate, it needs to load some
-information about that crate. This chapter gives an overview of that process,
-and the supported file formats for crate libraries.
+コンパイラが外部クレートへの参照を見つけると、そのクレートに関する情報をロードする必要があります。この章では、そのプロセスの概要と、クレートライブラリでサポートされているファイル形式について説明します。
 
-## Libraries
+## ライブラリ
 
-A crate dependency can be loaded from an `rlib`, `dylib`, or `rmeta` file. A
-key point of these file formats is that they contain `rustc`-specific
-[*metadata*](#metadata). This metadata allows the compiler to discover enough
-information about the external crate to understand the items it contains,
-which macros it exports, and *much* more.
+クレートの依存関係は、`rlib`、`dylib`、または `rmeta` ファイルからロードできます。これらのファイル形式の重要な点は、`rustc` 固有の[*メタデータ*](#metadata)を含んでいることです。このメタデータにより、コンパイラは外部クレートについて十分な情報を発見し、含まれるアイテム、エクスポートするマクロ、*その他多く*のことを理解できます。
 
 ### rlib
 
-An `rlib` is an [archive file], which is similar to a tar file. This file
-format is specific to `rustc`, and may change over time. This file contains:
+`rlib` は[アーカイブファイル]であり、tarファイルに似ています。このファイル形式は `rustc` 固有であり、時間の経過とともに変わる可能性があります。このファイルには以下が含まれます：
 
-* Object code, which is the result of code generation. This is used during
-  regular linking. There is a separate `.o` file for each [codegen unit]. The
-  codegen step can be skipped with the [`-C
-  linker-plugin-lto`][linker-plugin-lto] CLI option, which means each `.o`
-  file will only contain LLVM bitcode.
-* [LLVM bitcode], which is a binary representation of LLVM's intermediate
-  representation, which is embedded as a section in the `.o` files. This can
-  be used for [Link Time Optimization] (LTO). This can be removed with the
-  [`-C embed-bitcode=no`][embed-bitcode] CLI option to improve compile times
-  and reduce disk space if LTO is not needed.
-* `rustc` [metadata], in a file named `lib.rmeta`.
-* A symbol table, which is essentially a list of symbols with offsets to the
-  object files that contain that symbol. This is pretty standard for archive
-  files.
+* オブジェクトコード。これはコード生成の結果です。これは通常のリンク時に使用されます。各[コードジェネレーション単位][codegen unit]ごとに個別の `.o` ファイルがあります。コードジェネレーションステップは [`-C linker-plugin-lto`][linker-plugin-lto] CLIオプションでスキップでき、各 `.o` ファイルにはLLVMビットコードのみが含まれることになります。
+* [LLVMビットコード]。これはLLVMの中間表現のバイナリ表現で、`.o` ファイルにセクションとして埋め込まれています。これは[リンク時最適化][Link Time Optimization]（LTO）に使用できます。LTOが不要な場合は、[`-C embed-bitcode=no`][embed-bitcode] CLIオプションを使用してこれを削除し、コンパイル時間を改善しディスクスペースを節約できます。
+* `rustc` [メタデータ]。`lib.rmeta` という名前のファイルにあります。
+* シンボルテーブル。これは基本的に、そのシンボルを含むオブジェクトファイルへのオフセットを持つシンボルのリストです。これはアーカイブファイルではかなり標準的です。
 
-[archive file]: https://en.wikipedia.org/wiki/Ar_(Unix)
-[LLVM bitcode]: https://llvm.org/docs/BitCodeFormat.html
+[アーカイブファイル]: https://en.wikipedia.org/wiki/Ar_(Unix)
+[LLVMビットコード]: https://llvm.org/docs/BitCodeFormat.html
 [Link Time Optimization]: https://llvm.org/docs/LinkTimeOptimization.html
 [codegen unit]: ../backend/codegen.md
 [embed-bitcode]: https://doc.rust-lang.org/rustc/codegen-options/index.html#embed-bitcode
@@ -41,120 +24,71 @@ format is specific to `rustc`, and may change over time. This file contains:
 
 ### dylib
 
-A `dylib` is a platform-specific shared library. It includes the `rustc`
-[metadata] in a special link section called `.rustc`.
+`dylib` はプラットフォーム固有の共有ライブラリです。これには、`.rustc` と呼ばれる特殊なリンクセクションに `rustc` [メタデータ]が含まれています。
 
 ### rmeta
 
-An `rmeta` file is a custom binary format that contains the [metadata] for the
-crate. This file can be used for fast "checks" of a project by skipping all code
-generation (as is done with `cargo check`), collecting enough information for
-documentation (as is done with `cargo doc`), or for [pipelining](#pipelining).
-This file is created if the [`--emit=metadata`][emit] CLI option is used.
+`rmeta` ファイルは、クレートの[メタデータ]を含むカスタムバイナリ形式です。このファイルは、すべてのコード生成をスキップしてプロジェクトの高速な「チェック」（`cargo check` で行われるように）、ドキュメント用の十分な情報を収集すること（`cargo doc` で行われるように）、または[パイプライン化](#pipelining)に使用できます。このファイルは、[`--emit=metadata`][emit] CLIオプションを使用すると作成されます。
 
-`rmeta` files do not support linking, since they do not contain compiled
-object files.
+`rmeta` ファイルは、コンパイルされたオブジェクトファイルを含まないため、リンクをサポートしていません。
 
 [emit]: https://doc.rust-lang.org/rustc/command-line-arguments.html#option-emit
 
-## Metadata
+## メタデータ
 
-The metadata contains a wide swath of different elements. This guide will not go
-into detail about every field it contains. You are encouraged to browse the
-[`CrateRoot`] definition to get a sense of the different elements it contains.
-Everything about metadata encoding and decoding is in the [`rustc_metadata`]
-package.
+メタデータには、さまざまな要素が幅広く含まれています。このガイドでは、含まれるすべてのフィールドの詳細には触れません。[`CrateRoot`] 定義を参照して、含まれるさまざまな要素の感覚をつかむことをお勧めします。メタデータのエンコードとデコードに関するすべては、[`rustc_metadata`] パッケージにあります。
 
-Here are a few highlights of things it contains:
+以下は、含まれるいくつかのハイライトです：
 
-* The version of the `rustc` compiler. The compiler will refuse to load files
-  from any other version.
-* The [Strict Version Hash](#strict-version-hash) (SVH). This helps ensure the
-  correct dependency is loaded.
-* The [Stable Crate Id](#stable-crate-id). This is a hash used
-  to identify crates.
-* Information about all the source files in the library. This can be used for
-  a variety of things, such as diagnostics pointing to sources in a
-  dependency.
-* Information about exported macros, traits, types, and items. Generally,
-  anything that's needed to be known when a path references something inside a
-  crate dependency.
-* Encoded [MIR]. This is optional, and only encoded if needed for code
-  generation. `cargo check` skips this for performance reasons.
+* `rustc` コンパイラのバージョン。コンパイラは他のバージョンからのファイルのロードを拒否します。
+* [厳密バージョンハッシュ](#strict-version-hash)（SVH）。これは、正しい依存関係がロードされることを保証するのに役立ちます。
+* [安定クレートID](#stable-crate-id)。これは、クレートを識別するために使用されるハッシュです。
+* ライブラリ内のすべてのソースファイルに関する情報。これは、依存関係のソースを指す診断など、さまざまなことに使用できます。
+* エクスポートされたマクロ、トレイト、型、アイテムに関する情報。一般的に、パスがクレート依存関係内の何かを参照するときに知る必要があるものすべてです。
+* エンコードされた[MIR]。これはオプションで、コード生成に必要な場合にのみエンコードされます。`cargo check` はパフォーマンス上の理由でこれをスキップします。
 
 [`CrateRoot`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_metadata/rmeta/struct.CrateRoot.html
 [`rustc_metadata`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_metadata/index.html
 [MIR]: ../mir/index.md
 
-### Strict Version Hash
+### 厳密バージョンハッシュ
 
-The Strict Version Hash ([SVH], also known as the "crate hash") is a 64-bit
-hash that is used to ensure that the correct crate dependencies are loaded. It
-is possible for a directory to contain multiple copies of the same dependency
-built with different settings, or built from different sources. The crate
-loader will skip any crates that have the wrong SVH.
+厳密バージョンハッシュ（[SVH]、「クレートハッシュ」としても知られる）は、正しいクレート依存関係がロードされることを保証するために使用される64ビットハッシュです。ディレクトリに、異なる設定でビルドされた、または異なるソースからビルドされた同じ依存関係の複数のコピーが含まれている可能性があります。クレートローダーは、間違ったSVHを持つクレートをスキップします。
 
-The SVH is also used for the [incremental compilation] session filename,
-though that usage is mostly historic.
+SVHは[インクリメンタルコンパイル][incremental compilation]セッションのファイル名にも使用されますが、その使用法はほとんど歴史的なものです。
 
-The hash includes a variety of elements:
+ハッシュには以下のさまざまな要素が含まれます：
 
-* Hashes of the HIR nodes.
-* All of the upstream crate hashes.
-* All of the source filenames.
-* Hashes of certain command-line flags (like `-C metadata` via the [Stable
-  Crate Id](#stable-crate-id), and all CLI options marked with `[TRACKED]`).
+* HIRノードのハッシュ。
+* すべての上流クレートハッシュ。
+* すべてのソースファイル名。
+* 特定のコマンドラインフラグのハッシュ（[安定クレートID](#stable-crate-id)を介した `-C metadata` や、`[TRACKED]` でマークされたすべてのCLIオプション）。
 
-See [`compute_hir_hash`] for where the hash is actually computed.
+ハッシュが実際に計算される場所については、[`compute_hir_hash`] を参照してください。
 
 [SVH]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_data_structures/svh/struct.Svh.html
 [incremental compilation]: ../queries/incremental-compilation.md
 [`compute_hir_hash`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast_lowering/fn.compute_hir_hash.html
 
-### Stable Crate Id
+### 安定クレートID
 
-The [`StableCrateId`] is a 64-bit hash used to identify different crates with
-potentially the same name. It is a hash of the crate name and all the
-[`-C metadata`] CLI options computed in [`StableCrateId::new`]. It is
-used in a variety of places, such as symbol name mangling, crate loading, and
-much more.
+[`StableCrateId`] は、同じ名前の可能性のある異なるクレートを識別するために使用される64ビットハッシュです。これは、クレート名とすべての[`-C metadata`] CLIオプションのハッシュで、[`StableCrateId::new`] で計算されます。これは、シンボル名のマングリング、クレートのロード、その他多くの場所など、さまざまな場所で使用されます。
 
-By default, all Rust symbols are mangled and incorporate the stable crate id.
-This allows multiple versions of the same crate to be included together. Cargo
-automatically generates `-C metadata` hashes based on a variety of factors, like
-the package version, source, and target kind (a lib and test can have the same
-crate name, so they need to be disambiguated).
+デフォルトでは、すべてのRustシンボルはマングリングされ、安定クレートIDを組み込みます。これにより、同じクレートの複数のバージョンを一緒に含めることができます。Cargoは、パッケージバージョン、ソース、ターゲットの種類などのさまざまな要因に基づいて、自動的に `-C metadata` ハッシュを生成します（libとtestは同じクレート名を持つことができるため、曖昧さを解消する必要があります）。
 
 [`StableCrateId`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/def_id/struct.StableCrateId.html
 [`StableCrateId::new`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/def_id/struct.StableCrateId.html#method.new
 [`-C metadata`]: https://doc.rust-lang.org/rustc/codegen-options/index.html#metadata
 
-## Crate loading
+## クレートのロード
 
-Crate loading can have quite a few subtle complexities. During [name
-resolution], when an external crate is referenced (via an `extern crate` or
-path), the resolver uses the [`CrateLoader`] which is responsible for finding
-the crate libraries and loading the [metadata] for them. After the dependency
-is loaded, the `CrateLoader` will provide the information the resolver needs
-to perform its job (such as expanding macros, resolving paths, etc.).
+クレートのロードには、かなり多くの微妙な複雑さがあります。[名前解決][name resolution]中に、外部クレートが参照されると（`extern crate` またはパスを介して）、リゾルバは [`CrateLoader`] を使用します。これは、クレートライブラリを見つけてそれらの[メタデータ]をロードする責任があります。依存関係がロードされた後、`CrateLoader` はリゾルバがその仕事を実行するために必要な情報を提供します（マクロの展開、パスの解決など）。
 
-To load each external crate, the `CrateLoader` uses a [`CrateLocator`] to
-actually find the correct files for one specific crate. There is some great
-documentation in the [`locator`] module that goes into detail on how loading
-works, and I strongly suggest reading it to get the full picture.
+各外部クレートをロードするために、`CrateLoader` は [`CrateLocator`] を使用して、1つの特定のクレートの正しいファイルを実際に見つけます。[`locator`] モジュールには、ロードがどのように機能するかについて詳細に説明する素晴らしいドキュメントがあります。全体像を把握するために、それを読むことを強くお勧めします。
 
-The location of a dependency can come from several different places. Direct
-dependencies are usually passed with `--extern` flags, and the loader can look
-at those directly. Direct dependencies often have references to their own
-dependencies, which need to be loaded, too. These are usually found by
-scanning the directories passed with the `-L` flag for any file whose metadata
-contains a matching crate name and [SVH](#strict-version-hash). The loader
-will also look at the [sysroot] to find dependencies.
+依存関係の場所は、いくつかの異なる場所から来る可能性があります。直接依存関係は通常 `--extern` フラグで渡され、ローダーはそれらを直接見ることができます。直接依存関係には、独自の依存関係への参照があることが多く、それらもロードする必要があります。これらは通常、`-L` フラグで渡されたディレクトリをスキャンして、メタデータに一致するクレート名と[SVH](#strict-version-hash)を含む任意のファイルを見つけることで見つかります。ローダーは、依存関係を見つけるために[sysroot]も調べます。
 
-As crates are loaded, they are kept in the [`CStore`] with the crate metadata
-wrapped in the [`CrateMetadata`] struct. After resolution and expansion, the
-`CStore` will make its way into the [`GlobalCtxt`] for the rest of the
-compilation.
+クレートがロードされると、それらは[`CStore`]に保持され、クレートメタデータは[`CrateMetadata`]構造体でラップされます。解決と展開の後、`CStore` は残りのコンパイルのために [`GlobalCtxt`] に入ります。
 
 [name resolution]: ../name-resolution.md
 [`CrateLoader`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_metadata/creader/struct.CrateLoader.html
@@ -165,25 +99,13 @@ compilation.
 [`GlobalCtxt`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.GlobalCtxt.html
 [sysroot]: ../building/bootstrapping/what-bootstrapping-does.md#what-is-a-sysroot
 
-## Pipelining
+## パイプライン化
 
-One trick to improve compile times is to start building a crate as soon as the
-metadata for its dependencies is available. For a library, there is no need to
-wait for the code generation of dependencies to finish. Cargo implements this
-technique by telling `rustc` to emit an [`rmeta`](#rmeta) file for each
-dependency as well as an [`rlib`](#rlib). As early as it can, `rustc` will
-save the `rmeta` file to disk before it continues to the code generation
-phase. The compiler sends a JSON message to let the build tool know that it
-can start building the next crate if possible.
+コンパイル時間を改善するトリックの1つは、依存関係のメタデータが利用可能になり次第、クレートのビルドを開始することです。ライブラリの場合、依存関係のコード生成が終了するのを待つ必要はありません。Cargoは、各依存関係について[`rmeta`](#rmeta)ファイルと[`rlib`](#rlib)を出力するように `rustc` に指示することで、この手法を実装しています。できるだけ早く、`rustc` はコード生成フェーズに進む前に `rmeta` ファイルをディスクに保存します。コンパイラは、可能であれば次のクレートのビルドを開始できることをビルドツールに知らせるためにJSONメッセージを送信します。
 
-The [crate loading](#crate-loading) system is smart enough to know when it
-sees an `rmeta` file to use that if the `rlib` is not there (or has only been
-partially written).
+[クレートロード](#crate-loading)システムは、`rlib` が存在しない場合（または部分的にしか書き込まれていない場合）に `rmeta` ファイルを見たときにそれを使用することを知るのに十分賢いです。
 
-This pipelining isn't possible for binaries, because the linking phase will
-require the code generation of all its dependencies. In the future, it may be
-possible to further improve this scenario by splitting linking into a separate
-command (see [#64191]).
+このパイプライン化はバイナリには不可能です。リンクフェーズはすべての依存関係のコード生成を必要とするためです。将来的には、リンクを別のコマンドに分割することで、このシナリオをさらに改善できる可能性があります（[#64191]を参照）。
 
 [#64191]: https://github.com/rust-lang/rust/issues/64191
 

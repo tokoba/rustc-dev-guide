@@ -1,151 +1,121 @@
-# How to build and run the compiler
+# コンパイラのビルドと実行方法
 
 <div class="warning">
 
-For `profile = "library"` users, or users who use `download-rustc = true | "if-unchanged"`, please be advised that
-the `./x test library/std` flow where `download-rustc` is active (i.e. no compiler changes) is currently broken.
-This is tracked in <https://github.com/rust-lang/rust/issues/142505>. Only the `./x test` flow is affected in this
-case, `./x {check,build} library/std` should still work.
+`profile = "library"` ユーザー、または `download-rustc = true | "if-unchanged"` を使用するユーザーへ：
+`download-rustc` がアクティブな場合（つまり、コンパイラの変更がない場合）の `./x test library/std` フローは現在壊れています。
+これは <https://github.com/rust-lang/rust/issues/142505> で追跡されています。このケースでは `./x test` フローのみが影響を受けます。`./x {check,build} library/std` は引き続き機能するはずです。
 
-In the short-term, you may need to disable `download-rustc` for `./x test library/std`. This can be done either by:
+短期的には、`./x test library/std` のために `download-rustc` を無効にする必要がある場合があります。これは次のいずれかの方法で行うことができます：
 
 1. `./x test library/std --set rust.download-rustc=false`
-2. Or set `rust.download-rustc=false` in `bootstrap.toml`.
+2. または `bootstrap.toml` で `rust.download-rustc=false` を設定します。
 
-Unfortunately that will require building the stage 1 compiler. The bootstrap team is working on this, but
-implementing a maintainable fix is taking some time.
+残念ながら、これには stage 1 コンパイラのビルドが必要です。ブートストラップチームはこれに取り組んでいますが、保守可能な修正の実装には時間がかかっています。
 
 </div>
 
 
-The compiler is built using a tool called `x.py`. You will need to
-have Python installed to run it.
+コンパイラは `x.py` というツールを使用してビルドされます。これを実行するには Python がインストールされている必要があります。
 
-## Quick Start
+## クイックスタート
 
-For a less in-depth quick-start of getting the compiler running, see [quickstart](./quickstart.md).
+コンパイラを実行するための簡易的なクイックスタートについては、[クイックスタート](./quickstart.md) をご覧ください。
 
 
-## Get the source code
+## ソースコードの取得
 
-The main repository is [`rust-lang/rust`][repo]. This contains the compiler,
-the standard library (including `core`, `alloc`, `test`, `proc_macro`, etc),
-and a bunch of tools (e.g. `rustdoc`, the bootstrapping infrastructure, etc).
+メインリポジトリは [`rust-lang/rust`][repo] です。これには、コンパイラ、標準ライブラリ（`core`、`alloc`、`test`、`proc_macro` などを含む）、および多数のツール（例：`rustdoc`、ブートストラッピングインフラストラクチャなど）が含まれています。
 
 [repo]: https://github.com/rust-lang/rust
 
-The very first step to work on `rustc` is to clone the repository:
+`rustc` で作業するための最初のステップは、リポジトリをクローンすることです：
 
 ```bash
 git clone https://github.com/rust-lang/rust.git
 cd rust
 ```
 
-### Partial clone the repository
+### リポジトリの部分クローン
 
-Due to the size of the repository, cloning on a slower internet connection can take a long time,
-and requires disk space to store the full history of every file and directory.
-Instead, it is possible to tell git to perform a _partial clone_, which will only fully retrieve
-the current file contents, but will automatically retrieve further file contents when you, e.g.,
-jump back in the history.
-All git commands will continue to work as usual, at the price of requiring an internet connection
-to visit not-yet-loaded points in history.
+リポジトリのサイズが大きいため、遅いインターネット接続でクローンすると時間がかかり、すべてのファイルとディレクトリの完全な履歴を保存するためのディスク容量が必要です。代わりに、git に _部分クローン_ を実行するように指示することができます。これにより、現在のファイルの内容のみを完全に取得し、履歴を遡るときなどにさらなるファイルの内容を自動的に取得します。すべての git コマンドは通常どおり動作し続けますが、未ロードの履歴のポイントを訪れるにはインターネット接続が必要になるという代償があります。
 
 ```bash
 git clone --filter='blob:none' https://github.com/rust-lang/rust.git
 cd rust
 ```
 
-> **NOTE**: [This link](https://github.blog/open-source/git/get-up-to-speed-with-partial-clone-and-shallow-clone/)
-> describes this type of checkout in more detail, and also compares it to other modes, such as
-> shallow cloning.
+> **注意**: [このリンク](https://github.blog/open-source/git/get-up-to-speed-with-partial-clone-and-shallow-clone/) は、このタイプのチェックアウトについて詳しく説明しており、シャロークローンなどの他のモードと比較しています。
 
-### Shallow clone the repository
+### リポジトリのシャロークローン
 
-An older alternative to partial clones is to use shallow clone the repository instead.
-To do so, you can use the `--depth N` option with the `git clone` command.
-This instructs `git` to perform a "shallow clone", cloning the repository but truncating it to
-the last `N` commits.
+部分クローンの古い代替方法は、代わりにリポジトリをシャロークローンすることです。これを行うには、`git clone` コマンドで `--depth N` オプションを使用できます。これは、`git` にリポジトリをクローンするが、最後の `N` コミットに切り詰めるように指示します。
 
-Passing `--depth 1` tells `git` to clone the repository but truncate the history to the latest
-commit that is on the `main` branch, which is usually fine for browsing the source code or
-building the compiler.
+`--depth 1` を渡すと、`git` にリポジトリをクローンするが、`main` ブランチにある最新のコミットに履歴を切り詰めるように指示します。これは通常、ソースコードを閲覧したり、コンパイラをビルドしたりするには問題ありません。
 
 ```bash
 git clone --depth 1 https://github.com/rust-lang/rust.git
 cd rust
 ```
 
-> **NOTE**: A shallow clone limits which `git` commands can be run.
-> If you intend to work on and contribute to the compiler, it is
-> generally recommended to fully clone the repository [as shown above](#get-the-source-code),
-> or to perform a [partial clone](#partial-clone-the-repository) instead.
+> **注意**: シャロークローンは、実行できる `git` コマンドを制限します。コンパイラに取り組み、貢献する予定がある場合は、一般的に [上記のように](#get-the-source-code) リポジトリを完全にクローンするか、代わりに [部分クローン](#partial-clone-the-repository) を実行することをお勧めします。
 >
-> For example, `git bisect` and `git blame` require access to the commit history,
-> so they don't work if the repository was cloned with `--depth 1`.
+> たとえば、`git bisect` と `git blame` はコミット履歴へのアクセスを必要とするため、リポジトリが `--depth 1` でクローンされた場合は機能しません。
 
-## What is `x.py`?
+## `x.py` とは何ですか？
 
-`x.py` is the build tool for the `rust` repository. It can build docs, run tests, and compile the
-compiler and standard library.
+`x.py` は `rust` リポジトリのビルドツールです。ドキュメントをビルドし、テストを実行し、コンパイラと標準ライブラリをコンパイルできます。
 
-This chapter focuses on the basics to be productive, but
-if you want to learn more about `x.py`, [read this chapter][bootstrap].
+この章では、生産的になるための基本に焦点を当てていますが、`x.py` についてもっと学びたい場合は、[この章を読んでください][bootstrap]。
 
 [bootstrap]: ./bootstrapping/intro.md
 
-Also, using `x` rather than `x.py` is recommended as:
+また、`x.py` ではなく `x` を使用することをお勧めします：
 
-> `./x` is the most likely to work on every system (on Unix it runs the shell script
-> that does python version detection, on Windows it will probably run the
-> powershell script - certainly less likely to break than `./x.py` which often just
-> opens the file in an editor).[^1]
+> `./x` は、すべてのシステムで最も動作する可能性が高いです（Unix では Python バージョン検出を行うシェルスクリプトを実行し、Windows ではおそらく PowerShell スクリプトを実行します -- `./x.py` よりも壊れる可能性が低く、これは多くの場合ファイルをエディタで開くだけです）。[^1]
 
-(You can find the platform related scripts around the `x.py`, like `x.ps1`)
+（`x.py` の周りには、`x.ps1` のようなプラットフォーム関連のスクリプトがあります）
 
-Notice that this is not absolute. For instance, using Nushell in VSCode on Win10,
-typing `x` or `./x` still opens `x.py` in an editor rather than invoking the program. :)
+これは絶対的なものではないことに注意してください。たとえば、Win10 の VSCode で Nushell を使用している場合、`x` または `./x` と入力しても、プログラムを呼び出すのではなく、エディタで `x.py` を開きます。:)
 
-In the rest of this guide, we use `x` rather than `x.py` directly. The following
-command:
+このガイドの残りの部分では、`x.py` ではなく `x` を直接使用します。次のコマンド：
 
 ```bash
 ./x check
 ```
 
-could be replaced by:
+は、次のように置き換えることができます：
 
 ```bash
 ./x.py check
 ```
 
-### Running `x.py`
+### `x.py` の実行
 
-The `x.py` command can be run directly on most Unix systems in the following format:
+`x.py` コマンドは、ほとんどの Unix システムで次の形式で直接実行できます：
 
 ```sh
 ./x <subcommand> [flags]
 ```
 
-This is how the documentation and examples assume you are running `x.py`.
-Some alternative ways are:
+これは、ドキュメントと例が `x.py` を実行していると想定している方法です。いくつかの代替方法があります：
 
 ```sh
-# On a Unix shell if you don't have the necessary `python3` command
+# 必要な `python3` コマンドがない場合は Unix シェルで
 ./x <subcommand> [flags]
 
-# In Windows Powershell (if powershell is configured to run scripts)
+# Windows Powershell で（PowerShell がスクリプトを実行するように設定されている場合）
 ./x <subcommand> [flags]
 ./x.ps1 <subcommand> [flags]
 
-# On the Windows Command Prompt (if .py files are configured to run Python)
+# Windows コマンドプロンプトで（.py ファイルが Python を実行するように設定されている場合）
 x.py <subcommand> [flags]
 
-# You can also run Python yourself, e.g.:
+# Python を自分で実行することもできます、例：
 python x.py <subcommand> [flags]
 ```
 
-On Windows, the Powershell commands may give you an error that looks like this:
+Windows では、PowerShell コマンドで次のようなエラーが発生する場合があります：
 ```
 PS C:\Users\vboxuser\rust> ./x
 ./x : File C:\Users\vboxuser\rust\x.ps1 cannot be loaded because running scripts is disabled on this system. For more
@@ -157,139 +127,97 @@ At line:1 char:1
     + FullyQualifiedErrorId : UnauthorizedAccess
 ```
 
-You can avoid this error by allowing powershell to run local scripts:
+PowerShell がローカルスクリプトを実行できるようにすることで、このエラーを回避できます：
 ```
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-#### Running `x.py` slightly more conveniently
+#### `x.py` をもう少し便利に実行する
 
-There is a binary that wraps `x.py` called `x` in `src/tools/x`. All it does is
-run `x.py`, but it can be installed system-wide and run from any subdirectory
-of a checkout. It also looks up the appropriate version of `python` to use.
+`src/tools/x` に `x` という `x.py` をラップするバイナリがあります。それが行うことは `x.py` を実行することだけですが、システム全体にインストールでき、チェックアウトの任意のサブディレクトリから実行できます。また、使用する適切なバージョンの `python` も検索します。
 
-You can install it with `cargo install --path src/tools/x`.
+`cargo install --path src/tools/x` でインストールできます。
 
-To clarify that this is another global installed binary util, which is
-similar to the one declared in section [What is `x.py`](#what-is-xpy), but
-it works as an independent process to execute the `x.py` rather than calling the
-shell to run the platform related scripts.
+これが、[`x.py` とは何ですか](#what-is-xpy) セクションで宣言されているものと似ているグローバルにインストールされたバイナリユーティリティであることを明確にするために、これはシェルを呼び出してプラットフォーム関連のスクリプトを実行するのではなく、`x.py` を実行する独立したプロセスとして機能します。
 
-## Create a `bootstrap.toml`
+## `bootstrap.toml` の作成
 
-To start, run `./x setup` and select the `compiler` defaults. This will do some initialization
-and create a `bootstrap.toml` for you with reasonable defaults. If you use a different default (which
-you'll likely want to do if you want to contribute to an area of rust other than the compiler, such
-as rustdoc), make sure to read information about that default (located in `src/bootstrap/defaults`)
-as the build process may be different for other defaults.
+開始するには、`./x setup` を実行し、`compiler` デフォルトを選択します。これにより、いくつかの初期化が行われ、妥当なデフォルトで `bootstrap.toml` が作成されます。別のデフォルトを使用する場合（rustdoc など、コンパイラ以外の Rust の領域に貢献したい場合）、そのデフォルトに関する情報（`src/bootstrap/defaults` にあります）を読むようにしてください。他のデフォルトではビルドプロセスが異なる場合があります。
 
-Alternatively, you can write `bootstrap.toml` by hand. See `bootstrap.example.toml` for all the available
-settings and explanations of them. See `src/bootstrap/defaults` for common settings to change.
+または、`bootstrap.toml` を手動で書くこともできます。利用可能なすべての設定と説明については、`bootstrap.example.toml` をご覧ください。変更する一般的な設定については、`src/bootstrap/defaults` をご覧ください。
 
-If you have already built `rustc` and you change settings related to LLVM, then you may have to
-execute `./x clean --all` for subsequent configuration changes to take effect. Note that `./x
-clean` will not cause a rebuild of LLVM.
+すでに `rustc` をビルドしていて、LLVM に関連する設定を変更した場合、後続の設定変更を有効にするために `./x clean --all` を実行する必要がある場合があります。`./x clean` は LLVM の再ビルドを引き起こさないことに注意してください。
 
-## Common `x` commands
+## 一般的な `x` コマンド
 
-Here are the basic invocations of the `x` commands most commonly used when
-working on `rustc`, `std`, `rustdoc`, and other tools.
+以下は、`rustc`、`std`、`rustdoc`、およびその他のツールで作業する際に最も一般的に使用される `x` コマンドの基本的な呼び出しです。
 
-| Command     | When to use it                                                                                               |
+| コマンド | 使用するタイミング |
 | ----------- | ------------------------------------------------------------------------------------------------------------ |
-| `./x check` | Quick check to see if most things compile; [rust-analyzer can run this automatically for you][rust-analyzer] |
-| `./x build` | Builds `rustc`, `std`, and `rustdoc`                                                                         |
-| `./x test`  | Runs all tests                                                                                               |
-| `./x fmt`   | Formats all code                                                                                             |
+| `./x check` | ほとんどのものがコンパイルされるかどうかを素早くチェック；[rust-analyzer はこれを自動的に実行できます][rust-analyzer] |
+| `./x build` | `rustc`、`std`、および `rustdoc` をビルド |
+| `./x test` | すべてのテストを実行 |
+| `./x fmt` | すべてのコードをフォーマット |
 
-As written, these commands are reasonable starting points. However, there are
-additional options and arguments for each of them that are worth learning for
-serious development work. In particular, `./x build` and `./x test`
-provide many ways to compile or test a subset of the code, which can save a lot
-of time.
+書かれているように、これらのコマンドは妥当な出発点です。ただし、深刻な開発作業には、それぞれに追加のオプションと引数があることを知っておく価値があります。特に、`./x build` と `./x test` は、コードのサブセットをコンパイルまたはテストする多くの方法を提供し、多くの時間を節約できます。
 
-Also, note that `x` supports all kinds of path suffixes for `compiler`, `library`,
-and `src/tools` directories. So, you can simply run `x test tidy` instead of
-`x test src/tools/tidy`. Or, `x build std` instead of `x build library/std`.
+また、`x` は `compiler`、`library`、および `src/tools` ディレクトリのすべての種類のパスサフィックスをサポートしていることに注意してください。したがって、`x test src/tools/tidy` の代わりに `x test tidy` を単純に実行できます。または、`x build library/std` の代わりに `x build std` を実行できます。
 
 [rust-analyzer]: suggested.html#configuring-rust-analyzer-for-rustc
 
-See the chapters on
-[testing](../tests/running.md) and [rustdoc](../rustdoc.md) for more details.
+テストと rustdoc の詳細については、[testing](../tests/running.md) と [rustdoc](../rustdoc.md) の章をご覧ください。
 
-### Building the compiler
+### コンパイラのビルド
 
-Note that building will require a relatively large amount of storage space.
-You may want to have upwards of 10 or 15 gigabytes available to build the compiler.
+ビルドには比較的大量のストレージスペースが必要です。コンパイラをビルドするには、10 または 15 ギガバイト以上の空き容量が必要な場合があります。
 
-Once you've created a `bootstrap.toml`, you are now ready to run
-`x`. There are a lot of options here, but let's start with what is
-probably the best "go to" command for building a local compiler:
+`bootstrap.toml` を作成したら、`x` を実行する準備が整いました。ここには多くのオプションがありますが、ローカルコンパイラをビルドするための最良の「go to」コマンドから始めましょう：
 
 ```console
 ./x build library
 ```
 
-What this command does is:
-- Build `rustc` using the stage0 compiler and stage0 `std`.
-- Build `library` (the standard libraries) with the stage1 compiler that was just built.
-- Assemble a working stage1 sysroot, containing the stage1 compiler and stage1 standard libraries.
+このコマンドは次のことを行います：
+- stage0 コンパイラと stage0 `std` を使用して `rustc` をビルドします。
+- ちょうどビルドされた stage1 コンパイラで `library`（標準ライブラリ）をビルドします。
+- stage1 コンパイラと stage1 標準ライブラリを含む、動作する stage1 sysroot を組み立てます。
 
-This final product (stage1 compiler + libs built using that compiler)
-is what you need to build other Rust programs (unless you use `#![no_std]` or
-`#![no_core]`).
+この最終製品（stage1 コンパイラ + そのコンパイラを使用してビルドされたライブラリ）は、他の Rust プログラムをビルドするために必要なものです（`#![no_std]` または `#![no_core]` を使用しない限り）。
 
-You will probably find that building the stage1 `std` is a bottleneck for you,
-but fear not, there is a (hacky) workaround...
-see [the section on avoiding rebuilds for std][keep-stage].
+stage1 `std` のビルドがボトルネックになる可能性がありますが、恐れることはありません。（ハッキーな）回避策があります... std の再ビルドを回避する方法については、[セクション][keep-stage] をご覧ください。
 
 [keep-stage]: ./suggested.md#faster-rebuilds-with---keep-stage-std
 
-Sometimes you don't need a full build. When doing some kind of
-"type-based refactoring", like renaming a method, or changing the
-signature of some function, you can use `./x check` instead for a much faster build.
+時には、完全なビルドが必要ない場合があります。メソッドの名前を変更したり、関数のシグネチャを変更したりするような「型ベースのリファクタリング」を行う場合、はるかに高速なビルドのために代わりに `./x check` を使用できます。
 
-Note that this whole command just gives you a subset of the full `rustc`
-build. The **full** `rustc` build (what you get with `./x build
---stage 2 rustc`) has quite a few more steps:
+このコマンド全体は、完全な `rustc` ビルドのサブセットを提供するだけであることに注意してください。**完全な** `rustc` ビルド（`./x build --stage 2 rustc` で取得するもの）には、さらにいくつかのステップがあります：
 
-- Build `rustc` with the stage1 compiler.
-  - The resulting compiler here is called the "stage2" compiler, which uses stage1 std from the previous command.
-- Build `librustdoc` and a bunch of other things with the stage2 compiler.
+- stage1 コンパイラで `rustc` をビルドします。
+  - ここで得られるコンパイラは「stage2」コンパイラと呼ばれ、前のコマンドの stage1 std を使用します。
+- stage2 コンパイラで `librustdoc` および他の多くのものをビルドします。
 
-You almost never need to do this.
+これはほぼ必要ありません。
 
-### Build specific components
+### 特定のコンポーネントのビルド
 
-If you are working on the standard library, you probably don't need to build
-every other default component. Instead, you can build a specific component by
-providing its name, like this:
+標準ライブラリで作業している場合、おそらく他のすべてのデフォルトコンポーネントをビルドする必要はありません。代わりに、次のように名前を指定することで、特定のコンポーネントをビルドできます：
 
 ```bash
 ./x build --stage 1 library
 ```
 
-If you choose the `library` profile when running `x setup`, you can omit `--stage 1` (it's the
-default).
+`x setup` で `library` プロファイルを選択した場合、`--stage 1` を省略できます（これがデフォルトです）。
 
-## Creating a rustup toolchain
+## rustup ツールチェーンの作成
 
-Once you have successfully built `rustc`, you will have created a bunch
-of files in your `build` directory. In order to actually run the
-resulting `rustc`, we recommend creating rustup toolchains. The first
-one will run the stage1 compiler (which we built above). The second
-will execute the stage2 compiler (which we did not build, but which
-you will likely need to build at some point; for example, if you want
-to run the entire test suite).
+`rustc` を正常にビルドすると、`build` ディレクトリに多数のファイルが作成されます。実際に結果の `rustc` を実行するには、rustup ツールチェーンを作成することをお勧めします。最初のものは stage1 コンパイラ（上でビルドしたもの）を実行します。2 番目のものは stage2 コンパイラを実行します（ビルドしていませんが、ある時点でビルドする必要がある可能性があります；たとえば、テストスイート全体を実行したい場合）。
 
 ```bash
 rustup toolchain link stage1 build/host/stage1
 rustup toolchain link stage2 build/host/stage2
 ```
 
-Now you can run the `rustc` you built with. If you run with `-vV`, you
-should see a version number ending in `-dev`, indicating a build from
-your local environment:
+これで、ビルドした `rustc` を実行できます。`-vV` で実行すると、ローカル環境からのビルドを示す `-dev` で終わるバージョン番号が表示されるはずです：
 
 ```bash
 $ rustc +stage1 -vV
@@ -302,114 +230,72 @@ release: 1.48.0-dev
 LLVM version: 11.0
 ```
 
-The rustup toolchain points to the specified toolchain compiled in your `build` directory,
-so the rustup toolchain will be updated whenever `x build` or `x test` are run for
-that toolchain/stage.
+rustup ツールチェーンは、`build` ディレクトリ内のコンパイルされた指定されたツールチェーンを指しているため、rustup ツールチェーンは、そのツールチェーン/ステージのために `x build` または `x test` が実行されるたびに更新されます。
 
-**Note:** the toolchain we've built does not include `cargo`.  In this case, `rustup` will
-fall back to using `cargo` from the installed `nightly`, `beta`, or `stable` toolchain
-(in that order).  If you need to use unstable `cargo` flags, be sure to run
-`rustup install nightly` if you haven't already.  See the
-[rustup documentation on custom toolchains](https://rust-lang.github.io/rustup/concepts/toolchains.html#custom-toolchains).
+**注意**: ビルドしたツールチェーンには `cargo` が含まれていません。この場合、`rustup` はインストールされた `nightly`、`beta`、または `stable` ツールチェーンからの `cargo` の使用にフォールバックします（この順序で）。不安定な `cargo` フラグを使用する必要がある場合は、まだインストールしていない場合は `rustup install nightly` を実行してください。詳細については、[rustup documentation on custom toolchains](https://rust-lang.github.io/rustup/concepts/toolchains.html#custom-toolchains) をご覧ください。
 
-**Note:** rust-analyzer and IntelliJ Rust plugin use a component called
-`rust-analyzer-proc-macro-srv` to work with proc macros. If you intend to use a
-custom toolchain for a project (e.g. via `rustup override set stage1`) you may
-want to build this component:
+**注意**: rust-analyzer と IntelliJ Rust プラグインは、proc マクロで動作するために `rust-analyzer-proc-macro-srv` というコンポーネントを使用します。プロジェクトにカスタムツールチェーンを使用する予定がある場合（例：`rustup override set stage1` 経由で）、このコンポーネントをビルドすることをお勧めします：
 
 ```bash
 ./x build proc-macro-srv-cli
 ```
 
-## Building targets for cross-compilation
+## クロスコンパイル用のターゲットのビルド
 
-To produce a compiler that can cross-compile for other targets,
-pass any number of `target` flags to `x build`.
-For example, if your host platform is `x86_64-unknown-linux-gnu`
-and your cross-compilation target is `wasm32-wasip1`, you can build with:
+他のターゲット用にクロスコンパイルできるコンパイラを生成するには、任意の数の `target` フラグを `x build` に渡します。たとえば、ホストプラットフォームが `x86_64-unknown-linux-gnu` で、クロスコンパイルターゲットが `wasm32-wasip1` の場合、次のようにビルドできます：
 
 ```bash
 ./x build --target x86_64-unknown-linux-gnu,wasm32-wasip1
 ```
 
-Note that if you want the resulting compiler to be able to build crates that
-involve proc macros or build scripts, you must be sure to explicitly build target support for the
-host platform (in this case, `x86_64-unknown-linux-gnu`).
+結果のコンパイラが proc マクロまたはビルドスクリプトを含むクレートをビルドできるようにする場合は、ホストプラットフォーム（この場合、`x86_64-unknown-linux-gnu`）のターゲットサポートを明示的にビルドする必要があることに注意してください。
 
-If you want to always build for other targets without needing to pass flags to `x build`,
-you can configure this in the `[build]` section of your `bootstrap.toml` like so:
+`x build` にフラグを渡さずに常に他のターゲット用にビルドしたい場合は、`bootstrap.toml` の `[build]` セクションで次のように設定できます：
 
 ```toml
 [build]
 target = ["x86_64-unknown-linux-gnu", "wasm32-wasip1"]
 ```
 
-Note that building for some targets requires having external dependencies installed
-(e.g. building musl targets requires a local copy of musl).
-Any target-specific configuration (e.g. the path to a local copy of musl)
-will need to be provided by your `bootstrap.toml`.
-Please see `bootstrap.example.toml` for information on target-specific configuration keys.
+一部のターゲット用にビルドするには、外部依存関係をインストールする必要があることに注意してください（例：musl ターゲット用にビルドするには、musl のローカルコピーが必要です）。ターゲット固有の設定（例：musl のローカルコピーへのパス）は、`bootstrap.toml` で提供する必要があります。ターゲット固有の設定キーについては、`bootstrap.example.toml` をご覧ください。
 
-For examples of the complete configuration necessary to build a target, please visit
-[the rustc book](https://doc.rust-lang.org/rustc/platform-support.html),
-select any target under the "Platform Support" heading on the left,
-and see the section related to building a compiler for that target.
-For targets without a corresponding page in the rustc book,
-it may be useful to [inspect the Dockerfiles](../tests/docker.md)
-that the Rust infrastructure itself uses to set up and configure cross-compilation.
+ターゲットをビルドするために必要な完全な設定の例については、[the rustc book](https://doc.rust-lang.org/rustc/platform-support.html) をご覧ください。左側の「Platform Support」見出しの下で任意のターゲットを選択し、そのターゲット用のコンパイラをビルドすることに関連するセクションをご覧ください。rustc ブックに対応するページがないターゲットの場合、Rust インフラストラクチャ自体がクロスコンパイルを設定するために使用する [Dockerfiles を検査する](../tests/docker.md) ことが役立つ場合があります。
 
-If you have followed the directions from the prior section on creating a rustup toolchain,
-then once you have built your compiler you will be able to use it to cross-compile like so:
+前のセクションから rustup ツールチェーンを作成する手順に従った場合、コンパイラをビルドした後、次のようにクロスコンパイルに使用できます：
 
 ```bash
 cargo +stage1 build --target wasm32-wasip1
 ```
 
-## Other `x` commands
+## その他の `x` コマンド
 
-Here are a few other useful `x` commands. We'll cover some of them in detail
-in other sections:
+他にも便利な `x` コマンドがいくつかあります。その一部については、他のセクションで詳しく説明します：
 
-- Building things:
-  - `./x build` – builds everything using the stage 1 compiler,
-    not just up to `std`
-  - `./x build --stage 2` – builds everything with the stage 2 compiler including
-    `rustdoc`
-- Running tests (see the [section on running tests](../tests/running.html) for
-  more details):
-  - `./x test library/std` – runs the unit tests and integration tests from `std`
-  - `./x test tests/ui` – runs the `ui` test suite
-  - `./x test tests/ui/const-generics` - runs all the tests in
-    the `const-generics/` subdirectory of the `ui` test suite
-  - `./x test tests/ui/const-generics/const-types.rs` - runs
-    the single test `const-types.rs` from the `ui` test suite
+- ものをビルドする：
+  - `./x build` – stage 1 コンパイラを使用してすべてをビルドします。`std` までではありません
+  - `./x build --stage 2` – stage 2 コンパイラですべてをビルドします。`rustdoc` を含みます
+- テストの実行（詳細については、[テストの実行に関するセクション](../tests/running.html) をご覧ください）：
+  - `./x test library/std` – `std` からユニットテストと統合テストを実行します
+  - `./x test tests/ui` – `ui` テストスイートを実行します
+  - `./x test tests/ui/const-generics` - `ui` テストスイートの `const-generics/` サブディレクトリのすべてのテストを実行します
+  - `./x test tests/ui/const-generics/const-types.rs` - `ui` テストスイートから単一のテスト `const-types.rs` を実行します
 
-### Cleaning out build directories
+### ビルドディレクトリのクリーンアップ
 
-Sometimes you need to start fresh, but this is normally not the case.
-If you need to run this then bootstrap is most likely not acting right and
-you should file a bug as to what is going wrong. If you do need to clean
-everything up then you only need to run one command!
+時々、新しく始める必要がありますが、これは通常のケースではありません。これを実行する必要がある場合、ブートストラップがおそらく正しく動作していないため、何が間違っているかについてバグを報告すべきです。すべてをクリーンアップする必要がある場合は、1 つのコマンドを実行するだけです！
 
 ```bash
 ./x clean
 ```
 
-`rm -rf build` works too, but then you have to rebuild LLVM, which can take
-a long time even on fast computers.
+`rm -rf build` も機能しますが、LLVM を再ビルドする必要があり、高速なコンピュータでも長い時間がかかる場合があります。
 
-## Remarks on disk space
+## ディスクスペースに関する注意
 
-Building the compiler (especially if beyond stage 1) can require significant amounts of free disk
-space, possibly around 100GB. This is compounded if you have a separate build directory for
-rust-analyzer (e.g. `build-rust-analyzer`). This is easy to hit with dev-desktops which have a [set
-disk
-quota](https://github.com/rust-lang/simpleinfra/blob/8a59e4faeb75a09b072671c74a7cb70160ebef50/ansible/roles/dev-desktop/defaults/main.yml#L7)
-for each user, but this also applies to local development as well. Occasionally, you may need to:
+コンパイラをビルドする（特に stage 1 を超える場合）には、かなりの量の空きディスクスペースが必要になる場合があります。おそらく約 100GB です。rust-analyzer 用に別のビルドディレクトリがある場合（例：`build-rust-analyzer`）、これは増大します。これは、各ユーザーに [設定されたディスククォータ](https://github.com/rust-lang/simpleinfra/blob/8a59e4faeb75a09b072671c74a7cb70160ebef50/ansible/roles/dev-desktop/defaults/main.yml#L7) がある dev-desktop で簡単にヒットしますが、これはローカル開発にも適用されます。時々、次のことを行う必要がある場合があります：
 
-- Remove `build/` directory.
-- Remove `build-rust-analyzer/` directory (if you have a separate rust-analyzer build directory).
-- Uninstall unnecessary toolchains if you use `cargo-bisect-rustc`. You can check which toolchains
-  are installed with `rustup toolchain list`.
+- `build/` ディレクトリを削除します。
+- `build-rust-analyzer/` ディレクトリを削除します（rust-analyzer 用の別のビルドディレクトリがある場合）。
+- `cargo-bisect-rustc` を使用する場合、不要なツールチェーンをアンインストールします。`rustup toolchain list` でどのツールチェーンがインストールされているかを確認できます。
 
 [^1]: issue[#1707](https://github.com/rust-lang/rustc-dev-guide/issues/1707)

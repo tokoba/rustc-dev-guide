@@ -1,128 +1,104 @@
-# Request for stabilization
+# 安定化のリクエスト
 
-**NOTE**: This page is about stabilizing *language* features.
-For stabilizing *library* features, see [Stabilizing a library feature].
+**注意**：このページは*言語*機能の安定化についてです。*ライブラリ*機能の安定化については、[ライブラリ機能の安定化]を参照してください。
 
-[Stabilizing a library feature]: ./stability.md#stabilizing-a-library-feature
+[ライブラリ機能の安定化]: ./stability.md#stabilizing-a-library-feature
 
-Once an unstable feature has been well-tested with no outstanding concerns, anyone may push for its stabilization, though involving the people who have worked on it is prudent.
-Follow these steps:
+不安定な機能が十分にテストされ、未解決の懸念がなくなったら、誰でもその安定化を推進できます。ただし、その機能に取り組んだ人々を巻き込むのが賢明です。次の手順に従ってください：
 
-## Write an RFC, if needed
+## 必要に応じてRFCを書く
 
-If the feature was part of a [lang experiment], the lang team generally will want to first accept an RFC before stabilization.
+機能が[lang experiment]の一部であった場合、langチームは一般的に安定化の前にまずRFCを受け入れることを望みます。
 
 [lang experiment]: https://lang-team.rust-lang.org/how_to/experiment.html
 
-## Documentation PRs
+## ドキュメントのPR
 
 <a id="updating-documentation"></a>
 
-The feature might be documented in the [`Unstable Book`], located at [`src/doc/unstable-book`].
-Remove the page for the feature gate if it exists.
-Integrate any useful parts of that documentation in other places.
+機能は[`src/doc/unstable-book`]にある[`Unstable Book`]でドキュメント化されている可能性があります。機能ゲートのページが存在する場合は削除してください。そのドキュメントの有用な部分を他の場所に統合してください。
 
-Places that may need updated documentation include:
+更新が必要なドキュメントの場所には以下が含まれます：
 
-- [The Reference]: This must be updated, in full detail, and a member of the lang-docs team must review and approve the PR before the stabilization can be merged.
-- [The Book]: This is updated as needed.
-  If you're not sure, please open an issue on this repository and it can be discussed.
-- Standard library documentation: This is updated as needed.
-  Language features often don't need this, but if it's a feature that changes how idiomatic examples are written, such as when `?` was added to the language, updating these in the library documentation is important.
-  Review also the keyword documentation and ABI documentation in the standard library, as these sometimes need updates for language changes.
-- [Rust by Example]: This is updated as needed.
+- [The Reference]：これは詳細に完全に更新する必要があり、lang-docsチームのメンバーがPRをレビューし、承認してから安定化をマージできるようにする必要があります。
+- [The Book]：これは必要に応じて更新されます。確信が持てない場合は、このリポジトリにissueを開くと、議論できます。
+- 標準ライブラリのドキュメント：必要に応じて更新されます。言語機能は通常これを必要としませんが、`?`が言語に追加されたときのように慣用的な例の書き方を変える機能である場合、ライブラリドキュメントでこれらを更新することが重要です。標準ライブラリのキーワードドキュメントとABIドキュメントもレビューしてください。言語の変更によって更新が必要になることがあります。
+- [Rust by Example]：必要に応じて更新されます。
 
-Prepare PRs to update documentation involving this new feature for the repositories mentioned above.
-Maintainers of these repositories will keep these PRs open until the whole stabilization process has completed.
-Meanwhile, we can proceed to the next step.
+この新機能に関するドキュメントを更新するために、上記のリポジトリのPRを準備してください。これらのリポジトリのメンテナーは、安定化プロセス全体が完了するまでこれらのPRを開いたままにします。その間、次のステップに進むことができます。
 
-## Write a stabilization report
+## 安定化レポートを書く
 
-Author a stabilization report using the [template found in this repository][srt].
+[このリポジトリにあるテンプレート][srt]を使用して安定化レポートを作成してください。
 
-The stabilization reports summarizes:
+安定化レポートには以下がまとめられます：
 
-- The main design decisions and deviations since the RFC was accepted, including both decisions that were FCP'd or otherwise accepted by the language team as well as those being presented to the lang team for the first time.
-    - Often, the final stabilized language feature has significant design deviations from the original RFC.
-      That's OK, but these deviations must be highlighted and explained carefully.
-- The work that has been done since the RFC was accepted, acknowledging the main contributors that helped drive the language feature forward.
+- RFCが受け入れられてからの主な設計決定と逸脱。langチームによってFCPされたか、その他の方法で受け入れられた決定と、初めてlangチームに提示される決定の両方を含みます。
+    - 多くの場合、最終的に安定化される言語機能は、元のRFCから大幅な設計の逸脱があります。それは問題ありませんが、これらの逸脱は慎重に強調され、説明される必要があります。
+- RFCが受け入れられてから行われた作業を、言語機能を前進させた主要なコントリビューターを認めながらまとめます。
 
-The [*Stabilization Template*][srt] includes a series of questions that aim to surface connections between this feature and lang's subteams (e.g. types, opsem, lang-docs, etc.) and to identify items that are commonly overlooked.
+[*安定化テンプレート*][srt]には、この機能とlangのサブチーム（例：types、opsem、lang-docsなど）との間のつながりを浮き彫りにし、一般的に見落とされがちな項目を特定することを目的とした一連の質問が含まれています。
 
 [srt]: ./stabilization_report_template.md
 
-The stabilization report is typically posted as the main comment on the stabilization PR (see the next section).
+安定化レポートは通常、安定化PR（次のセクションを参照）のメインコメントとして投稿されます。
 
-## Stabilization PR
+## 安定化PR
 
-Every feature is different, and some may require steps beyond what this guide discusses.
+すべての機能は異なり、一部はこのガイドで議論する以上のステップが必要になる場合があります。
 
-Before the stabilization will be considered by the lang team, there must be a complete PR to the Reference describing the feature, and before the stabilization PR will be merged, this PR must have been reviewed and approved by the lang-docs team.
+安定化がlangチームによって検討される前に、機能を説明するReferenceへの完全なPRが必要であり、安定化PRがマージされる前に、このPRはlang-docsチームによってレビューおよび承認されている必要があります。
 
-### Updating the feature-gate listing
+### 機能ゲートリストの更新
 
-There is a central listing of unstable feature-gates in [`compiler/rustc_feature/src/unstable.rs`].
-Search for the `declare_features!`  macro.
-There should be an entry for the feature you are aiming to stabilize,
-something like the following (taken from [rust-lang/rust#32409]:
+[`compiler/rustc_feature/src/unstable.rs`]に不安定な機能ゲートの中心的なリストがあります。`declare_features!`マクロを探してください。安定化を目指している機能のエントリがあるはずです。次のようなものです（[rust-lang/rust#32409]から取得）：
 
 ```rust,ignore
 // pub(restricted) visibilities (RFC 1422)
 (unstable, pub_restricted, "CURRENT_RUSTC_VERSION", Some(32409)),
 ```
 
-The above line should be moved to [`compiler/rustc_feature/src/accepted.rs`].
-Entries in the `declare_features!` call are sorted, so find the correct place.
-When it is done, it should look like:
+上記の行は[`compiler/rustc_feature/src/accepted.rs`]に移動する必要があります。`declare_features!`呼び出しのエントリはソートされているので、正しい場所を見つけてください。完了すると、次のようになります：
 
 ```rust,ignore
 // pub(restricted) visibilities (RFC 1422)
 (accepted, pub_restricted, "CURRENT_RUSTC_VERSION", Some(32409)),
-// note that we changed this
+// これを変更したことに注意
 ```
 
-(Even though you will encounter version numbers in the file of past changes, you should not put the rustc version you expect your stabilization to happen in, but instead use `CURRENT_RUSTC_VERSION`.)
+（過去の変更のバージョン番号がファイルにあることに気づくと思いますが、安定化が行われることを期待するrustcバージョンを入れるのではなく、`CURRENT_RUSTC_VERSION`を使用する必要があります。）
 
-### Removing existing uses of the feature-gate
+### 機能ゲートの既存の使用を削除する
 
-Next, search for the feature string (in this case, `pub_restricted`) in the codebase to find where it appears.
-Change uses of `#![feature(XXX)]` from the `std` and any rustc crates
-(which includes test folders under `library/` and `compiler/` but not the toplevel `tests/` one)
-to be `#![cfg_attr(bootstrap, feature(XXX))]`.
-This includes the feature-gate only for stage0, which is built using the current beta (this is needed because the feature is still unstable in the current beta).
+次に、コードベースで機能文字列（この場合は`pub_restricted`）を検索して、どこに現れるかを見つけます。`std`および任意のrustcクレート（`library/`および`compiler/`の下のテストフォルダーを含むが、トップレベルの`tests/`は除く）からの`#![feature(XXX)]`の使用を`#![cfg_attr(bootstrap, feature(XXX))]`に変更します。これには、現在のベータ（これが必要なのは機能がまだ現在のベータで不安定であるため）を使用してビルドされるstage0の機能ゲートのみが含まれます。
 
-Also, remove those strings from any tests (e.g. under `tests/`). If there are tests specifically targeting the feature-gate (i.e., testing that the feature-gate is required to use the feature, but nothing else), simply remove the test.
+また、任意のテスト（例：`tests/`の下）からそれらの文字列を削除します。機能ゲートを具体的にターゲットとするテスト（つまり、機能を使用するために機能ゲートが必要であることをテストするが、他には何もない）がある場合は、単にテストを削除します。
 
-### Do not require the feature-gate to use the feature
+### 機能を使用するために機能ゲートを必要としない
 
-Most importantly, remove the code which flags an error if the feature-gate is not present (since the feature is now considered stable).
-If the feature can be detected because it employs some new syntax, then a common place for that code to be is in `compiler/rustc_ast_passes/src/feature_gate.rs`.
-For example, you might see code like this:
+最も重要なのは、機能ゲートが存在しない場合にエラーをフラグするコードを削除することです（機能は安定と見なされるため）。機能が新しい構文を使用するために検出できる場合、そのコードの一般的な場所は`compiler/rustc_ast_passes/src/feature_gate.rs`です。たとえば、次のようなコードが表示される場合があります：
 
 ```rust,ignore
 gate_all!(pub_restricted, "`pub(restricted)` syntax is experimental");
 ```
 
-The `gate_all!` macro reports an error if the `pub_restricted` feature is not enabled.
-It is not needed now that `pub(restricted)` is stable.
+`gate_all!`マクロは、`pub_restricted`機能が有効になっていない場合にエラーを報告します。これは不要になりました。`pub(restricted)`が安定しているためです。
 
-For more subtle features, you may find code like this:
+よりサブトルな機能の場合、次のようなコードが見つかる場合があります：
 
 ```rust,ignore
 if self.tcx.features().async_fn_in_dyn_trait() { /* XXX */ }
 ```
 
-This `pub_restricted` field (named after the feature) would ordinarily be false if the feature flag is not present and true if it is.
-So, transform the code to assume that the field is true.
-In this case, that would mean removing the `if` and leaving just the `/* XXX */`.
+この`pub_restricted`フィールド（機能にちなんで名付けられている）は、通常、機能フラグが存在しない場合はfalse、存在する場合はtrueになります。したがって、コードをフィールドがtrueであると仮定するように変換します。この場合、それは`if`を削除して`/* XXX */`だけを残すことを意味します。
 
 ```rust,ignore
 if self.tcx.sess.features.borrow().pub_restricted { /* XXX */ }
-becomes
+次のようになります
 /* XXX */
 
 if self.tcx.sess.features.borrow().pub_restricted && something { /* XXX */ }
- becomes
+ 次のようになります
 if something { /* XXX */ }
 ```
 
@@ -140,42 +116,45 @@ if something { /* XXX */ }
 [`Unstable Book`]: https://doc.rust-lang.org/unstable-book/index.html
 [`src/doc/unstable-book`]: https://github.com/rust-lang/rust/tree/HEAD/src/doc/unstable-book
 
-## Team nominations
+## チーム指名
 
-When opening the stabilization PR, CC the lang team and its advisors (`@rust-lang/lang @rust-lang/lang-advisors`) and any other teams to whom the feature is relevant, e.g.:
+安定化PRを開くときは、langチームとそのアドバイザー（`@rust-lang/lang @rust-lang/lang-advisors`）および機能に関連するその他のチームにCCしてください。たとえば：
 
-- `@rust-lang/types`, for type system interactions.
-- `@rust-lang/opsem`, for interactions with unsafe code.
-- `@rust-lang/compiler`, for implementation robustness.
-- `@rust-lang/libs-api`, for changes to the standard library API or its guarantees.
-- `@rust-lang/lang-docs`, for questions about how this should be documented in the Reference.
+- `@rust-lang/types`：型システムの相互作用について。
+- `@rust-lang/opsem`：unsafeコードとの相互作用について。
+- `@rust-lang/compiler`：実装の堅牢性について。
+- `@rust-lang/libs-api`：標準ライブラリAPIまたはその保証の変更について。
+- `@rust-lang/lang-docs`：Referenceでこれをどのようにドキュメント化すべきかについての質問について。
 
-After the stabilization PR is opened with the stabilization report, wait a bit for any immediate comments.
-When such comments "simmer down" and you feel the PR is ready for consideration by the lang team, [nominate the PR](https://lang-team.rust-lang.org/how_to/nominate.html) to get it on the agenda for consideration in an upcoming lang meeting.
+安定化レポートとともに安定化PRが開かれた後、即座のコメントのために少し待ちます。そのようなコメントが「落ち着いて」、PRがlangチームによる検討の準備ができたと感じたら、次回のlang会議で検討するためのアジェンダに載せるために[PRをノミネート](https://lang-team.rust-lang.org/how_to/nominate.html)します。
 
-If you are not a `rust-lang` organization member, you can ask your assigned reviewer to CC the relevant teams on your behalf.
+`rust-lang`組織のメンバーでない場合は、割り当てられたレビュアーにあなたの代わりに関連チームにCCするように依頼できます。
 
-## Propose FCP on the PR
+## PRでFCPを提案する
 
-After the lang team and other relevant teams review the stabilization, and after you have answered any questions they may have had, a member of one of the teams may propose to accept the stabilization by commenting:
+langチームおよび他の関連チームが安定化をレビューし、質問に答えた後、チームの1人のメンバーがコメントすることで安定化の承認を提案する場合があります：
 
 ```text
 @rfcbot fcp merge
 ```
 
-Once enough team members have reviewed, the PR will move into a "final comment period" (FCP).
-If no new concerns are raised, this period will complete and the PR can be merged after implementation review in the usual way.
+十分な数のチームメンバーがレビューすると、PRは「最終コメント期間」（FCP）に移行します。新しい懸念が提起されなければ、この期間は完了し、通常の方法で実装レビュー後にPRをマージできます。
 
-## Reviewing and merging stabilizations
+## 安定化のレビューとマージ
 
-On a stabilization, before giving it the `r+`, ensure that the PR:
+安定化では、`r+`を与える前に、PRが次のことを確認してください：
 
-- Matches what the team proposed for stabilization and what is documented in the Reference PR.
-- Includes any changes the team decided to request along the way in order to resolve or avoid concerns.
-- Is otherwise exactly what is described in the stabilization report and in any relevant RFCs or prior lang FCPs.
-- Does not expose on stable behaviors other than those specified, accepted for stabilization, and documented in the Reference.
-- Has sufficient tests to convincingly demonstrate these things.
-- Is accompanied by a PR to the Reference than has been reviewed and approved by a member of lang-docs.
+- チームが安定化のために提案したものと、Referenceで文書化されているものと一致している。
+- チームが懸念を解決または回避するために途中で要求することを決定した変更が含まれている。
+- 安定化レポートおよび関連するRFCや以前のlang FCPで説明されているものと正確に一致している。
+- 指定され、安定化のために受け入れられ、Referenceで文書化されているもの以外の動作を安定版で公開しない。
+- これらのことを確実に示す十分なテストがある。
+- テストは、もちろん機能が動作することを包括的に示す必要がある。また、一般的なミスが犯されたときに表示される診断や、機能が誤って使用されたときの診断を示すことも考えてください。
 
-In particular, when reviewing the PR, keep an eye out for any user-visible details that the lang team failed to consider and specify.
-If you find one, describe it and nominate the PR for the lang team.
+各テスト内で、テストの目的とそれが実証しようとしている一連の不変条件を説明するコメントをテストの上部に含めてください。これはレビューにとって大きな助けになります。
+
+テストカバレッジに既知のまたは意図的なギャップがある場合は、それを説明してください。
+
+テストフォルダーと個々のテストをコンテキスト化してリンクしてください。
+
+特に、PRをレビューするときは、langチームが考慮し、指定しなかったユーザーに見える詳細に注意してください。それを見つけた場合は、それを説明してlangチーム用にPRをノミネートしてください。

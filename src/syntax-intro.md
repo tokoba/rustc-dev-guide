@@ -1,19 +1,12 @@
-# Syntax and the AST
+# 構文とAST
 
-Working directly with source code is very inconvenient and error-prone.
-Thus, before we do anything else, we convert raw source code into an
-[Abstract Syntax Tree (AST)][AST]. It turns out that doing this involves a lot of work,
-including [lexing, parsing], [macro expansion], [name resolution], conditional
-compilation, [feature-gate checking], and [validation] of the [AST].
-In this chapter, we take a look at all of these steps.
+ソースコードを直接扱うことは非常に不便でエラーが発生しやすいです。したがって、他のことを行う前に、生のソースコードを[抽象構文木（AST）][AST]に変換します。このASTを行うには、[字句解析と構文解析]、[マクロ展開]、[名前解決]、条件付きコンパイル、[機能ゲートチェック]、[ASTの検証][validation]など、多くの作業が必要です。この章では、これらのステップすべてを見ていきます。
 
-Notably, there isn't always a clean ordering between these tasks.
-For example, macro expansion relies on name resolution to resolve the names of macros and imports.
-And parsing requires macro expansion, which in turn may require parsing the output of the macro.
+これらのタスクの間には常にきれいな順序があるわけではないことに注意してください。たとえば、マクロ展開は名前解決に依存してマクロとインポートの名前を解決します。そして、構文解析はマクロ展開を必要とし、マクロ展開は順番にマクロの出力を構文解析する必要がある場合があります。
 
 [AST]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_parse/index.html
-[macro expansion]: ./macro-expansion.md
-[feature-gate checking]: ./feature-gate-ck.md
-[lexing, parsing]: ./the-parser.md
-[name resolution]: ./name-resolution.md
+[マクロ展開]: ./macro-expansion.md
+[機能ゲートチェック]: ./feature-gate-ck.md
+[字句解析と構文解析]: ./the-parser.md
+[名前解決]: ./name-resolution.md
 [validation]: ./ast-validation.md

@@ -1,47 +1,51 @@
-# `rust-lang/rust` Licenses
+# `rust-lang/rust` ライセンス
 
-The `rustc` compiler source and standard library are dual licensed under the [Apache License v2.0](https://github.com/rust-lang/rust/blob/HEAD/LICENSE-APACHE) and the [MIT License](https://github.com/rust-lang/rust/blob/HEAD/LICENSE-MIT) unless otherwise specified.
+`rustc`コンパイラソースと標準ライブラリは、特に指定されていない限り、
+[Apache License v2.0](https://github.com/rust-lang/rust/blob/HEAD/LICENSE-APACHE)と
+[MIT License](https://github.com/rust-lang/rust/blob/HEAD/LICENSE-MIT)のデュアルライセンスです。
 
-Detailed licensing information is available in the [COPYRIGHT document](https://github.com/rust-lang/rust/blob/HEAD/COPYRIGHT) of the `rust-lang/rust` repository.
+詳細なライセンス情報は、`rust-lang/rust`リポジトリの
+[COPYRIGHTドキュメント](https://github.com/rust-lang/rust/blob/HEAD/COPYRIGHT)で入手できます。
 
-## Guidelines for reviewers
+## レビュアーのガイドライン
 
-In general, reviewers need to be looking not only for the code quality of contributions but also
-that they are properly licensed.
-We have some tips below for things to look out for when reviewing, but if you ever feel uncertain
-as to whether some code might be properly licensed, err on the safe side — reach out to the Council
-or Compiler Team Leads for feedback!
+一般的に、レビュアーはコントリビューションのコード品質だけでなく、
+適切にライセンスされているかどうかも確認する必要があります。
+レビュー時に注意すべき点についていくつかのヒントを以下に示しますが、
+コードが適切にライセンスされているかどうかについて不確かな場合は、
+安全側に倒してください。フィードバックについては、評議会またはコンパイラチームリードに連絡してください！
 
-Things to watch out for:
+注意すべき点：
 
-- The PR author states that they copied, ported, or adapted the code from some other source.
-- There is a comment in the code pointing to a webpage or describing where the algorithm was taken
-from.
-- The algorithm or code pattern seems like it was likely copied from somewhere else.
-- When adding new dependencies, double check the dependency's license.
+- PRの作成者が、他のソースからコードをコピー、移植、または適応したと述べている。
+- コード内に、Webページを指すコメントや、アルゴリズムがどこから取得されたかを説明する
+  コメントがある。
+- アルゴリズムまたはコードパターンが、どこかからコピーされたように見える。
+- 新しい依存関係を追加する場合は、依存関係のライセンスを再確認してください。
 
-In all of these cases, we will want to check that source to make sure it is licensed in a way
-that is compatible with Rust’s license.
+これらすべての場合において、そのソースが
+Rustのライセンスと互換性のある方法でライセンスされていることを確認する必要があります。
 
-Examples
+例
 
-- Porting C code from a GPL project, like GNU binutils, is not allowed. That would require Rust
-itself to be licensed under the GPL.
-- Copying code from an algorithms text book may be allowed, but some algorithms are patented.
+- GNU binutilsなどのGPLプロジェクトからCコードを移植することは許可されていません。
+  それはRust自体がGPLの下でライセンスされることを必要とします。
+- アルゴリズムのテキストブックからコードをコピーすることは許可される場合がありますが、
+  一部のアルゴリズムは特許を取得しています。
 
-## Porting
+## 移植
 
-Contributions to rustc, especially around platform and compiler intrinsics, often include porting
-over work from other projects, mainly LLVM and GCC.
+rustcへのコントリビューション、特にプラットフォームとコンパイラの組み込みに関するものは、
+他のプロジェクト、主にLLVMとGCCからの作業を移植することがよくあります。
 
-Some general rules apply:
+いくつかの一般的なルールが適用されます。
 
-- Copying work needs to adhere to the original license
-    - This applies to direct copy & paste
-    - This also applies to code you looked at and ported
+- 作業をコピーするには、元のライセンスを遵守する必要があります
+    - これは、直接コピー＆ペーストに適用されます
+    - これは、見て移植したコードにも適用されます
 
-In general, taking inspiration from other codebases is fine, but please exercise caution when
-porting code.
+一般的に、他のコードベースからインスピレーションを得ることは問題ありませんが、
+コードを移植する際は注意してください。
 
-Ports of full libraries (e.g. C libraries shipped with LLVM) must keep the license of the original
-library.
+完全なライブラリ（LLVMに同梱されているCライブラリなど）の移植は、
+元のライブラリのライセンスを保持する必要があります。

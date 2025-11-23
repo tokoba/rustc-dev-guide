@@ -1,109 +1,103 @@
-# Incremental compilation
+# インクリメンタルコンパイル
 
-The incremental compilation scheme is, in essence, a surprisingly
-simple extension to the overall query system. We'll start by describing
-a slightly simplified variant of the real thing – the "basic algorithm" –
-and then describe some possible improvements.
+インクリメンタルコンパイルスキームは、本質的には、全体的なクエリシステムへの驚くほど
+シンプルな拡張です。実際のものの少し簡略化されたバリアント--「基本アルゴリズム」--を
+説明することから始め、次にいくつかの可能な改善について説明します。
 
-## The basic algorithm
+## 基本アルゴリズム
 
-The basic algorithm is
-called the **red-green** algorithm[^salsa]. The high-level idea is
-that, after each run of the compiler, we will save the results of all
-the queries that we do, as well as the **query DAG**. The
-**query DAG** is a [DAG] that indexes which queries executed which
-other queries. So, for example, there would be an [edge] from a query Q1
-to another query Q2 if computing Q1 required computing Q2 (note that
-because queries cannot depend on themselves, this results in a DAG and
-not a general graph).
+基本アルゴリズムは
+**red-green**アルゴリズム[^salsa]と呼ばれています。高レベルのアイデアは、
+コンパイラの各実行後に、実行したすべてのクエリの結果と**クエリDAG**を保存するということです。
+**クエリDAG**は、どのクエリが他のどのクエリを実行したかをインデックス化する[DAG]です。
+したがって、たとえば、Q1の計算にQ2の計算が必要だった場合、クエリQ1から
+別のクエリQ2への[エッジ]があります(クエリは自分自身に依存できないため、
+これは一般的なグラフではなくDAGになることに注意してください)。
 
 [DAG]: https://en.wikipedia.org/wiki/Directed_acyclic_graph
 
-> **NOTE**: You might think of a query as simply the definition of a query.
-> A thing that you can invoke, a bit like a function, 
-> and which either returns a cached result or actually executes the code.
-> 
-> If that's the way you think about queries,
-> it's good to know that in the following text, queries will be said to have colours. 
-> Keep in mind though, that here the word query also refers to a certain invocation of 
-> the query for a certain input. As you will read later, queries are fingerprinted based 
-> on their arguments. The result of a query might change when we give it one argument 
-> and be coloured red, while it stays the same for another argument and is thus green.
-> 
-> In short, the word query is here not just used to mean the definition of a query, 
-> but also for a specific instance of that query with given arguments.
+> **注意**: クエリを単にクエリの定義として考えるかもしれません。
+> 呼び出すことができるもの、関数のようなもので、
+> キャッシュされた結果を返すか、実際にコードを実行します。
+>
+> クエリについてそのように考える場合、
+> 以下のテキストでは、クエリには色があると言われることを知っておくと良いでしょう。
+> ただし、ここでクエリという言葉は、特定の入力に対するクエリの特定の呼び出しも指すことを
+> 覚えておいてください。後で読むように、クエリは引数に基づいてフィンガープリントされます。
+> クエリの結果は、ある引数を与えたときに変更され、赤色になる可能性がありますが、
+> 別の引数では同じままで、したがって緑色になります。
+>
+> 要するに、ここでクエリという言葉は、クエリの定義を意味するだけでなく、
+> 特定の引数を持つそのクエリの特定のインスタンスに対しても使用されます。
 
-On the next run of the compiler, then, we can sometimes reuse these
-query results to avoid re-executing a query. We do this by assigning
-every query a **color**:
+コンパイラの次の実行では、クエリの再実行を避けるために、これらの
+クエリ結果を再利用できる場合があります。これは、すべてのクエリに**色**を
+割り当てることによって行います:
 
-- If a query is colored **red**, that means that its result during
-  this compilation has **changed** from the previous compilation.
-- If a query is colored **green**, that means that its result is
-  the **same** as the previous compilation.
+- クエリが**赤**色の場合、このコンパイル中のその結果が
+  前回のコンパイルから**変更された**ことを意味します。
+- クエリが**緑**色の場合、その結果が
+  前回のコンパイルと**同じ**であることを意味します。
 
-There are two key insights here:
+ここには2つの重要な洞察があります:
 
-- First, if all the inputs to query Q are colored green, then the
-  query Q **must** result in the same value as last time and hence
-  need not be re-executed (or else the compiler is not deterministic).
-- Second, even if some inputs to a query changes, it may be that it
-  **still** produces the same result as the previous compilation. In
-  particular, the query may only use part of its input.
-  - Therefore, after executing a query, we always check whether it
-    produced the same result as the previous time. **If it did,** we
-    can still mark the query as green, and hence avoid re-executing
-    dependent queries.
+- まず、クエリQへのすべての入力が緑色の場合、
+  クエリQは前回と同じ値を生成する**必要があり**、したがって
+  再実行する必要はありません(そうでなければコンパイラは決定論的ではありません)。
+- 次に、クエリへの一部の入力が変更されたとしても、
+  前回のコンパイルと同じ結果を生成する**可能性があります**。
+  特に、クエリは入力の一部のみを使用する場合があります。
+  - したがって、クエリを実行した後、前回と同じ結果を生成したかどうかを
+    常に確認します。**そうであれば**、クエリを緑色としてマークでき、
+    したがって依存クエリの再実行を避けることができます。
 
-### The try-mark-green algorithm
+### try-mark-greenアルゴリズム
 
-At the core of incremental compilation is an algorithm called
-"try-mark-green". It has the job of determining the color of a given
-query Q (which must not have yet been executed). In cases where Q has
-red inputs, determining Q's color may involve re-executing Q so that
-we can compare its output, but if all of Q's inputs are green, then we
-can conclude that Q must be green without re-executing it or inspecting
-its value at all. In the compiler, this allows us to avoid
-deserializing the result from disk when we don't need it, and in fact
-enables us to sometimes skip *serializing* the result as well
-(see the refinements section below).
+インクリメンタルコンパイルの中核には、
+「try-mark-green」というアルゴリズムがあります。これは、特定の
+クエリQ(まだ実行されていない必要があります)の色を決定する役割があります。Qに
+赤い入力がある場合、Qの色を決定するには、出力を比較できるようにQを再実行する必要が
+ありますが、Qのすべての入力が緑色の場合、
+Qを再実行したり、その値を調べたりすることなく、Qが緑色である必要があると
+結論付けることができます。コンパイラでは、これにより、
+必要ないときにディスクから結果をデシリアライズすることを避けることができ、実際には
+結果の*シリアライズ*をスキップすることもできます
+(以下の改善セクションを参照)。
 
-Try-mark-green works as follows:
+Try-mark-greenは次のように機能します:
 
-- First check if the query Q was executed during the previous compilation.
-  - If not, we can just re-execute the query as normal, and assign it the
-    color of red.
-- If yes, then load the 'dependent queries' of Q.
-- If there is a saved result, then we load the `reads(Q)` vector from the
-  query DAG. The "reads" is the set of queries that Q executed during
-  its execution.
-  - For each query R in `reads(Q)`, we recursively demand the color
-    of R using try-mark-green.
-    - Note: it is important that we visit each node in `reads(Q)` in same order
-      as they occurred in the original compilation. See [the section on the
-      query DAG below](#dag).
-    - If **any** of the nodes in `reads(Q)` wind up colored **red**, then Q is
-      dirty.
-      - We re-execute Q and compare the hash of its result to the hash of the
-        result from the previous compilation.
-      - If the hash has not changed, we can mark Q as **green** and return.
-    - Otherwise, **all** of the nodes in `reads(Q)` must be **green**. In that
-      case, we can color Q as **green** and return.
+- まず、前回のコンパイル中にクエリQが実行されたかどうかを確認します。
+  - そうでない場合、通常どおりクエリを再実行し、
+    赤色を割り当てることができます。
+- はいの場合、Qの「依存クエリ」をロードします。
+- 保存された結果がある場合、クエリDAGから`reads(Q)`ベクトルをロードします。
+  「reads」は、Qがその実行中に実行したクエリのセットです。
+  - `reads(Q)`の各クエリRについて、try-mark-greenを使用して
+    Rの色を再帰的に要求します。
+    - 注意: `reads(Q)`の各ノードを元のコンパイルで発生したのと同じ順序で
+      訪問することが重要です。[以下のクエリDAGのセクション](#dag)を参照してください。
+    - `reads(Q)`のノードの**いずれか**が**赤**色になった場合、Qは
+      ダーティです。
+      - Qを再実行し、その結果のハッシュを前回のコンパイルの
+        結果のハッシュと比較します。
+      - ハッシュが変更されていない場合、Qを**緑**色としてマークして戻ることができます。
+    - それ以外の場合、`reads(Q)`のノードの**すべて**が**緑**色である必要があります。その
+      場合、Qを**緑**色として色付けして戻ることができます。
 
 <a id="dag"></a>
 
-### The query DAG
+### クエリDAG
 
-The query DAG code is stored in
-[`compiler/rustc_middle/src/dep_graph`][dep_graph]. Construction of the DAG is done
-by instrumenting the query execution.
+クエリDAGコードは
+[`compiler/rustc_middle/src/dep_graph`][dep_graph]に保存されています。DAGの構築は、
+クエリの実行を計装することによって行われます。
 
-One key point is that the query DAG also tracks ordering; that is, for
-each query Q, we not only track the queries that Q reads, we track the
-**order** in which they were read.  This allows try-mark-green to walk
-those queries back in the same order. This is important because once a
-subquery comes back as red, we can no longer be sure that Q will continue
-along the same path as before. That is, imagine a query like this:
+重要な点の1つは、クエリDAGも順序を追跡することです。つまり、
+各クエリQについて、Qが読み取るクエリを追跡するだけでなく、
+それらが読み取られた**順序**も追跡します。これにより、try-mark-greenが
+同じ順序でそれらのクエリを逆にたどることができます。これは、
+サブクエリが赤として戻ってくると、Qが以前と同じパスに沿って続くかどうかを
+確信できなくなるため重要です。つまり、次のようなクエリを想像してください:
 
 ```rust,ignore
 fn main_query(tcx) {
@@ -115,49 +109,45 @@ fn main_query(tcx) {
 }
 ```
 
-Now imagine that in the first compilation, `main_query` starts by
-executing `subquery1`, and this returns true. In that case, the next
-query `main_query` executes will be `subquery2`, and `subquery3` will
-not be executed at all.
+最初のコンパイルで、`main_query`が`subquery1`の実行から始まり、
+これがtrueを返すとします。その場合、次に`main_query`が実行するクエリは`subquery2`で、
+`subquery3`はまったく実行されません。
 
-But now imagine that in the **next** compilation, the input has
-changed such that `subquery1` returns **false**. In this case, `subquery2`
-would never execute. If try-mark-green were to visit `reads(main_query)` out
-of order, however, it might visit `subquery2` before `subquery1`, and hence
-execute it.
-This can lead to ICEs and other problems in the compiler.
+しかし、**次の**コンパイルで、入力が変更されて
+`subquery1`が**false**を返すとします。この場合、`subquery2`は
+決して実行されません。ただし、try-mark-greenが`reads(main_query)`を順序外で訪問した場合、
+`subquery1`の前に`subquery2`を訪問し、したがって
+実行する可能性があります。
+これにより、コンパイラでICEやその他の問題が発生する可能性があります。
 
 [dep_graph]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/dep_graph/index.html
 
-## Improvements to the basic algorithm
+## 基本アルゴリズムの改善
 
-In the description of the basic algorithm, we said that at the end of
-compilation we would save the results of all the queries that were
-performed.  In practice, this can be quite wasteful – many of those
-results are very cheap to recompute, and serializing and deserializing
-them is not a particular win. In practice, what we would do is to save
-**the hashes** of all the subqueries that we performed. Then, in select cases,
-we **also** save the results.
+基本アルゴリズムの説明では、コンパイルの最後に
+実行されたすべてのクエリの結果を保存すると述べました。実際には、これは非常に無駄になる可能性があります
+-- それらの結果の多くは再計算するのが非常に安価であり、
+それらをシリアライズおよびデシリアライズすることは特に有益ではありません。実際には、
+実行したすべてのサブクエリの**ハッシュ**を保存します。次に、特定のケースで、
+結果も**保存**します。
 
-This is why the incremental algorithm separates computing the
-**color** of a node, which often does not require its value, from
-computing the **result** of a node. Computing the result is done via a simple
-algorithm like so:
+これが、インクリメンタルアルゴリズムがノードの
+**色**の計算を、多くの場合その値を必要としないことから、
+ノードの**結果**の計算から分離する理由です。結果の計算は、次のような単純な
+アルゴリズムを介して行われます:
 
-- Check if a saved result for Q is available. If so, compute the color of Q.
-  If Q is green, deserialize and return the saved result.
-- Otherwise, execute Q.
-  - We can then compare the hash of the result and color Q as green if
-    it did not change.
+- Qの保存された結果が利用可能かどうかを確認します。ある場合、Qの色を計算します。
+  Qが緑色の場合、保存された結果をデシリアライズして返します。
+- それ以外の場合、Qを実行します。
+  - その後、結果のハッシュを比較し、変更されていない場合はQを緑色として色付けできます。
 
-## Resources
-The initial design document can be found [here][initial-design], which expands
-on the memoization details, provides more high-level overview and motivation
-for this system.
+## リソース
+初期設計ドキュメントは[こちら][initial-design]にあり、
+メモ化の詳細を拡張し、このシステムの高レベルの概要と動機を提供します。
 
-# Footnotes
+# 脚注
 
-[^salsa]: I have long wanted to rename it to the Salsa algorithm, but it never caught on. -@nikomatsakis
+[^salsa]: 私は長い間、これをSalsaアルゴリズムに名前を変更したいと思っていましたが、普及しませんでした。-@nikomatsakis
 
-[edge]: https://en.wikipedia.org/wiki/Glossary_of_graph_theory_terms#edge
+[エッジ]: https://en.wikipedia.org/wiki/Glossary_of_graph_theory_terms#edge
 [initial-design]: https://github.com/nikomatsakis/rustc-on-demand-incremental-design-doc/blob/master/0000-rustc-on-demand-and-incremental.md

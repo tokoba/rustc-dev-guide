@@ -1,31 +1,29 @@
-# Command-line Arguments
+# コマンドライン引数
 
-Command-line flags are documented in the [rustc book][cli-docs]. All *stable*
-flags should be documented there. Unstable flags should be documented in the
-[unstable book].
+コマンドラインフラグは [rustc book][cli-docs] で文書化されています。すべての*安定した*
+フラグはそこで文書化されるべきです。不安定なフラグは
+[unstable book] で文書化されるべきです。
 
-See the [forge guide for new options] for details on the *procedure* for
-adding a new command-line argument.
+新しいコマンドライン引数を追加するための*手順*の詳細については、[新しいオプションの forge ガイド][forge guide for new options]を参照してください。
 
-## Guidelines
+## ガイドライン
 
-- Flags should be orthogonal to each other. For example, if we'd have a
-  json-emitting variant of multiple actions `foo` and `bar`, an additional
-  `--json` flag is better than adding `--foo-json` and `--bar-json`.
-- Avoid flags with the `no-` prefix. Instead, use the [`parse_bool`] function,
-  such as `-C embed-bitcode=no`.
-- Consider the behavior if the flag is passed multiple times. In some
-  situations, the values should be accumulated (in order!). In other
-  situations, subsequent flags should override previous flags (for example,
-  the lint-level flags). And some flags (like `-o`) should generate an error
-  if it is too ambiguous what multiple flags would mean.
-- Always give options a long descriptive name, if only for more understandable
-  compiler scripts.
-- The `--verbose` flag is for adding verbose information to `rustc`
-  output. For example, using it with the `--version`
-  flag gives information about the hashes of the compiler code.
-- Experimental flags and options must be guarded behind the `-Z
-  unstable-options` flag.
+- フラグは互いに直交している必要があります。たとえば、複数のアクション `foo` と `bar` の
+  json 出力バリアントがある場合、`--foo-json` と `--bar-json` を追加するよりも、追加の
+  `--json` フラグの方が優れています。
+- `no-` プレフィックスを持つフラグは避けてください。代わりに、
+  `-C embed-bitcode=no` のように、[`parse_bool`] 関数を使用してください。
+- フラグが複数回渡された場合の動作を考慮してください。状況によっては、
+  値を（順番に！）累積する必要があります。他の
+  状況では、後続のフラグが以前のフラグを上書きする必要があります（たとえば、
+  lint レベルフラグ）。そして、一部のフラグ（`-o` など）は、複数のフラグが何を意味するかが
+  あまりにも曖昧な場合はエラーを生成する必要があります。
+- より理解しやすいコンパイラスクリプトのためにも、常にオプションに長い説明的な名前を付けてください。
+- `--verbose` フラグは、`rustc`
+  出力に詳細情報を追加するためのものです。たとえば、`--version`
+  フラグと一緒に使用すると、コンパイラコードのハッシュに関する情報が得られます。
+- 実験的なフラグとオプションは、`-Z
+  unstable-options` フラグの背後で保護する必要があります。
 
 [cli-docs]: https://doc.rust-lang.org/rustc/command-line-arguments.html
 [forge guide for new options]: https://forge.rust-lang.org/compiler/proposals-and-stabilization.html#compiler-flags

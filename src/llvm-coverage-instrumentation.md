@@ -1,128 +1,129 @@
-# LLVM source-based code coverage
+# LLVMソースベースのコードカバレッジ
 
-`rustc` supports detailed source-based code and test coverage analysis
-with a command line option (`-C instrument-coverage`) that instruments Rust
-libraries and binaries with additional instructions and data, at compile time.
+`rustc`は、コンパイル時にRustライブラリとバイナリに追加の命令とデータを使用して、
+詳細なソースベースのコードとテストカバレッジ分析をサポートします。
+これには、コマンドラインオプション（`-C instrument-coverage`）を使用します。
 
-The coverage instrumentation injects calls to the LLVM intrinsic instruction
-[`llvm.instrprof.increment`][llvm-instrprof-increment] at code branches
-(based on a MIR-based control flow analysis), and LLVM converts these to
-instructions that increment static counters, when executed. The LLVM coverage
-instrumentation also requires a [Coverage Map] that encodes source metadata,
-mapping counter IDs--directly and indirectly--to the file locations (with
-start and end line and column).
+カバレッジ計装は、LLVMの組み込み命令
+[`llvm.instrprof.increment`][llvm-instrprof-increment]への呼び出しを
+コードブランチ（MIRベースの制御フロー分析に基づく）に挿入し、
+LLVMはこれらを実行時に静的カウンターをインクリメントする命令に変換します。
+LLVM カバレッジ計装には、ソースメタデータをエンコードする[Coverage Map]も必要です。
+これは、カウンターIDを直接および間接的にファイルの場所（開始行と終了行および列を含む）にマッピングします。
 
-Rust libraries, with or without coverage instrumentation, can be linked into
-instrumented binaries. When the program is executed and cleanly terminates,
-LLVM libraries write the final counter values to a file (`default.profraw` or
-a custom file set through environment variable `LLVM_PROFILE_FILE`).
+カバレッジ計装の有無にかかわらず、Rustライブラリは
+計装されたバイナリにリンクできます。プログラムが実行されてクリーンに終了すると、
+LLVMライブラリは最終的なカウンター値をファイル（`default.profraw`または
+環境変数`LLVM_PROFILE_FILE`を介して設定されたカスタムファイル）に書き込みます。
 
-Developers use existing LLVM coverage analysis tools to decode `.profraw`
-files, with corresponding Coverage Maps (from matching binaries that produced
-them), and generate various reports for analysis, for example:
+開発者は、既存のLLVMカバレッジ分析ツールを使用して、
+`.profraw`ファイルを、それらを生成した対応するCoverage Map（一致するバイナリから）と共にデコードし、
+分析のためのさまざまなレポートを生成します。例えば：
 
 <img alt="Screenshot of sample `llvm-cov show` result, for function add_quoted_string"
  src="img/llvm-cov-show-01.png" class="center"/>
 <br/>
 
-Detailed instructions and examples are documented in the
-[rustc book][rustc-book-instrument-coverage].
+詳細な手順と例は、
+[rustcブック][rustc-book-instrument-coverage]に文書化されています。
 
 [llvm-instrprof-increment]: https://llvm.org/docs/LangRef.html#llvm-instrprof-increment-intrinsic
 [coverage map]: https://llvm.org/docs/CoverageMappingFormat.html
 [rustc-book-instrument-coverage]: https://doc.rust-lang.org/nightly/rustc/instrument-coverage.html
 
-## Recommended `bootstrap.toml` settings
+## 推奨される`bootstrap.toml`設定
 
-When working on the coverage instrumentation code, it is usually necessary to
-**enable the profiler runtime** by setting `profiler = true` in `[build]`.
-This allows the compiler to produce instrumented binaries, and makes it possible
-to run the full coverage test suite.
+カバレッジ計装コードで作業する場合、通常は
+`[build]`で`profiler = true`を設定して**プロファイラランタイムを有効にする**必要があります。
+これにより、コンパイラは計装されたバイナリを生成でき、
+完全なカバレッジテストスイートを実行できるようになります。
 
-Enabling debug assertions in the compiler and in LLVM is recommended, but not
-mandatory.
+コンパイラとLLVMでデバッグアサーションを有効にすることをお勧めしますが、
+必須ではありません。
 
 ```toml
-# Similar to the "compiler" profile, but also enables debug assertions in LLVM.
-# These assertions can detect malformed coverage mappings in some cases.
+# 「compiler」プロファイルに似ていますが、LLVMでデバッグアサーションも有効にします。
+# これらのアサーションは、場合によっては不正なカバレッジマッピングを検出できます。
 profile = "codegen"
 
 [build]
-# IMPORTANT: This tells the build system to build the LLVM profiler runtime.
-# Without it, the compiler can't produce coverage-instrumented binaries,
-# and many of the coverage tests will be skipped.
+# 重要：これにより、ビルドシステムにLLVMプロファイラランタイムをビルドするように指示します。
+# これがないと、コンパイラはカバレッジ計装されたバイナリを生成できず、
+# 多くのカバレッジテストがスキップされます。
 profiler = true
 
 [rust]
-# Enable debug assertions in the compiler.
+# コンパイラでデバッグアサーションを有効にします。
 debug-assertions = true
 ```
 
-## Rust symbol mangling
+## Rustシンボルマングリング
 
-`-C instrument-coverage` automatically enables Rust symbol mangling `v0` (as
-if the user specified `-C symbol-mangling-version=v0` option when invoking
-`rustc`) to ensure consistent and reversible name mangling. This has two
-important benefits:
+`-C instrument-coverage`は、
+Rustシンボルマングリング`v0`を自動的に有効にします
+（ユーザーが`rustc`を呼び出すときに`-C symbol-mangling-version=v0`オプションを指定したかのように）。
+これにより、一貫性のある可逆的な名前マングリングが保証されます。これには2つの重要な利点があります。
 
-1. LLVM coverage tools can analyze coverage over multiple runs, including some
-   changes to source code; so mangled names must be consistent across compilations.
-2. LLVM coverage reports can report coverage by function, and even separates
-   out the coverage counts of each unique instantiation of a generic function,
-   if invoked with multiple type substitution variations.
+1. LLVMカバレッジツールは、ソースコードへの一部の変更を含む、複数の実行にわたって
+   カバレッジを分析できます。したがって、マングルされた名前はコンパイル間で一貫している必要があります。
+2. LLVMカバレッジレポートは、関数ごとにカバレッジを報告でき、
+   複数の型置換バリエーションで呼び出された場合でも、
+   ジェネリック関数の各一意のインスタンス化のカバレッジカウントを分離します。
 
-## The LLVM profiler runtime
+## LLVMプロファイラランタイム
 
-Coverage data is only generated by running the executable Rust program. `rustc`
-statically links coverage-instrumented binaries with LLVM runtime code
-([compiler-rt][compiler-rt-profile]) that implements program hooks
-(such as an `exit` hook) to write the counter values to the `.profraw` file.
+カバレッジデータは、実行可能なRustプログラムを実行することによってのみ生成されます。`rustc`は、
+カバレッジ計装されたバイナリを、`.profraw`ファイルにカウンター値を書き込むプログラムフック
+（`exit`フックなど）を実装するLLVMランタイムコード
+([compiler-rt][compiler-rt-profile])と静的にリンクします。
 
-In the `rustc` source tree,
-`library/profiler_builtins` bundles the LLVM `compiler-rt` code into a Rust library crate.
-Note that when building `rustc`,
-`profiler_builtins` is only included when `build.profiler = true` is set in `bootstrap.toml`.
+`rustc`ソースツリーでは、
+`library/profiler_builtins`がLLVM `compiler-rt`コードをRustライブラリクレートにバンドルします。
+`rustc`をビルドする際、
+`profiler_builtins`は`build.profiler = true`が`bootstrap.toml`に設定されている場合にのみ含まれることに注意してください。
 
-When compiling with `-C instrument-coverage`,
-[`CrateLoader::postprocess()`][crate-loader-postprocess] dynamically loads
-`profiler_builtins` by calling `inject_profiler_runtime()`.
+`-C instrument-coverage`でコンパイルする場合、
+[`CrateLoader::postprocess()`][crate-loader-postprocess]は、
+`inject_profiler_runtime()`を呼び出すことで`profiler_builtins`を動的にロードします。
 
 [compiler-rt-profile]: https://github.com/llvm/llvm-project/tree/main/compiler-rt/lib/profile
 [crate-loader-postprocess]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_metadata/creader/struct.CrateLoader.html#method.postprocess
 
-## Testing coverage instrumentation
+## カバレッジ計装のテスト
 
-[(See also the compiletest documentation for the `tests/coverage`
-test suite.)](./tests/compiletest.md#coverage-tests)
+[(コンパイルテストのドキュメントで`tests/coverage`
+テストスイートも参照してください。)](./tests/compiletest.md#coverage-tests)
 
-Coverage instrumentation in the MIR is validated by a `mir-opt` test:
-[`tests/mir-opt/coverage/instrument_coverage.rs`].
+MIRのカバレッジ計装は、`mir-opt`テストで検証されます。
+[`tests/mir-opt/coverage/instrument_coverage.rs`]。
 
-Coverage instrumentation in LLVM IR is validated by the [`tests/coverage`]
-test suite in `coverage-map` mode.
-These tests compile a test program to LLVM IR assembly, and then
-use the [`src/tools/coverage-dump`] tool to extract and pretty-print the
-coverage mappings that would be embedded in the final binary.
+LLVM IRのカバレッジ計装は、`coverage-map`モードの[`tests/coverage`]
+テストスイートによって検証されます。
+これらのテストは、テストプログラムをLLVM IRアセンブリにコンパイルし、
+次に[`src/tools/coverage-dump`]ツールを使用して、
+最終バイナリに埋め込まれるカバレッジマッピングを抽出して
+きれいに印刷します。
 
-End-to-end testing of coverage instrumentation and coverage reporting is
-performed by the [`tests/coverage`] test suite in `coverage-run` mode,
-and by the [`tests/coverage-run-rustdoc`] test suite.
-These tests compile and run a test program with coverage
-instrumentation, then use LLVM tools to convert the coverage data into a
-human-readable coverage report.
+カバレッジ計装とカバレッジレポートのエンドツーエンドテストは、
+`coverage-run`モードの[`tests/coverage`]テストスイートと
+[`tests/coverage-run-rustdoc`]テストスイートによって実行されます。
+これらのテストは、カバレッジ計装を使用してテストプログラムをコンパイルして実行し、
+次にLLVMツールを使用してカバレッジデータを
+人間が読める形式のカバレッジレポートに変換します。
 
-> Tests in `coverage-run` mode have an implicit `//@ needs-profiler-runtime`
-> directive, so they will be skipped if the profiler runtime has not been
-> [enabled in `bootstrap.toml`](#recommended-configtoml-settings).
+> `coverage-run`モードのテストには、暗黙の`//@ needs-profiler-runtime`
+> ディレクティブがあるため、プロファイラランタイムが
+> [`bootstrap.toml`で有効になっていない](#recommended-configtoml-settings)場合はスキップされます。
 
-Finally, the [`tests/codegen-llvm/instrument-coverage/testprog.rs`] test compiles a simple Rust program
-with `-C instrument-coverage` and compares the compiled program's LLVM IR to
-expected LLVM IR instructions and structured data for a coverage-enabled
-program, including various checks for Coverage Map-related metadata and the LLVM
-intrinsic calls to increment the runtime counters.
+最後に、[`tests/codegen-llvm/instrument-coverage/testprog.rs`]テストは、
+単純なRustプログラムを`-C instrument-coverage`でコンパイルし、
+コンパイルされたプログラムのLLVM IRを、
+カバレッジ対応プログラムの期待されるLLVM IR命令と構造化データと比較します。
+これには、Coverage Map関連のメタデータとLLVM組み込み呼び出しのさまざまなチェックが含まれ、
+ランタイムカウンターをインクリメントします。
 
-Expected results for the `coverage`, `coverage-run-rustdoc`,
-and `mir-opt` tests can be refreshed by running:
+`coverage`、`coverage-run-rustdoc`、
+および`mir-opt`テストの期待される結果は、次を実行してリフレッシュできます。
 
 ```shell
 ./x test coverage --bless

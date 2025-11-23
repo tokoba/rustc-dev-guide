@@ -1,64 +1,41 @@
-# Performance testing
+# パフォーマンステスト
 
 ## rustc-perf
 
-A lot of work is put into improving the performance of the compiler and
-preventing performance regressions.
+コンパイラのパフォーマンス向上とパフォーマンス退行の防止に多くの労力が費やされています。
 
-The [rustc-perf](https://github.com/rust-lang/rustc-perf) project provides
-several services for testing and tracking performance. It provides hosted
-infrastructure for running benchmarks as a service. At this time, only
-`x86_64-unknown-linux-gnu` builds are tracked.
+[rustc-perf](https://github.com/rust-lang/rustc-perf) プロジェクトは、パフォーマンスのテストと追跡のためのいくつかのサービスを提供しています。サービスとしてベンチマークを実行するためのホストされたインフラストラクチャを提供しています。現時点では、`x86_64-unknown-linux-gnu` ビルドのみが追跡されています。
 
-A "perf run" is used to compare the performance of the compiler in different
-configurations for a large collection of popular crates. Different
-configurations include "fresh builds", builds with incremental compilation, etc.
+「perf run」は、人気のあるクレートの大規模なコレクションに対して、異なる構成でのコンパイラのパフォーマンスを比較するために使用されます。異なる構成には「フレッシュビルド」、インクリメンタルコンパイルを使用したビルドなどが含まれます。
 
-The result of a perf run is a comparison between two versions of the compiler
-(by their commit hashes).
+perf run の結果は、2つのバージョンのコンパイラ（それらのコミットハッシュによる）の比較です。
 
-You can also use `rustc-perf` to manually benchmark and profile the compiler
-[locally](../profiling/with_rustc_perf.md).
+また、`rustc-perf` を使用して、コンパイラを[ローカルで](../profiling/with_rustc_perf.md)手動でベンチマークおよびプロファイリングすることもできます。
 
-### Automatic perf runs
+### 自動 perf run
 
-After every PR is merged, a suite of benchmarks are run against the compiler.
-The results are tracked over time on the <https://perf.rust-lang.org/> website.
-Any changes are noted in a comment on the PR.
+すべての PR がマージされた後、コンパイラに対してベンチマークのスイートが実行されます。
+結果は <https://perf.rust-lang.org/> ウェブサイトで時系列に追跡されます。
+変更があった場合は PR にコメントが付けられます。
 
-### Manual perf runs
+### 手動 perf run
 
-Additionally, performance tests can be ran before a PR is merged on an as-needed
-basis. You should request a perf run if your PR may affect performance,
-especially if it can affect performance adversely.
+さらに、必要に応じて PR がマージされる前にパフォーマンステストを実行できます。PR がパフォーマンスに影響を与える可能性がある場合、特にパフォーマンスに悪影響を与える可能性がある場合は、perf run をリクエストする必要があります。
 
-To evaluate the performance impact of a PR, write this comment on the PR:
+PR のパフォーマンス影響を評価するには、PR に次のコメントを書いてください：
 
 `@bors try @rust-timer queue`
 
-> **Note**: Only users authorized to do perf runs are allowed to post this
-> comment. Teams that are allowed to use it are tracked in the [Teams
-> repository](https://github.com/rust-lang/team) with the `perf = true` value in
-> the `[permissions]` section (and bors permissions are also required). If you
-> are not on one of those teams, feel free to ask for someone to post it for you
-> (either on Zulip or ask the assigned reviewer).
+> **注意**: perf run の実行が許可されているユーザーのみがこのコメントを投稿できます。使用を許可されているチームは、[Teams リポジトリ](https://github.com/rust-lang/team)で `[permissions]` セクションに `perf = true` の値で追跡されています（bors の権限も必要です）。これらのチームのいずれかにいない場合は、誰かに代わりに投稿するよう気軽に依頼してください（Zulip で、または割り当てられたレビュアーに依頼してください）。
 
-This will first tell bors to do a "try" build which do a full release build for
-`x86_64-unknown-linux-gnu`. After the build finishes, it will place it in the
-queue to run the performance suite against it. After the performance tests
-finish, the bot will post a comment on the PR with a summary and a link to a
-full report.
+これはまず bors に「try」ビルドを行うよう指示し、`x86_64-unknown-linux-gnu` の完全なリリースビルドを行います。ビルドが完了すると、それに対してパフォーマンススイートを実行するキューに配置されます。パフォーマンステストが完了すると、ボットは要約と完全なレポートへのリンクを含むコメントを PR に投稿します。
 
-If you want to do a perf run for an already built artifact (e.g. for a previous
-try build that wasn't benchmarked yet), you can run this instead:
+既にビルドされたアーティファクトに対して perf run を実行したい場合（例えば、まだベンチマークされていない以前の try ビルドに対して）、代わりに次を実行できます：
 
 `@rust-timer build <commit-sha>`
 
-You cannot benchmark the same artifact twice though.
+ただし、同じアーティファクトを2回ベンチマークすることはできません。
 
-More information about the available perf bot commands can be found
-[here](https://perf.rust-lang.org/help.html). 
+利用可能な perf bot コマンドの詳細については、[こちら](https://perf.rust-lang.org/help.html)をご覧ください。
 
-More details about the benchmarking process itself are available in the [perf
-collector
-documentation](https://github.com/rust-lang/rustc-perf/blob/master/collector/README.md).
+ベンチマークプロセス自体の詳細については、[perf collector ドキュメント](https://github.com/rust-lang/rustc-perf/blob/master/collector/README.md)で入手できます。

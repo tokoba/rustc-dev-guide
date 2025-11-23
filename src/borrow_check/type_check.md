@@ -1,61 +1,44 @@
-# The MIR type-check
+# MIR 型チェック
 
-A key component of the borrow check is the
-[MIR type-check](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/type_check/index.html).
-This check walks the MIR and does a complete "type check" -- the same
-kind you might find in any other language. In the process of doing
-this type-check, we also uncover the region constraints that apply to
-the program.
+borrow check の重要なコンポーネントは [MIR 型チェック](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/type_check/index.html) です。このチェックは MIR を歩いて、他の言語で見られるような完全な「型チェック」を行います。この型チェックを行う過程で、プログラムに適用される領域制約も明らかにします。
 
-TODO -- elaborate further? Maybe? :)
+TODO -- さらに詳しく説明する？多分？:)
 
-## User types
+## ユーザー型
 
-At the start of MIR type-check, we replace all regions in the body with new unconstrained regions.
-However, this would cause us to accept the following program:
+MIR 型チェックの開始時に、本体内のすべての領域を新しい制約のない領域に置き換えます。
+ただし、これにより次のプログラムを受け入れてしまいます:
 ```rust
 fn foo<'a>(x: &'a u32) {
     let y: &'static u32 = x;
 }
 ```
-By erasing the lifetimes in the type of `y` we no longer know that it is supposed to be `'static`,
-ignoring the intentions of the user.
+`y` の型のライフタイムを消去することで、それが `'static` であることを知らなくなり、ユーザーの意図を無視します。
 
-To deal with this we remember all places where the user explicitly mentioned a type during
-HIR type-check as [`CanonicalUserTypeAnnotations`][annot].
+これに対処するために、ユーザーが HIR 型チェック中に明示的に型を言及したすべての場所を [`CanonicalUserTypeAnnotations`][annot] として記憶します。
 
-There are two different annotations we care about:
-- explicit type ascriptions, e.g. `let y: &'static u32` results in `UserType::Ty(&'static u32)`.
-- explicit generic arguments, e.g. `x.foo<&'a u32, Vec<String>>`
-results in `UserType::TypeOf(foo_def_id, [&'a u32, Vec<String>])`.
+私たちが気にする 2 つの異なる注釈があります:
+- 明示的な型アスクリプション。例えば、`let y: &'static u32` は `UserType::Ty(&'static u32)` になります。
+- 明示的なジェネリック引数。例えば、`x.foo<&'a u32, Vec<String>>` は `UserType::TypeOf(foo_def_id, [&'a u32, Vec<String>])` になります。
 
-As we do not want the region inference from the HIR type-check to influence MIR typeck,
-we store the user type right after lowering it from the HIR.
-This means that it may still contain inference variables,
-which is why we are using **canonical** user type annotations.
-We replace all inference variables with existential bound variables instead.
-Something like `let x: Vec<_>` would therefore result in `exists<T> UserType::Ty(Vec<T>)`.
+HIR 型チェックからの領域推論が MIR typeck に影響を与えないようにしたいため、HIR から下げた直後にユーザー型を格納します。
+これは、まだ推論変数が含まれている可能性があることを意味し、そのため**正規**ユーザー型注釈を使用しています。
+すべての推論変数を存在束縛変数に置き換えます。
+`let x: Vec<_>` のようなものは、`exists<T> UserType::Ty(Vec<T>)` になります。
 
-A pattern like `let Foo(x): Foo<&'a u32>` has a user type `Foo<&'a u32>` but
-the actual type of `x` should only be `&'a u32`. For this, we use a [`UserTypeProjection`][proj].
+`let Foo(x): Foo<&'a u32>` のようなパターンは、ユーザー型 `Foo<&'a u32>` を持ちますが、`x` の実際の型は `&'a u32` だけであるべきです。このために、[`UserTypeProjection`][proj] を使用します。
 
-In the MIR, we deal with user types in two slightly different ways.
+MIR では、ユーザー型を 2 つの若干異なる方法で扱います。
 
-Given a MIR local corresponding to a variable in a pattern which has an explicit type annotation,
-we require the type of that local to be equal to the type of the [`UserTypeProjection`][proj].
-This is directly stored in the [`LocalDecl`][decl].
+明示的な型注釈を持つパターン内の変数に対応する MIR ローカルが与えられた場合、そのローカルの型が [`UserTypeProjection`][proj] の型と等しいことを要求します。
+これは [`LocalDecl`][decl] に直接格納されます。
 
-We also constrain the type of scrutinee expressions, e.g. the type of `x` in `let _: &'a u32 = x;`.
-Here `T_x` only has to be a subtype of the user type, so we instead use
-[`StatementKind::AscribeUserType`][stmt] for that.
+スクルーティニー式の型も制約します。例えば、`let _: &'a u32 = x;` の `x` の型です。
+ここで、`T_x` はユーザー型のサブタイプであればよいため、代わりに [`StatementKind::AscribeUserType`][stmt] を使用します。
 
-Note that we do not directly use the user type as the MIR typechecker
-doesn't really deal with type and const inference variables. We instead store the final
-[`inferred_type`][inf] from the HIR type-checker. During MIR typeck, we then replace its regions
-with new nll inference vars and relate it with the actual `UserType` to get the correct region
-constraints again.
+MIR 型チェッカーは型と const 推論変数を直接扱わないため、ユーザー型を直接使用しないことに注意してください。代わりに、HIR 型チェッカーからの最終的な [`inferred_type`][inf] を格納します。MIR typeck 中、その領域を新しい nll 推論変数に置き換え、実際の `UserType` と関連付けて正しい領域制約を再び取得します。
 
-After the MIR type-check, all user type annotations get discarded, as they aren't needed anymore.
+MIR 型チェックの後、すべてのユーザー型注釈は破棄されます。もう必要ないためです。
 
 [annot]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.CanonicalUserTypeAnnotation.html
 [proj]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/mir/struct.UserTypeProjection.html

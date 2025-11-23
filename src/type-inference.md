@@ -1,10 +1,8 @@
-# Type inference
+# 型推論
 
-Type inference is the process of automatic detection of the type of an
-expression.
+型推論は、式の型を自動的に検出するプロセスです。
 
-It is what allows Rust to work with fewer or no type annotations,
-making things easier for users:
+これにより、Rustは型注釈をほとんど、またはまったく必要とせずに動作し、ユーザーにとって物事が簡単になります：
 
 ```rust
 fn main() {
@@ -13,244 +11,142 @@ fn main() {
 }
 ```
 
-Here, the type of `things` is *inferred* to be `Vec<&str>` because of the value
-we push into `things`.
+ここで、`things`の型は、`things`にプッシュする値のために`Vec<&str>`であると*推論*されます。
 
-The type inference is based on the standard Hindley-Milner (HM) type inference
-algorithm, but extended in various ways to accommodate subtyping, region
-inference, and higher-ranked types.
+型推論は、標準のHindley-Milner（HM）型推論アルゴリズムに基づいていますが、サブタイピング、リージョン推論、および高ランク型に対応するためにさまざまな方法で拡張されています。
 
-## A note on terminology
+## 用語に関する注記
 
-We use the notation `?T` to refer to inference variables, also called
-existential variables.
+推論変数を参照するために`?T`という表記法を使用します。これは存在変数とも呼ばれます。
 
-We use the terms "region" and "lifetime" interchangeably. Both refer to
-the `'a` in `&'a T`.
+「リージョン」と「ライフタイム」という用語は同じ意味で使用します。どちらも`&'a T`の`'a`を指します。
 
-The term "bound region" refers to a region that is bound in a function
-signature, such as the `'a` in `for<'a> fn(&'a u32)`. A region is
-"free" if it is not bound.
+「束縛リージョン」という用語は、`for<'a> fn(&'a u32)`の`'a`のように、関数シグネチャで束縛されたリージョンを指します。リージョンが束縛されていない場合、そのリージョンは「自由」です。
 
-## Creating an inference context
+## 推論コンテキストの作成
 
-You create an inference context by doing something like
-the following:
+次のようなことを行うことで、推論コンテキストを作成します：
 
 ```rust,ignore
 let infcx = tcx.infer_ctxt().build();
-// Use the inference context `infcx` here.
+// ここで推論コンテキスト`infcx`を使用します。
 ```
 
-`infcx` has the type `InferCtxt<'tcx>`, the same `'tcx` lifetime as on
-the `tcx` it was built from.
+`infcx`には、`InferCtxt<'tcx>`という型があり、ビルド元の`tcx`と同じ`'tcx`ライフタイムです。
 
-The `tcx.infer_ctxt` method actually returns a builder, which means
-there are some kinds of configuration you can do before the `infcx` is
-created. See `InferCtxtBuilder` for more information.
+`tcx.infer_ctxt`メソッドは実際にはビルダーを返します。つまり、`infcx`が作成される前に実行できる構成がいくつかあります。詳細については、`InferCtxtBuilder`を参照してください。
 
 <a id="vars"></a>
 
-## Inference variables
+## 推論変数
 
-The main purpose of the inference context is to house a bunch of
-**inference variables** – these represent types or regions whose precise
-value is not yet known, but will be uncovered as we perform type-checking.
+推論コンテキストの主な目的は、多数の**推論変数**を保持することです。これらは、正確な値がまだわかっていないが、型チェックを実行する際に明らかになる型またはリージョンを表します。
 
-If you're familiar with the basic ideas of unification from H-M type
-systems, or logic languages like Prolog, this is the same concept. If
-you're not, you might want to read a tutorial on how H-M type
-inference works, or perhaps this blog post on
-[unification in the Chalk project].
+H-M型システムまたはPrologのような論理言語からの統合の基本的なアイデアに精通している場合、これは同じ概念です。精通していない場合は、H-M型推論の動作に関するチュートリアルを読むか、おそらく[Chalkプロジェクトでの統合][Unification in the Chalk project]に関するこのブログ記事を読むことをお勧めします。
 
 [Unification in the Chalk project]: http://smallcultfollowing.com/babysteps/blog/2017/03/25/unification-in-chalk-part-1/
 
-All told, the inference context stores five kinds of inference variables
-(as of <!-- date-check --> March 2023):
+全体として、推論コンテキストは5種類の推論変数を保存します（<!-- date-check --> 2023年3月現在）：
 
-- Type variables, which come in three varieties:
-  - General type variables (the most common). These can be unified with any
-    type.
-  - Integral type variables, which can only be unified with an integral type,
-    and arise from an integer literal expression like `22`.
-  - Float type variables, which can only be unified with a float type, and
-    arise from a float literal expression like `22.0`.
-- Region variables, which represent lifetimes, and arise all over the place.
-- Const variables, which represent constants.
+- 型変数、3つのバリエーションがあります：
+  - 一般的な型変数（最も一般的）。これらは任意の型で統合できます。
+  - 整数型変数。整数型とのみ統合でき、`22`のような整数リテラル式から発生します。
+  - 浮動小数点型変数。浮動小数点型とのみ統合でき、`22.0`のような浮動小数点リテラル式から発生します。
+- リージョン変数。ライフタイムを表し、いたるところで発生します。
+- Const変数。定数を表します。
 
-All the type variables work in much the same way: you can create a new
-type variable, and what you get is `Ty<'tcx>` representing an
-unresolved type `?T`. Then later you can apply the various operations
-that the inferencer supports, such as equality or subtyping, and it
-will possibly **instantiate** (or **bind**) that `?T` to a specific
-value as a result.
+すべての型変数は同じように動作します：新しい型変数を作成でき、得られるものは未解決の型`?T`を表す`Ty<'tcx>`です。後で、推論器がサポートするさまざまな操作（等価性やサブタイピングなど）を適用でき、その結果として`?T`を特定の値に**インスタンス化**（または**バインド**）する可能性があります。
 
-The region variables work somewhat differently, and are described
-below in a separate section.
+リージョン変数は多少異なる方法で動作し、以下の別のセクションで説明されています。
 
-## Enforcing equality / subtyping
+## 等価性/サブタイピングの強制
 
-The most basic operations you can perform in the type inferencer is
-**equality**, which forces two types `T` and `U` to be the same. The
-recommended way to add an equality constraint is to use the `at`
-method, roughly like so:
+型推論器で実行できる最も基本的な操作は**等価性**です。これにより、2つの型`T`と`U`が同じであることが強制されます。等価性制約を追加する推奨される方法は、`at`メソッドを使用することです。次のようになります：
 
 ```rust,ignore
 infcx.at(...).eq(t, u);
 ```
 
-The first `at()` call provides a bit of context, i.e. why you are
-doing this unification, and in what environment, and the `eq` method
-performs the actual equality constraint.
+最初の`at()`呼び出しは少しのコンテキストを提供します。つまり、この統合を行っている理由と、どのような環境で行っているかです。`eq`メソッドは実際の等価性制約を実行します。
 
-When you equate things, you force them to be precisely equal. Equating
-returns an `InferResult` – if it returns `Err(err)`, then equating
-failed, and the enclosing `TypeError` will tell you what went wrong.
+物事を等価にすると、それらが正確に等しくなることが強制されます。等価化は`InferResult`を返します。`Err(err)`を返す場合、等価化は失敗し、囲まれた`TypeError`は何が問題だったかを教えてくれます。
 
-The success case is perhaps more interesting. The "primary" return
-type of `eq` is `()` – that is, when it succeeds, it doesn't return a
-value of any particular interest. Rather, it is executed for its
-side-effects of constraining type variables and so forth. However, the
-actual return type is not `()`, but rather `InferOk<()>`. The
-`InferOk` type is used to carry extra trait obligations – your job is
-to ensure that these are fulfilled (typically by enrolling them in a
-fulfillment context). See the [trait chapter] for more background on that.
+成功のケースはおそらくもっと興味深いです。`eq`の「プライマリ」戻り値の型は`()`です。つまり、成功したときに特に興味深い値を返しません。むしろ、型変数の制約などの副作用のために実行されます。ただし、実際の戻り値の型は`()`ではなく、`InferOk<()>`です。`InferOk`型は、追加のトレイト義務を運ぶために使用されます。これらを満たすことはあなたの仕事です（通常は充足コンテキストに登録することによって）。詳細については、[トレイトの章][trait chapter]を参照してください。
 
 [trait chapter]: traits/resolution.html
 
-You can similarly enforce subtyping through `infcx.at(..).sub(..)`. The same
-basic concepts as above apply.
+`infcx.at(..).sub(..)`を介してサブタイピングも同様に強制できます。同じ基本的な概念が適用されます。
 
-## "Trying" equality
+## 等価性を「試す」
 
-Sometimes you would like to know if it is *possible* to equate two
-types without error.  You can test that with `infcx.can_eq` (or
-`infcx.can_sub` for subtyping). If this returns `Ok`, then equality
-is possible – but in all cases, any side-effects are reversed.
+エラーなしで2つの型を等価にすることが*可能*かどうかを知りたい場合があります。`infcx.can_eq`（またはサブタイピングの場合は`infcx.can_sub`）でそれをテストできます。これが`Ok`を返す場合、等価性は可能です。ただし、すべての場合において、副作用は元に戻されます。
 
-Be aware, though, that the success or failure of these methods is always
-**modulo regions**. That is, two types `&'a u32` and `&'b u32` will
-return `Ok` for `can_eq`, even if `'a != 'b`.  This falls out from the
-"two-phase" nature of how we solve region constraints.
+ただし、これらのメソッドの成功または失敗は常に**リージョンをモジュロ**していることに注意してください。つまり、2つの型`&'a u32`と`&'b u32`は、`'a != 'b`であっても、`can_eq`に対して`Ok`を返します。これは、リージョン制約を解決する方法の「2フェーズ」性質から生じます。
 
-## Snapshots
+## スナップショット
 
-As described in the previous section on `can_eq`, often it is useful
-to be able to do a series of operations and then roll back their
-side-effects. This is done for various reasons: one of them is to be
-able to backtrack, trying out multiple possibilities before settling
-on which path to take. Another is in order to ensure that a series of
-smaller changes take place atomically or not at all.
+前のセクションの`can_eq`で説明したように、一連の操作を実行してから、その副作用をロールバックできると便利なことがよくあります。これはさまざまな理由で行われます：その1つは、複数の可能性を試してから決定する前にバックトラックできるようにすることです。もう1つは、一連の小さな変更が原子的に行われるか、まったく行われないようにすることです。
 
-To allow for this, the inference context supports a `snapshot` method.
-When you call it, it will start recording changes that occur from the
-operations you perform. When you are done, you can either invoke
-`rollback_to`, which will undo those changes, or else `confirm`, which
-will make them permanent. Snapshots can be nested as long as you follow
-a stack-like discipline.
+これを可能にするために、推論コンテキストは`snapshot`メソッドをサポートしています。これを呼び出すと、実行する操作から発生する変更の記録が開始されます。完了したら、`rollback_to`を呼び出してこれらの変更を元に戻すか、`confirm`を呼び出して永続的にすることができます。スナップショットは、スタックのような規律に従う限り、ネストできます。
 
-Rather than use snapshots directly, it is often helpful to use the
-methods like `commit_if_ok` or `probe` that encapsulate higher-level
-patterns.
+スナップショットを直接使用するのではなく、`commit_if_ok`や`probe`などの高レベルパターンをカプセル化するメソッドを使用すると便利なことがよくあります。
 
-## Subtyping obligations
+## サブタイピング義務
 
-One thing worth discussing is subtyping obligations. When you force
-two types to be a subtype, like `?T <: i32`, we can often convert those
-into equality constraints. This follows from Rust's rather limited notion
-of subtyping: so, in the above case, `?T <: i32` is equivalent to `?T = i32`.
+議論する価値がある1つのことは、サブタイピング義務です。2つの型がサブタイプであることを強制すると、`?T <: i32`のように、それらを等価性制約に変換できることがよくあります。これはRustの非常に限定的なサブタイピングの概念から生じます：したがって、上記の場合、`?T <: i32`は`?T = i32`と同等です。
 
-However, in some cases we have to be more careful. For example, when
-regions are involved. So if you have `?T <: &'a i32`, what we would do
-is to first "generalize" `&'a i32` into a type with a region variable:
-`&'?b i32`, and then unify `?T` with that (`?T = &'?b i32`). We then
-relate this new variable with the original bound:
+ただし、場合によってはもっと注意する必要があります。たとえば、リージョンが関与する場合です。したがって、`?T <: &'a i32`がある場合、最初に行うことは、リージョン変数で`&'a i32`を「一般化」することです：`&'?b i32`、次に`?T`とそれを統合します（`?T = &'?b i32`）。次に、この新しい変数を元の境界に関連付けます：
 
 ```text
 &'?b i32 <: &'a i32
 ```
 
-This will result in a region constraint (see below) of `'?b: 'a`.
+これにより、リージョン制約（以下を参照）`'?b: 'a`が生成されます。
 
-One final interesting case is relating two unbound type variables,
-like `?T <: ?U`.  In that case, we can't make progress, so we enqueue
-an obligation `Subtype(?T, ?U)` and return it via the `InferOk`
-mechanism. You'll have to try again when more details about `?T` or
-`?U` are known.
+最後に興味深いケースの1つは、`?T <: ?U`のような2つの非束縛型変数を関連付けることです。その場合、進捗できないので、義務`Subtype(?T, ?U)`をエンキューして`InferOk`メカニズムを介して返します。`?T`または`?U`の詳細がわかったら、再度試す必要があります。
 
-## Region constraints
+## リージョン制約
 
-Regions are inferenced somewhat differently from types. Rather than
-eagerly unifying things, we simply collect constraints as we go, but
-make (almost) no attempt to solve regions. These constraints have the
-form of an "outlives" constraint:
+リージョンは型とは多少異なる方法で推論されます。物事を熱心に統合するのではなく、進行しながら制約を収集しますが、リージョンを解決する試みは（ほとんど）しません。これらの制約には、「外存」制約の形式があります：
 
 ```text
 'a: 'b
 ```
 
-Actually the code tends to view them as a subregion relation, but it's the same
-idea:
+実際、コードはそれらをサブリージョン関係として見る傾向がありますが、同じアイデアです：
 
 ```text
 'b <= 'a
 ```
 
-(There are various other kinds of constraints, such as "verifys"; see
-the [`region_constraints`] module for details.)
+（他にも「verifys」などのさまざまな種類の制約があります。詳細については、[`region_constraints`]モジュールを参照してください。）
 
-There is one case where we do some amount of eager unification. If you have an
-equality constraint between two regions
+2つのリージョン間に等価性制約がある場合、熱心な統合を多少行う場合があります
 
 ```text
 'a = 'b
 ```
 
-we will record that fact in a unification table. You can then use
-[`opportunistic_resolve_var`] to convert `'b` to `'a` (or vice
-versa). This is sometimes needed to ensure termination of fixed-point
-algorithms.
+統合テーブルにその事実を記録します。次に、[`opportunistic_resolve_var`]を使用して、`'b`を`'a`に変換できます（またはその逆）。これは、固定点アルゴリズムの終了を保証するために必要な場合があります。
 
 [`region_constraints`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_infer/infer/region_constraints/index.html
 [`opportunistic_resolve_var`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_infer/infer/region_constraints/struct.RegionConstraintCollector.html#method.opportunistic_resolve_var
 
-## Solving region constraints
+## リージョン制約の解決
 
-Region constraints are only solved at the very end of
-typechecking, once all other constraints are known and
-all other obligations have been proven. There are two
-ways to solve region constraints right now: lexical and
-non-lexical. Eventually there will only be one.
+リージョン制約は、他のすべての制約が既知で、他のすべての義務が証明された後、型チェックの最後にのみ解決されます。リージョン制約を解決する方法は現在2つあります：字句的および非字句的です。最終的には1つだけになります。
 
-An exception here is the leak-check which is used during trait solving
-and relies on region constraints containing higher-ranked regions. Region
-constraints in the root universe (i.e. not arising from a `for<'a>`) must
-not influence the trait system, as these regions are all erased during
-codegen.
+ここでの例外は、トレイト解決中に使用され、高ランクリージョンを含むリージョン制約に依存するリークチェックです。ルート宇宙のリージョン制約（つまり、`for<'a>`から生じないもの）は、これらのリージョンがすべてコードジェン中に消去されるため、トレイトシステムに影響を与えてはなりません。
 
-To solve **lexical** region constraints, you invoke
-[`resolve_regions_and_report_errors`].  This "closes" the region
-constraint process and invokes the [`lexical_region_resolve`] code. Once
-this is done, any further attempt to equate or create a subtyping
-relationship will yield an ICE.
+**字句的**リージョン制約を解決するには、[`resolve_regions_and_report_errors`]を呼び出します。これによりリージョン制約プロセスが「閉じ」、[`lexical_region_resolve`]コードが呼び出されます。これが完了すると、等価性を作成したり、サブタイピング関係を作成したりする試みはICEをもたらします。
 
-The NLL solver (actually, the MIR type-checker) does things slightly
-differently. It uses canonical queries for trait solving which use
-[`take_and_reset_region_constraints`] at the end. This extracts all of the
-outlives constraints added during the canonical query. This is required
-as the NLL solver must not only know *what* regions outlive each other,
-but also *where*. Finally, the NLL solver invokes [`get_region_var_infos`],
-providing all region variables to the solver.
+NLLソルバー（実際にはMIR型チェッカー）は少し異なることを行います。トレイト解決には、最後に[`take_and_reset_region_constraints`]を使用する正規クエリを使用します。これにより、正規クエリ中に追加されたすべての外存制約が抽出されます。これは、NLLソルバーが*どの*リージョンが他のリージョンより長生きするかだけでなく、*どこで*も知る必要があるため必要です。最後に、NLLソルバーは[`get_region_var_infos`]を呼び出し、すべてのリージョン変数をソルバーに提供します。
 
 [`resolve_regions_and_report_errors`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_trait_selection/traits/struct.ObligationCtxt.html#method.resolve_regions_and_report_errors
 [`lexical_region_resolve`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_infer/infer/lexical_region_resolve/index.html
 [`take_and_reset_region_constraints`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_infer/infer/struct.InferCtxt.html#method.take_and_reset_region_constraints
 [`get_region_var_infos`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_infer/infer/struct.InferCtxt.html#method.get_region_var_infos
 
-## Lexical region resolution
+## 字句的リージョン解決
 
-Lexical region resolution is done by initially assigning each region
-variable to an empty value. We then process each outlives constraint
-repeatedly, growing region variables until a fixed-point is reached.
-Region variables can be grown using a least-upper-bound relation on
-the region lattice in a fairly straightforward fashion.
+字句的リージョン解決は、最初に各リージョン変数に空の値を割り当てることによって行われます。次に、各外存制約を繰り返し処理し、固定点に達するまでリージョン変数を拡大します。リージョン変数は、リージョン格子上の最小上界関係を使用してかなり直接的な方法で拡大できます。

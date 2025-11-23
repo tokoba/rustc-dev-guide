@@ -1,14 +1,13 @@
-# Placeholders and universes
+# プレースホルダーとユニバース
 
-From time to time we have to reason about regions that we can't
-concretely know. For example, consider this program:
+時々、具体的にはわからない領域について推論しなければならないことがあります。例えば、次のプログラムを考えてみましょう:
 
 ```rust,ignore
-// A function that needs a static reference
+// static 参照を必要とする関数
 fn foo(x: &'static u32) { }
 
 fn bar(f: for<'a> fn(&'a u32)) {
-       // ^^^^^^^^^^^^^^^^^^^ a function that can accept **any** reference
+       // ^^^^^^^^^^^^^^^^^^^ **任意の**参照を受け入れることができる関数
     let x = 22;
     f(&x);
 }
@@ -18,65 +17,39 @@ fn main() {
 }
 ```
 
-This program ought not to type-check: `foo` needs a static reference
-for its argument, and `bar` wants to be given a function that
-accepts **any** reference (so it can call it with something on its
-stack, for example). But *how* do we reject it and *why*?
+このプログラムは型チェックに合格すべきではありません: `foo` はその引数に static 参照を必要としますが、`bar` は**任意の**参照を受け入れる関数を与えられることを望んでいます（したがって、例えばスタック上の何かでそれを呼び出すことができます）。しかし、*どのように*それを拒否し、*なぜ*拒否するのでしょうか？
 
-## Subtyping and Placeholders
+## サブタイピングとプレースホルダー
 
-When we type-check `main`, and in particular the call `bar(foo)`, we
-are going to wind up with a subtyping relationship like this one:
+`main` を型チェックするとき、特に呼び出し `bar(foo)` では、次のようなサブタイピング関係になります:
 
 ```text
 fn(&'static u32) <: for<'a> fn(&'a u32)
 ----------------    -------------------
-the type of `foo`   the type `bar` expects
+`foo` の型          `bar` が期待する型
 ```
 
-We handle this sort of subtyping by taking the variables that are
-bound in the supertype and replacing them with
-[universally quantified](../../appendix/background.md#quantified)
-representatives, denoted like `!1` here. We call these regions "placeholder
-regions" – they represent, basically, "some unknown region".
+この種のサブタイピングを処理するには、スーパータイプで束縛されている変数を取り、それらを[全称量化された](../../appendix/background.md#quantified)代表で置き換えます。ここでは `!1` のように表記されます。これらの領域を「プレースホルダー領域」と呼びます -- 基本的に「いくつかの未知の領域」を表します。
 
-Once we've done that replacement, we have the following relation:
+その置き換えを行うと、次の関係が得られます:
 
 ```text
 fn(&'static u32) <: fn(&'!1 u32)
 ```
 
-The key idea here is that this unknown region `'!1` is not related to
-any other regions. So if we can prove that the subtyping relationship
-is true for `'!1`, then it ought to be true for any region, which is
-what we wanted.
+ここでの重要なアイデアは、この未知の領域 `'!1` は他の領域と関連していないということです。したがって、サブタイピング関係が `'!1` に対して真であることを証明できれば、それは任意の領域に対して真であるはずで、それが私たちが望んでいたことです。
 
-So let's work through what happens next. To check if two functions are
-subtypes, we check if their arguments have the desired relationship
-(fn arguments are [contravariant](../../appendix/background.md#variance), so
-we swap the left and right here):
+では、次に何が起こるかを見ていきましょう。2 つの関数がサブタイプであるかどうかをチェックするには、引数が望ましい関係を持っているかどうかをチェックします（fn 引数は[反変](../../appendix/background.md#variance)なので、ここでは左と右を入れ替えます）:
 
 ```text
 &'!1 u32 <: &'static u32
 ```
 
-According to the basic subtyping rules for a reference, this will be
-true if `'!1: 'static`. That is – if "some unknown region `!1`" outlives `'static`.
-Now, this *might* be true – after all, `'!1` could be `'static` –
-but we don't *know* that it's true. So this should yield up an error (eventually).
+参照の基本的なサブタイピングルールによれば、これは `'!1: 'static` の場合に真になります。つまり -- 「いくつかの未知の領域 `!1`」が `'static` より長く生存する場合。これは*真である可能性があります* -- 結局のところ、`'!1` は `'static` である可能性があります -- しかし、それが真であることを*知りません*。したがって、これはエラーを生じるべきです（最終的に）。
 
-## What is a universe?
+## ユニバースとは何ですか？
 
-In the previous section, we introduced the idea of a placeholder
-region, and we denoted it `!1`. We call this number `1` the **universe
-index**. The idea of a "universe" is that it is a set of names that
-are in scope within some type or at some point. Universes are formed
-into a tree, where each child extends its parents with some new names.
-So the **root universe** conceptually contains global names, such as
-the lifetime `'static` or the type `i32`. In the compiler, we also
-put generic type parameters into this root universe (in this sense,
-there is not just one root universe, but one per item). So consider
-this function `bar`:
+前のセクションで、プレースホルダー領域のアイデアを紹介し、それを `!1` と表記しました。この数字 `1` を**ユニバースインデックス**と呼びます。「ユニバース」のアイデアは、それがある型内またはあるポイントでスコープ内にある名前のセットであるということです。ユニバースはツリーに形成され、各子は親をいくつかの新しい名前で拡張します。したがって、**ルートユニバース**は概念的にグローバルな名前を含みます。例えば、ライフタイム `'static` や型 `i32` などです。コンパイラでは、ジェネリック型パラメータもこのルートユニバースに入れます（この意味で、ルートユニバースは 1 つだけではなく、アイテムごとに 1 つあります）。したがって、この関数 `bar` を考えてみましょう:
 
 ```rust,ignore
 struct Foo { }
@@ -86,14 +59,9 @@ fn bar<'a, T>(t: &'a T) {
 }
 ```
 
-Here, the root universe would consist of the lifetimes `'static` and
-`'a`.  In fact, although we're focused on lifetimes here, we can apply
-the same concept to types, in which case the types `Foo` and `T` would
-be in the root universe (along with other global types, like `i32`).
-Basically, the root universe contains all the names that
-[appear free](../../appendix/background.md#free-vs-bound) in the body of `bar`.
+ここで、ルートユニバースはライフタイム `'static` と `'a` で構成されます。実際、ここではライフタイムに焦点を当てていますが、型にも同じ概念を適用できます。その場合、型 `Foo` と `T` はルートユニバースに入ります（`i32` のような他のグローバル型と一緒に）。基本的に、ルートユニバースには `bar` の本体で[自由に現れる](../../appendix/background.md#free-vs-bound)すべての名前が含まれます。
 
-Now let's extend `bar` a bit by adding a variable `x`:
+では、変数 `x` を追加して `bar` を少し拡張しましょう:
 
 ```rust,ignore
 fn bar<'a, T>(t: &'a T) {
@@ -101,21 +69,17 @@ fn bar<'a, T>(t: &'a T) {
 }
 ```
 
-Here, the name `'b` is not part of the root universe. Instead, when we
-"enter" into this `for<'b>` (e.g., by replacing it with a placeholder), we will create
-a child universe of the root, let's call it U1:
+ここで、名前 `'b` はルートユニバースの一部ではありません。代わりに、この `for<'b>` に「入る」とき（例えば、プレースホルダーで置き換えることによって）、ルートの子ユニバースを作成します。それを U1 と呼びましょう:
 
 ```text
-U0 (root universe)
+U0 (ルートユニバース)
 │
-└─ U1 (child universe)
+└─ U1 (子ユニバース)
 ```
 
-The idea is that this child universe U1 extends the root universe U0
-with a new name, which we are identifying by its universe number:
-`!1`.
+アイデアは、この子ユニバース U1 がルートユニバース U0 を新しい名前で拡張するということです。これをユニバース番号で識別しています: `!1`。
 
-Now let's extend `bar` a bit by adding one more variable, `y`:
+では、もう 1 つの変数 `y` を追加して `bar` をさらに拡張しましょう:
 
 ```rust,ignore
 fn bar<'a, T>(t: &'a T) {
@@ -124,48 +88,23 @@ fn bar<'a, T>(t: &'a T) {
 }
 ```
 
-When we enter *this* type, we will again create a new universe, which
-we'll call `U2`. Its parent will be the root universe, and U1 will be
-its sibling:
+*この*型に入ると、再び新しいユニバースを作成します。それを `U2` と呼びます。その親はルートユニバースになり、U1 はその兄弟になります:
 
 ```text
-U0 (root universe)
+U0 (ルートユニバース)
 │
-├─ U1 (child universe)
+├─ U1 (子ユニバース)
 │
-└─ U2 (child universe)
+└─ U2 (子ユニバース)
 ```
 
-This implies that, while in U2, we can name things from U0 or U2, but
-not U1.
+これは、U2 にいる間、U0 または U2 からのものに名前を付けることができますが、U1 からは付けることができないことを意味します。
 
-**Giving existential variables a universe.** Now that we have this
-notion of universes, we can use it to extend our type-checker and
-things to prevent illegal names from leaking out. The idea is that we
-give each inference (existential) variable – whether it be a type or
-a lifetime – a universe. That variable's value can then only
-reference names visible from that universe. So for example if a
-lifetime variable is created in U0, then it cannot be assigned a value
-of `!1` or `!2`, because those names are not visible from the universe
-U0.
+**存在変数にユニバースを与える。** ユニバースの概念ができたので、それを使用して型チェッカーなどを拡張し、不正な名前が漏れるのを防ぐことができます。アイデアは、各推論（存在）変数 -- 型またはライフタイムのいずれか -- にユニバースを与えることです。その変数の値は、そのユニバースから見える名前のみを参照できます。したがって、例えばライフタイム変数が U0 で作成された場合、`!1` または `!2` の値を割り当てることはできません。なぜなら、それらの名前はユニバース U0 から見えないからです。
 
-**Representing universes with just a counter.** You might be surprised
-to see that the compiler doesn't keep track of a full tree of
-universes. Instead, it just keeps a counter – and, to determine if
-one universe can see another one, it just checks if the index is
-greater. For example, U2 can see U0 because 2 >= 0. But U0 cannot see
-U2, because 0 >= 2 is false.
+**ユニバースをカウンターだけで表現する。** コンパイラがユニバースの完全なツリーを追跡していないことに驚くかもしれません。代わりに、カウンターを保持するだけです -- そして、あるユニバースが別のユニバースを見ることができるかどうかを判断するために、インデックスが大きいかどうかをチェックするだけです。例えば、U2 は U0 を見ることができます。なぜなら、2 >= 0 だからです。しかし、U0 は U2 を見ることができません。なぜなら、0 >= 2 は false だからです。
 
-How can we get away with this? Doesn't this mean that we would allow
-U2 to also see U1? The answer is that, yes, we would, **if that
-question ever arose**.  But because of the structure of our type
-checker etc, there is no way for that to happen. In order for
-something happening in the universe U1 to "communicate" with something
-happening in U2, they would have to have a shared inference variable X
-in common. And because everything in U1 is scoped to just U1 and its
-children, that inference variable X would have to be in U0. And since
-X is in U0, it cannot name anything from U1 (or U2). This is perhaps easiest
-to see by using a kind of generic "logic" example:
+どうしてこれで済むのでしょうか？これは U2 が U1 も見ることを許可することを意味しないのでしょうか？答えは、はい、許可します。**その質問が生じた場合**。しかし、型チェッカーなどの構造のため、それが起こる方法はありません。ユニバース U1 で起こっている何かがユニバース U2 で起こっている何かと「通信」するためには、共通の推論変数 X を持っている必要があります。そして、U1 のすべてのものは U1 とその子だけにスコープされているため、その推論変数 X は U0 にある必要があります。そして、X は U0 にあるため、U1（または U2）から何も名前を付けることができません。これは、一種の汎用的な「論理」の例を使用することで最も簡単にわかります:
 
 ```text
 exists<X> {
@@ -174,140 +113,86 @@ exists<X> {
 }
 ```
 
-Here, the only way for the two foralls to interact would be through X,
-but neither Y nor Z are in scope when X is declared, so its value
-cannot reference either of them.
+ここで、2 つの forall が相互作用する唯一の方法は X を介してですが、Y も Z も X が宣言されたときにスコープ内にないため、その値はどちらも参照できません。
 
-## Universes and placeholder region elements
+## ユニバースとプレースホルダー領域要素
 
-But where does that error come from?  The way it happens is like this.
-When we are constructing the region inference context, we can tell
-from the type inference context how many placeholder variables exist
-(the `InferCtxt` has an internal counter). For each of those, we
-create a corresponding universal region variable `!n` and a "region
-element" `placeholder(n)`. This corresponds to "some unknown set of other
-elements". The value of `!n` is `{placeholder(n)}`.
+しかし、そのエラーはどこから来るのでしょうか？それが起こる方法は次のとおりです。領域推論コンテキストを構築するとき、型推論コンテキストからプレースホルダー変数がいくつ存在するかを知ることができます（`InferCtxt` には内部カウンターがあります）。それぞれについて、対応する全称領域変数 `!n` と「領域要素」`placeholder(n)` を作成します。これは「他の要素の未知のセット」に対応します。`!n` の値は `{placeholder(n)}` です。
 
-At the same time, we also give each existential variable a
-**universe** (also taken from the `InferCtxt`). This universe
-determines which placeholder elements may appear in its value: For
-example, a variable in universe U3 may name `placeholder(1)`, `placeholder(2)`, and
-`placeholder(3)`, but not `placeholder(4)`. Note that the universe of an inference
-variable controls what region elements **can** appear in its value; it
-does not say region elements **will** appear.
+同時に、各存在変数にも**ユニバース**（`InferCtxt` からも取得）を与えます。このユニバースは、その値にどのプレースホルダー要素が現れる可能性があるかを決定します: 例えば、ユニバース U3 の変数は `placeholder(1)`、`placeholder(2)`、および `placeholder(3)` に名前を付けることができますが、`placeholder(4)` には付けることができません。推論変数のユニバースは、その値に領域要素が**現れることができる**ものを制御することに注意してください; 領域要素が**現れる**とは言っていません。
 
-## Placeholders and outlives constraints
+## プレースホルダーと outlives 制約
 
-In the region inference engine, outlives constraints have the form:
+領域推論エンジンでは、outlives 制約は次の形式を持ちます:
 
 ```text
 V1: V2 @ P
 ```
 
-where `V1` and `V2` are region indices, and hence map to some region
-variable (which may be universally or existentially quantified). The
-`P` here is a "point" in the control-flow graph; it's not important
-for this section. This variable will have a universe, so let's call
-those universes `U(V1)` and `U(V2)` respectively. (Actually, the only
-one we are going to care about is `U(V1)`.)
+ここで、`V1` と `V2` は領域インデックスであり、したがってある領域変数（全称的または存在的に量化される可能性があります）にマップされます。ここでの `P` は制御フローグラフの「ポイント」です; このセクションでは重要ではありません。この変数にはユニバースがあるため、それらのユニバースを `U(V1)` と `U(V2)` とそれぞれ呼びましょう。（実際、気にするのは `U(V1)` だけです。）
 
-When we encounter this constraint, the ordinary procedure is to start
-a DFS from `P`. We keep walking so long as the nodes we are walking
-are present in `value(V2)` and we add those nodes to `value(V1)`. If
-we reach a return point, we add in any `end(X)` elements. That part
-remains unchanged.
+この制約に遭遇したとき、通常の手順は `P` から DFS を開始することです。歩いているノードが `value(V2)` に存在する限り歩き続け、それらのノードを `value(V1)` に追加します。返却ポイントに到達した場合、任意の `end(X)` 要素を追加します。その部分は変更されません。
 
-But then *after that* we want to iterate over the placeholder `placeholder(x)`
-elements in V2 (each of those must be visible to `U(V2)`, but we
-should be able to just assume that is true, we don't have to check
-it). We have to ensure that `value(V1)` outlives each of those
-placeholder elements.
+しかし、*その後*、V2 のプレースホルダー `placeholder(x)` 要素を反復したいです（それらのそれぞれは `U(V2)` から見える必要がありますが、それが真であると仮定できるはずです。チェックする必要はありません）。`value(V1)` がそれらのプレースホルダー要素のそれぞれを生存することを確認する必要があります。
 
-Now there are two ways that could happen. First, if `U(V1)` can see
-the universe `x` (i.e., `x <= U(V1)`), then we can just add `placeholder(x)`
-to `value(V1)` and be done. But if not, then we have to approximate:
-we may not know what set of elements `placeholder(x)` represents, but we
-should be able to compute some sort of **upper bound** B for it –
-some region B that outlives `placeholder(x)`. For now, we'll just use
-`'static` for that (since it outlives everything) – in the future, we
-can sometimes be smarter here (and in fact we have code for doing this
-already in other contexts). Moreover, since `'static` is in the root
-universe U0, we know that all variables can see it – so basically if
-we find that `value(V2)` contains `placeholder(x)` for some universe `x`
-that `V1` can't see, then we force `V1` to `'static`.
+これが起こる方法は 2 つあります。第一に、`U(V1)` がユニバース `x` を見ることができる場合（つまり、`x <= U(V1)`）、`placeholder(x)` を `value(V1)` に追加して完了できます。しかし、そうでない場合は、近似する必要があります: `placeholder(x)` が表す要素のセットが何であるかはわからないかもしれませんが、その**上限** B を計算できるはずです -- `placeholder(x)` を生存する領域 B。今のところ、それには `'static` を使用します（すべてを生存するため） -- 将来的には、ここでより賢くなることができる場合があります（実際、他のコンテキストですでにこれを行うコードがあります）。さらに、`'static` はルートユニバース U0 にあるため、すべての変数がそれを見ることができることがわかります -- したがって、基本的に `value(V2)` に `V1` が見ることができないユニバース `x` の `placeholder(x)` が含まれていることがわかった場合、`V1` を `'static` に強制します。
 
-## Extending the "universal regions" check
+## 「全称領域」チェックの拡張
 
-After all constraints have been propagated, the NLL region inference
-has one final check, where it goes over the values that wound up being
-computed for each universal region and checks that they did not get
-'too large'. In our case, we will go through each placeholder region
-and check that it contains *only* the `placeholder(u)` element it is known to
-outlive. (Later, we might be able to know that there are relationships
-between two placeholder regions and take those into account, as we do
-for universal regions from the fn signature.)
+すべての制約が伝播された後、NLL 領域推論には最終チェックがあります。各全称領域に対して計算された値を調べ、それらが「大きすぎない」かどうかをチェックします。この場合、各プレースホルダー領域を調べ、それが生存することが知られている `placeholder(u)` 要素*のみ*を含むことをチェックします。（後で、2 つのプレースホルダー領域間に関係があることを知ることができ、それらを考慮に入れることができるかもしれません。fn シグネチャからの全称領域に対して行うように。）
 
-Put another way, the "universal regions" check can be considered to be
-checking constraints like:
+別の言い方をすると、「全称領域」チェックは次のような制約をチェックしていると考えることができます:
 
 ```text
 {placeholder(1)}: V1
 ```
 
-where `{placeholder(1)}` is like a constant set, and V1 is the variable we
-made to represent the `!1` region.
+ここで、`{placeholder(1)}` は定数セットのようなもので、V1 は `!1` 領域を表すために作成した変数です。
 
-## Back to our example
+## 例に戻る
 
-OK, so far so good. Now let's walk through what would happen with our
-first example:
+さて、これまでのところ順調です。では、最初の例で何が起こるかを見ていきましょう:
 
 ```text
-fn(&'static u32) <: fn(&'!1 u32) @ P  // this point P is not imp't here
+fn(&'static u32) <: fn(&'!1 u32) @ P  // このポイント P はここでは重要ではありません
 ```
 
-The region inference engine will create a region element domain like this:
+領域推論エンジンは、次のような領域要素ドメインを作成します:
 
 ```text
 { CFG; end('static); placeholder(1) }
-  ---  ------------  ------- from the universe `!1`
-  |    'static is always in scope
-  all points in the CFG; not especially relevant here
+  ---  ------------  ------- ユニバース `!1` から
+  |    'static は常にスコープ内にあります
+  CFG 内のすべてのポイント; ここでは特に関連しません
 ```
 
-It will always create two universal variables, one representing
-`'static` and one representing `'!1`. Let's call them Vs and V1. They
-will have initial values like so:
+常に 2 つの全称変数を作成します。1 つは `'static` を表し、もう 1 つは `'!1` を表します。それらを Vs と V1 と呼びましょう。それらは次のような初期値を持ちます:
 
 ```text
-Vs = { CFG; end('static) } // it is in U0, so can't name anything else
+Vs = { CFG; end('static) } // U0 にあるため、他に何も名前を付けることができません
 V1 = { placeholder(1) }
 ```
 
-From the subtyping constraint above, we would have an outlives constraint like
+上記のサブタイピング制約から、次のような outlives 制約があります
 
 ```text
 '!1: 'static @ P
 ```
 
-To process this, we would grow the value of V1 to include all of Vs:
+これを処理するために、V1 の値を拡大して Vs のすべてを含めます:
 
 ```text
 Vs = { CFG; end('static) }
 V1 = { CFG; end('static), placeholder(1) }
 ```
 
-At that point, constraint propagation is complete, because all the
-outlives relationships are satisfied. Then we would go to the "check
-universal regions" portion of the code, which would test that no
-universal region grew too large.
+その時点で、すべての outlives 関係が満たされるため、制約伝播は完了します。次に、コードの「全称領域をチェック」部分に移動します。これは、全称領域が大きくなりすぎていないかをテストします。
 
-In this case, `V1` *did* grow too large – it is not known to outlive
-`end('static)`, nor any of the CFG – so we would report an error.
+この場合、`V1` は*大きくなりすぎました* -- `end('static)` も CFG のいずれも生存することは知られていないため、エラーを報告します。
 
-## Another example
+## 別の例
 
-What about this subtyping relationship?
+このサブタイピング関係についてはどうでしょうか？
 
 ```text
 for<'a> fn(&'a u32, &'a u32)
@@ -315,7 +200,7 @@ for<'a> fn(&'a u32, &'a u32)
 for<'b, 'c> fn(&'b u32, &'c u32)
 ```
 
-Here we would replace the bound region in the supertype with a placeholder, as before, yielding:
+ここでは、前と同様に、スーパータイプの束縛領域をプレースホルダーで置き換えます:
 
 ```text
 for<'a> fn(&'a u32, &'a u32)
@@ -323,9 +208,7 @@ for<'a> fn(&'a u32, &'a u32)
 fn(&'!1 u32, &'!2 u32)
 ```
 
-then we instantiate the variable on the left-hand side with an
-existential in universe U2, yielding the following (`?n` is a notation
-for an existential variable):
+次に、左辺の変数をユニバース U2 の存在変数でインスタンス化し、次のようになります（`?n` は存在変数の表記法です）:
 
 ```text
 fn(&'?3 u32, &'?3 u32)
@@ -333,41 +216,29 @@ fn(&'?3 u32, &'?3 u32)
 fn(&'!1 u32, &'!2 u32)
 ```
 
-Then we break this down further:
+次に、これをさらに分解します:
 
 ```text
 &'!1 u32 <: &'?3 u32
 &'!2 u32 <: &'?3 u32
 ```
 
-and even further, yield up our region constraints:
+さらに分解して、領域制約を生成します:
 
 ```text
 '!1: '?3
 '!2: '?3
 ```
 
-Note that, in this case, both `'!1` and `'!2` have to outlive the
-variable `'?3`, but the variable `'?3` is not forced to outlive
-anything else. Therefore, it simply starts and ends as the empty set
-of elements, and hence the type-check succeeds here.
+この場合、`'!1` と `'!2` の両方が変数 `'?3` を生存しなければならないことに注意してください。しかし、変数 `'?3` は他に何も生存することを強制されません。したがって、空の要素セットとして開始および終了し、したがって型チェックはここで成功します。
 
-(This should surprise you a little. It surprised me when I first realized it.
-We are saying that if we are a fn that **needs both of its arguments to have
-the same region**, we can accept being called with **arguments with two
-distinct regions**. That seems intuitively unsound. But in fact, it's fine, as
-I tried to explain in [this issue][ohdeargoditsallbroken] on the Rust issue
-tracker long ago.  The reason is that even if we get called with arguments of
-two distinct lifetimes, those two lifetimes have some intersection (the call
-itself), and that intersection can be our value of `'a` that we use as the
-common lifetime of our arguments. -nmatsakis)
+（これは少し驚くべきです。私が最初にそれに気付いたとき、私は驚きました。**両方の引数が同じ領域を持つことを必要とする** fn である場合、**2 つの異なる領域を持つ引数**で呼び出されることを受け入れることができると言っています。それは直感的に健全ではないように思えます。しかし、実際には、それは問題ありません。ずっと前に Rust issue トラッカーの[この issue][ohdeargoditsallbroken] で説明しようとしたように。理由は、2 つの異なるライフタイムを持つ引数で呼び出された場合でも、それらの 2 つのライフタイムには何らかの交差点（呼び出し自体）があり、その交差点を引数の共通ライフタイムとして使用する `'a` の値にすることができるからです。-nmatsakis）
 
 [ohdeargoditsallbroken]: https://github.com/rust-lang/rust/issues/32330#issuecomment-202536977
 
-## Final example
+## 最終例
 
-Let's look at one last example. We'll extend the previous one to have
-a return type:
+最後の例を見てみましょう。前のものを拡張して、戻り値型を持つようにします:
 
 ```text
 for<'a> fn(&'a u32, &'a u32) -> &'a u32
@@ -375,12 +246,9 @@ for<'a> fn(&'a u32, &'a u32) -> &'a u32
 for<'b, 'c> fn(&'b u32, &'c u32) -> &'b u32
 ```
 
-Despite seeming very similar to the previous example, this case is going to get
-an error. That's good: the problem is that we've gone from a fn that promises
-to return one of its two arguments, to a fn that is promising to return the
-first one. That is unsound. Let's see how it plays out.
+前の例と非常に似ているように見えますが、このケースはエラーになります。それは良いことです: 問題は、2 つの引数のうちの 1 つを返すことを約束する fn から、最初の引数を返すことを約束する fn に移行したことです。それは健全ではありません。どのように展開されるかを見てみましょう。
 
-First, we replace the bound region in the supertype with a placeholder:
+まず、スーパータイプの束縛領域をプレースホルダーで置き換えます:
 
 ```text
 for<'a> fn(&'a u32, &'a u32) -> &'a u32
@@ -388,7 +256,7 @@ for<'a> fn(&'a u32, &'a u32) -> &'a u32
 fn(&'!1 u32, &'!2 u32) -> &'!1 u32
 ```
 
-Then we instantiate the subtype with existentials (in U2):
+次に、サブタイプを存在変数でインスタンス化します（U2 で）:
 
 ```text
 fn(&'?3 u32, &'?3 u32) -> &'?3 u32
@@ -396,7 +264,7 @@ fn(&'?3 u32, &'?3 u32) -> &'?3 u32
 fn(&'!1 u32, &'!2 u32) -> &'!1 u32
 ```
 
-And now we create the subtyping relationships:
+そして、サブタイピング関係を作成します:
 
 ```text
 &'!1 u32 <: &'?3 u32 // arg 1
@@ -404,8 +272,7 @@ And now we create the subtyping relationships:
 &'?3 u32 <: &'!1 u32 // return type
 ```
 
-And finally the outlives relationships. Here, let V1, V2, and V3 be the
-variables we assign to `!1`, `!2`, and `?3` respectively:
+最後に outlives 関係。ここで、V1、V2、V3 を `!1`、`!2`、`?3` にそれぞれ割り当てる変数とします:
 
 ```text
 V1: V3
@@ -413,7 +280,7 @@ V2: V3
 V3: V1
 ```
 
-Those variables will have these initial values:
+これらの変数は次の初期値を持ちます:
 
 ```text
 V1 in U1 = {placeholder(1)}
@@ -421,20 +288,16 @@ V2 in U2 = {placeholder(2)}
 V3 in U2 = {}
 ```
 
-Now because of the `V3: V1` constraint, we have to add `placeholder(1)` into `V3` (and
-indeed it is visible from `V3`), so we get:
+`V3: V1` 制約のため、`placeholder(1)` を `V3` に追加する必要があります（実際、`V3` から見えます）。したがって、次のようになります:
 
 ```text
 V3 in U2 = {placeholder(1)}
 ```
 
-then we have this constraint `V2: V3`, so we wind up having to enlarge
-`V2` to include `placeholder(1)` (which it can also see):
+次に、この制約 `V2: V3` があるため、`V2` を拡大して `placeholder(1)` を含める必要があります（これも見ることができます）:
 
 ```text
 V2 in U2 = {placeholder(1), placeholder(2)}
 ```
 
-Now constraint propagation is done, but when we check the outlives
-relationships, we find that `V2` includes this new element `placeholder(1)`,
-so we report an error.
+これで制約伝播は完了しますが、outlives 関係をチェックすると、`V2` にこの新しい要素 `placeholder(1)` が含まれていることがわかるため、エラーを報告します。

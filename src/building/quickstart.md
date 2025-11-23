@@ -1,71 +1,52 @@
-# Quickstart
+# クイックスタート
 
-This is a quickstart guide about getting the compiler running. For more
-information on the individual steps, see the other pages in this chapter.
+これは、コンパイラを実行するためのクイックスタートガイドです。この章の他のページには、個々のステップに関する詳細情報があります。
 
-First, clone the repository:
+まず、リポジトリをクローンします：
 
 ```sh
 git clone https://github.com/rust-lang/rust.git
 cd rust
 ```
 
-When building the compiler, we don't use `cargo` directly, instead we use a
-wrapper called "x". It is invoked with `./x`.
+コンパイラをビルドする際、`cargo` を直接使用せず、代わりに「x」と呼ばれるラッパーを使用します。これは `./x` で呼び出されます。
 
-We need to create a configuration for the build. Use `./x setup` to create a
-good default.
+ビルド用の設定を作成する必要があります。`./x setup` を使用して適切なデフォルトを作成します。
 
 ```sh
 ./x setup
 ```
 
-Then, we can build the compiler. Use `./x build` to build the compiler, standard
-library and a few tools. You can also `./x check` to just check it. All these
-commands can take specific components/paths as arguments, for example `./x check
-compiler` to just check the compiler.
+次に、コンパイラをビルドできます。`./x build` を使用して、コンパイラ、標準ライブラリ、およびいくつかのツールをビルドします。チェックだけするために `./x check` を使用することもできます。これらのすべてのコマンドは、特定のコンポーネント/パスを引数として取ることができます。たとえば、`./x check compiler` はコンパイラだけをチェックします。
 
 ```sh
 ./x build
 ```
 
-> When doing a change to the compiler that does not affect the way it compiles
-the standard library (so for example, a change to an error message), use
-`--keep-stage-std 1` to avoid recompiling it.
+> 標準ライブラリのコンパイル方法に影響を与えないコンパイラへの変更を行う場合（たとえば、エラーメッセージへの変更）、再コンパイルを避けるために `--keep-stage-std 1` を使用します。
 
-After building the compiler and standard library, you now have a working
-compiler toolchain. You can use it with rustup by linking it.
+コンパイラと標準ライブラリをビルドした後、動作するコンパイラツールチェーンができました。rustup を使用してリンクすることができます。
 
 ```sh
 rustup toolchain link stage1 build/host/stage1
 ```
 
-Now you have a toolchain called `stage1` linked to your build. You can use it to
-test the compiler.
+これで、ビルドにリンクされた `stage1` という名前のツールチェーンができました。これを使用してコンパイラをテストできます。
 
 ```sh
 rustc +stage1 testfile.rs
 ```
 
-After doing a change, you can run the compiler test suite with `./x test`.
+変更を行った後、`./x test` を使用してコンパイラテストスイートを実行できます。
 
-`./x test` runs the full test suite, which is slow and rarely what you want.
-Usually, `./x test tests/ui` is what you want after a compiler change, testing
-all [UI tests](../tests/ui.md) that invoke the compiler on a specific test file
-and check the output.
+`./x test` はフルテストスイートを実行しますが、これは遅く、めったに望むものではありません。通常、コンパイラの変更後は `./x test tests/ui` が望むものです。これは、コンパイラを特定のテストファイルで呼び出し、出力をチェックするすべての [UI tests](../tests/ui.md) をテストします。
 
 ```sh
 ./x test tests/ui
 ```
 
-Use `--bless` if you've made a change and want to update the `.stderr` files
-with the new output.
+変更を行い、新しい出力で `.stderr` ファイルを更新したい場合は、`--bless` を使用します。
 
-Congrats, you are now ready to make a change to the compiler! If you have more
-questions, [the full chapter](./how-to-build-and-run.md) might contain the
-answers, and if it doesn't, feel free to ask for help on
-[Zulip](https://rust-lang.zulipchat.com/#narrow/stream/182449-t-compiler.2Fhelp).
+おめでとうございます。これでコンパイラに変更を加える準備が整いました！さらに質問がある場合は、[完全な章](./how-to-build-and-run.md) に答えが含まれているかもしれません。含まれていない場合は、お気軽に [Zulip](https://rust-lang.zulipchat.com/#narrow/stream/182449-t-compiler.2Fhelp) で助けを求めてください。
 
-If you use VSCode, Vim, Emacs or Helix, `./x setup` will ask you if you want to
-set up the editor config. For more information, check out [suggested
-workflows](./suggested.md).
+VSCode、Vim、Emacs、または Helix を使用している場合、`./x setup` はエディタ設定をセットアップするかどうかを尋ねます。詳細については、[推奨ワークフロー](./suggested.md) をご覧ください。

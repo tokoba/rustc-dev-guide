@@ -1,117 +1,115 @@
-# The Query Evaluation Model in detail
+# クエリ評価モデルの詳細
 
-This chapter provides a deeper dive into the abstract model queries are built on.
-It does not go into implementation details but tries to explain
-the underlying logic. The examples here, therefore, have been stripped down and
-simplified and don't directly reflect the compilers internal APIs.
+この章では、クエリが構築される抽象モデルについてより深く掘り下げます。
+実装の詳細には触れませんが、基礎となるロジックを
+説明しようとします。したがって、ここでの例は、簡略化されており、
+コンパイラの内部APIを直接反映していません。
 
-## What is a query?
+## クエリとは何ですか?
 
-Abstractly we view the compiler's knowledge about a given crate as a "database"
-and queries are the way of asking the compiler questions about it, i.e.
-we "query" the compiler's "database" for facts.
+抽象的に言えば、特定のクレートに関するコンパイラの知識を「データベース」として見なし、
+クエリはコンパイラにそれについて質問する方法です。つまり、
+コンパイラの「データベース」に事実を「クエリ」します。
 
-However, there's something special to this compiler database: It starts out empty
-and is filled on-demand when queries are executed. Consequently, a query must
-know how to compute its result if the database does not contain it yet. For
-doing so, it can access other queries and certain input values that the database
-is pre-filled with on creation.
+ただし、このコンパイラデータベースには特別なものがあります: 空の状態から始まり、
+クエリが実行されるときにオンデマンドで埋められます。その結果、クエリは、
+データベースにまだ含まれていない場合、その結果を計算する方法を知っている必要があります。
+そのために、他のクエリとデータベースが作成時に事前に埋められている特定の入力値に
+アクセスできます。
 
-A query thus consists of the following things:
+したがって、クエリは次のもので構成されます:
 
- - A name that identifies the query
- - A "key" that specifies what we want to look up
- - A result type that specifies what kind of result it yields
- - A "provider" which is a function that specifies how the result is to be
-   computed if it isn't already present in the database.
+ - クエリを識別する名前
+ - 何を検索したいかを指定する「キー」
+ - どのような結果を生成するかを指定する結果の型
+ - 「プロバイダー」。これは、結果がまだデータベースに存在しない場合に
+   結果を計算する方法を指定する関数です。
 
-As an example, the name of the `type_of` query is `type_of`, its query key is a
-`DefId` identifying the item we want to know the type of, the result type is
-`Ty<'tcx>`, and the provider is a function that, given the query key and access
-to the rest of the database, can compute the type of the item identified by the
-key.
+例として、`type_of`クエリの名前は`type_of`で、クエリキーは
+型を知りたいアイテムを識別する`DefId`で、結果の型は
+`Ty<'tcx>`で、プロバイダーは、クエリキーと
+データベースの残りの部分へのアクセスが与えられると、キーによって識別されるアイテムの型を
+計算できる関数です。
 
-So in some sense a query is just a function that maps the query key to the
-corresponding result. However, we have to apply some restrictions in order for
-this to be sound:
+したがって、ある意味では、クエリは単にクエリキーを対応する
+結果にマッピングする関数です。ただし、これが健全であるためには、
+いくつかの制限を適用する必要があります:
 
- - The key and result must be immutable values.
- - The provider function must be a pure function in the sense that for the same
-   key it must always yield the same result.
- - The only parameters a provider function takes are the key and a reference to
-   the "query context" (which provides access to the rest of the "database").
+ - キーと結果は不変の値でなければなりません。
+ - プロバイダー関数は、同じキーに対して常に同じ結果を生成するという意味で
+   純粋関数でなければなりません。
+ - プロバイダー関数が取る唯一のパラメーターは、キーと
+   「クエリコンテキスト」への参照(「データベース」の残りの部分へのアクセスを提供します)です。
 
-The database is built up lazily by invoking queries. The query providers will
-invoke other queries, for which the result is either already cached or computed
-by calling another query provider. These query provider invocations
-conceptually form a directed acyclic graph (DAG) at the leaves of which are
-input values that are already known when the query context is created.
-
-
-
-## Caching/Memoization
-
-Results of query invocations are "memoized" which means that the query context
-will cache the result in an internal table and, when the query is invoked with
-the same query key again, will return the result from the cache instead of
-running the provider again.
-
-This caching is crucial for making the query engine efficient. Without
-memoization the system would still be sound (that is, it would yield the same
-results) but the same computations would be done over and over again.
-
-Memoization is one of the main reasons why query providers have to be pure
-functions. If calling a provider function could yield different results for
-each invocation (because it accesses some global mutable state) then we could
-not memoize the result.
+データベースは、クエリを呼び出すことによって遅延的に構築されます。クエリプロバイダーは
+他のクエリを呼び出し、その結果はすでにキャッシュされているか、
+別のクエリプロバイダーを呼び出すことによって計算されます。これらのクエリプロバイダー呼び出しは、
+概念的には、葉がクエリコンテキストの作成時にすでにわかっている
+入力値である有向非循環グラフ(DAG)を形成します。
 
 
 
-## Input data
+## キャッシング/メモ化
 
-When the query context is created, it is still empty: No queries have been
-executed, no results are cached. But the context already provides access to
-"input" data, i.e. pieces of immutable data that were computed before the
-context was created and that queries can access to do their computations.
+クエリ呼び出しの結果は「メモ化」されます。これは、クエリコンテキストが
+結果を内部テーブルにキャッシュし、同じクエリキーで再度クエリが呼び出されると、
+プロバイダーを再度実行する代わりにキャッシュから結果を返すことを意味します。
 
-As of <!-- date-check --> January 2021, this input data consists mainly of
-the HIR map, upstream crate metadata, and the command-line options the compiler
-was invoked with; but in the future inputs will just consist of command-line
-options and a list of source files -- the HIR map will itself be provided by a
-query which processes these source files.
+このキャッシングは、クエリエンジンを効率的にするために重要です。メモ化がないと、
+システムは依然として健全です(つまり、同じ結果を生成します)が、
+同じ計算が何度も行われます。
 
-Without inputs, queries would live in a void without anything to compute their
-result from (remember, query providers only have access to other queries and
-the context but not any other outside state or information).
-
-For a query provider, input data and results of other queries look exactly the
-same: It just tells the context "give me the value of X". Because input data
-is immutable, the provider can rely on it being the same across
-different query invocations, just as is the case for query results.
+メモ化は、クエリプロバイダーが純粋関数でなければならない主な理由の1つです。
+プロバイダー関数を呼び出すと、呼び出しごとに異なる結果を生成できる場合
+(グローバルな可変状態にアクセスするため)、結果をメモ化することはできません。
 
 
 
-## An example execution trace of some queries
+## 入力データ
 
-How does this DAG of query invocations come into existence? At some point
-the compiler driver will create the, as yet empty, query context. It will then,
-from outside of the query system, invoke the queries it needs to perform its
-task. This looks something like the following:
+クエリコンテキストが作成されると、まだ空です: クエリは実行されておらず、
+結果はキャッシュされていません。ただし、コンテキストは、
+コンテキストが作成される前に計算された不変データである「入力」データへの
+アクセスをすでに提供しています。クエリは、計算を実行するためにアクセスできます。
+
+<!-- date-check --> 2021年1月時点では、この入力データは主に
+HIRマップ、アップストリームクレートメタデータ、コンパイラが呼び出されたコマンドライン
+オプションで構成されています。ただし、将来的には、入力はコマンドライン
+オプションとソースファイルのリストだけで構成されます -- HIRマップ自体は、
+これらのソースファイルを処理するクエリによって提供されます。
+
+入力がないと、クエリは結果を計算するものがない空間に住むことになります
+(クエリプロバイダーは他のクエリと
+コンテキストへのアクセスしかなく、他の外部状態や情報はありません)。
+
+クエリプロバイダーにとって、入力データと他のクエリの結果は
+まったく同じに見えます: コンテキストに「Xの値を教えてください」と伝えるだけです。
+入力データは不変であるため、プロバイダーは、クエリ結果の場合と同様に、
+異なるクエリ呼び出しにわたって同じであることを信頼できます。
+
+
+
+## いくつかのクエリの実行トレースの例
+
+このクエリ呼び出しのDAGはどのようにして存在するのでしょうか? ある時点で、
+コンパイラドライバーは、まだ空のクエリコンテキストを作成します。次に、
+クエリシステムの外部から、タスクを実行するために必要なクエリを呼び出します。
+これは次のようになります:
 
 ```rust,ignore
 fn compile_crate() {
     let cli_options = ...;
     let hir_map = ...;
 
-    // Create the query context `tcx`
+    // クエリコンテキスト`tcx`を作成します
     let tcx = TyCtxt::new(cli_options, hir_map);
 
-    // Do type checking by invoking the type check query
+    // 型チェッククエリを呼び出して型チェックを実行します
     tcx.type_check_crate();
 }
 ```
 
-The `type_check_crate` query provider would look something like the following:
+`type_check_crate`クエリプロバイダーは次のようになります:
 
 ```rust,ignore
 fn type_check_crate_provider(tcx, _key: ()) {
@@ -123,12 +121,12 @@ fn type_check_crate_provider(tcx, _key: ()) {
 }
 ```
 
-We see that the `type_check_crate` query accesses input data
-(`tcx.hir_map.list_of_items()`) and invokes other queries
-(`type_check_item`). The `type_check_item`
-invocations will themselves access input data and/or invoke other queries,
-so that in the end the DAG of query invocations will be built up backwards
-from the node that was initially executed:
+`type_check_crate`クエリが入力データ
+(`tcx.hir_map.list_of_items()`)にアクセスし、他のクエリ
+(`type_check_item`)を呼び出すことがわかります。`type_check_item`
+呼び出し自体は、入力データにアクセスしたり、他のクエリを呼び出したりするため、
+最終的には、最初に実行されたノードから逆方向に、
+クエリ呼び出しのDAGが構築されます:
 
 ```ignore
          (2)                                                 (1)
@@ -142,70 +140,67 @@ from the node that was initially executed:
     (7)             v  (6)                  (8)                |
   Hir(bar) <--- type_of(bar) <--- type_check_item(bar) <-------+
 
-// (x) denotes invocation order
+// (x) は呼び出し順序を示します
 ```
 
-We also see that often a query result can be read from the cache:
-`type_of(bar)` was computed for `type_check_item(foo)` so when
-`type_check_item(bar)` needs it, it is already in the cache.
+また、多くの場合、クエリ結果をキャッシュから読み取ることができることもわかります:
+`type_of(bar)`は`type_check_item(foo)`に対して計算されたため、
+`type_check_item(bar)`が必要とするときには、すでにキャッシュにあります。
 
-Query results stay cached in the query context as long as the context lives.
-So if the compiler driver invoked another query later on, the above graph
-would still exist and already executed queries would not have to be re-done.
+クエリ結果は、コンテキストが存続する限り、クエリコンテキストにキャッシュされたままです。
+したがって、コンパイラドライバーが後で別のクエリを呼び出した場合、
+上記のグラフは依然として存在し、すでに実行されたクエリを再度実行する必要はありません。
 
 
 
-## Cycles
+## サイクル
 
-Earlier we stated that query invocations form a DAG. However, it would be easy
-to form a cyclic graph by, for example, having a query provider like the
-following:
+前述のように、クエリ呼び出しはDAGを形成すると述べました。ただし、たとえば次のような
+クエリプロバイダーを持つことによって、循環グラフを形成するのは簡単です:
 
 ```rust,ignore
 fn cyclic_query_provider(tcx, key) -> u32 {
-  // Invoke the same query with the same key again
+  // 同じキーで同じクエリを再度呼び出します
   tcx.cyclic_query(key)
 }
 ```
 
-Since query providers are regular functions, this would behave much as expected:
-Evaluation would get stuck in an infinite recursion. A query like this would not
-be very useful either. However, sometimes certain kinds of invalid user input
-can result in queries being called in a cyclic way. The query engine includes
-a check for cyclic invocations of queries with the same input arguments. 
-And, because cycles are an irrecoverable error, will abort execution with a 
-"cycle error" message that tries to be human readable.
+クエリプロバイダーは通常の関数であるため、これは期待どおりに動作します:
+評価は無限再帰でスタックします。このようなクエリはあまり有用ではありません。
+ただし、特定の種類の無効なユーザー入力により、クエリが循環的に呼び出される
+場合があります。クエリエンジンには、同じ入力引数を持つクエリの循環呼び出しの
+チェックが含まれています。また、サイクルは回復不可能なエラーであるため、
+人間が読めるようにしようとする「サイクルエラー」メッセージで実行を中止します。
 
-At some point the compiler had a notion of "cycle recovery", that is, one could
-"try" to execute a query and if it ended up causing a cycle, proceed in some
-other fashion. However, this was later removed because it is not entirely
-clear what the theoretical consequences of this are, especially regarding
-incremental compilation.
+ある時点で、コンパイラには「サイクルリカバリ」の概念がありました。つまり、
+クエリの実行を「試行」でき、サイクルを引き起こすことになった場合は、
+他の方法で進むことができました。ただし、これは後で削除されました。
+特にインクリメンタルコンパイルに関して、これの理論的な結果が完全に
+明確ではないためです。
 
 
-## "Steal" Queries
+## 「Steal」クエリ
 
-Some queries have their result wrapped in a `Steal<T>` struct. These queries
-behave exactly the same as regular with one exception: Their result is expected
-to be "stolen" out of the cache at some point, meaning some other part of the
-program is taking ownership of it and the result cannot be accessed anymore.
+一部のクエリには、結果が`Steal<T>`構造体でラップされています。これらのクエリは、
+1つの例外を除いて、通常のクエリとまったく同じように動作します: その結果は、
+ある時点でキャッシュから「盗まれる」ことが予想されます。つまり、プログラムの
+他の部分がその所有権を取得し、結果にアクセスできなくなります。
 
-This stealing mechanism exists purely as a performance optimization because some
-result values are too costly to clone (e.g. the MIR of a function). It seems
-like result stealing would violate the condition that query results must be
-immutable (after all we are moving the result value out of the cache) but it is
-OK as long as the mutation is not observable. This is achieved by two things:
+この盗み取りメカニズムは、純粋にパフォーマンスの最適化として存在します。
+一部の結果値はクローンするのが非常にコストがかかるためです(例: 関数のMIR)。
+結果の盗み取りは、クエリ結果が不変でなければならないという条件に違反するように
+見えますが(結局のところ、結果値をキャッシュから移動しています)、
+変異が観察可能でない限り、問題ありません。これは2つのことによって達成されます:
 
-- Before a result is stolen, we make sure to eagerly run all queries that
-  might ever need to read that result. This has to be done manually by calling
-  those queries.
-- Whenever a query tries to access a stolen result, we make an ICE
-  (Internal Compiler Error) so that such a condition cannot go unnoticed.
+- 結果が盗まれる前に、その結果を読み取る必要がある可能性のあるすべてのクエリを
+  積極的に実行します。これは、それらのクエリを呼び出すことによって手動で行う必要があります。
+- クエリが盗まれた結果にアクセスしようとすると、ICE
+  (Internal Compiler Error)を作成して、そのような状態が気付かれないようにします。
 
-This is not an ideal setup because of the manual intervention needed, so it
-should be used sparingly and only when it is well known which queries might
-access a given result. In practice, however, stealing has not turned out to be
-much of a maintenance burden.
+これは、手動介入が必要なため、理想的なセットアップではありません。したがって、
+控えめに使用し、特定のクエリがどの結果にアクセスする可能性があるかがよくわかっている
+場合にのみ使用する必要があります。ただし、実際には、盗み取りは
+メンテナンスの負担にはなっていません。
 
-To summarize: "Steal queries" break some of the rules in a controlled way.
-There are checks in place that make sure that nothing can go silently wrong.
+要約すると: 「Stealクエリ」は、制御された方法でいくつかのルールを破ります。
+何も静かに間違いが起こらないようにするためのチェックがあります。

@@ -1,19 +1,15 @@
-# Apple notification group
+# Apple通知グループ
 
-**Github Labels:** [O-macos], [O-ios], [O-tvos], [O-watchos] and [O-visionos] <br>
-**Ping command:** `@rustbot ping apple`
+**Githubラベル:** [O-macos], [O-ios], [O-tvos], [O-watchos] および [O-visionos] <br>
+**Pingコマンド:** `@rustbot ping apple`
 
-This list will be used to ask for help both in diagnosing and testing
-Apple-related issues as well as suggestions on how to resolve interesting
-questions regarding our macOS/iOS/tvOS/watchOS/visionOS support.
+このリストは、Apple関連の問題の診断とテストの両方の支援を求めるだけでなく、macOS/iOS/tvOS/watchOS/visionOSサポートに関する興味深い質問の解決方法についての提案を求めるために使用されます。
 
-To get a better idea for what the group will do, here are some examples of the
-kinds of questions where we would have reached out to the group for advice in
-determining the best course of action:
+グループが行うことをよりよく理解するために、最善の行動方針を決定するためにグループのアドバイスを求めたであろう質問の種類の例をいくつか示します：
 
-* Raising the minimum supported versions (e.g. [#104385])
-* Additional Apple targets (e.g. [#121419])
-* Obscure Xcode linker details (e.g. [#121430])
+* 最小サポートバージョンの引き上げ（例：[#104385]）
+* 追加のAppleターゲット（例：[#121419]）
+* 不明瞭なXcodeリンカーの詳細（例：[#121430]）
 
 [O-macos]: https://github.com/rust-lang/rust/labels/O-macos
 [O-ios]: https://github.com/rust-lang/rust/labels/O-ios
@@ -24,30 +20,19 @@ determining the best course of action:
 [#121419]: https://github.com/rust-lang/rust/pull/121419
 [#121430]: https://github.com/rust-lang/rust/pull/121430
 
-## Deployment targets
+## デプロイメントターゲット
 
-Apple platforms have a concept of "deployment target", controlled with the
-`*_DEPLOYMENT_TARGET` environment variables, and specifies the minimum OS
-version that a binary runs on.
+Appleプラットフォームには「デプロイメントターゲット」という概念があり、`*_DEPLOYMENT_TARGET`環境変数で制御され、バイナリが実行される最小OSバージョンを指定します。
 
-Using an API from a newer OS version in the standard library than the default
-that `rustc` uses will result in either a static or a dynamic linker error.
-For this reason, try to suggest that people document on `extern "C"` APIs
-which OS version they were introduced with, and if that's newer than the
-current default used by `rustc`, suggest to use weak linking.
+`rustc`がデフォルトで使用するものよりも新しいOSバージョンからの標準ライブラリのAPIを使用すると、静的リンカーエラーまたは動的リンカーエラーのいずれかが発生します。
+このため、`extern "C"` APIについては、導入されたOSバージョンを文書化するように提案し、それが`rustc`が使用する現在のデフォルトよりも新しい場合は、weak linkingの使用を提案してください。
 
-## The App Store and private APIs
+## App StoreとプライベートAPI
 
-Apple are very protective about using undocumented APIs, so it's important
-that whenever a change uses a new function, that they are verified to actually
-be public API, as even just mentioning undocumented APIs in the binary
-(without calling it) can lead to rejections from the App Store.
+Appleは文書化されていないAPIの使用について非常に保護的であるため、変更が新しい関数を使用する場合は常に、それが実際に公開APIであることを確認することが重要です。文書化されていないAPIをバイナリで言及するだけ（呼び出さなくても）でも、App Storeからのリジェクトにつながる可能性があるためです。
 
-For example, Darwin / the XNU kernel actually has futex syscalls, but we can't
-use them in `std` because they are not public API.
+例えば、Darwin / XNUカーネルには実際にfutexシステムコールがありますが、公開APIではないため、`std`では使用できません。
 
-In general, for an API to be considered public by Apple, it has to:
-- Appear in a public header (i.e. one distributed with Xcode, and found for
-  the specific platform under `xcrun --show-sdk-path --sdk $SDK`).
-- Have an availability attribute on it (like `__API_AVAILABLE`,
-  `API_AVAILABLE` or similar).
+一般的に、APIがAppleによって公開と見なされるためには、以下の条件を満たす必要があります：
+- 公開ヘッダーに現れる（つまり、Xcodeと一緒に配布され、`xcrun --show-sdk-path --sdk $SDK`で特定のプラットフォーム用に見つかるもの）。
+- 可用性属性がある（`__API_AVAILABLE`、`API_AVAILABLE`など）。

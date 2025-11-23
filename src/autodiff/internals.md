@@ -1,11 +1,11 @@
-The `std::autodiff` module in Rust allows differentiable programming:
+Rustの`std::autodiff`モジュールは、微分可能プログラミングを可能にします：
 
 ```rust
 #![feature(autodiff)]
 use std::autodiff::*;
 
 // f(x) = x * x, f'(x) = 2.0 * x
-// bar therefore returns (x * x, 2.0 * x)
+// したがって、barは (x * x, 2.0 * x) を返す
 #[autodiff_reverse(bar, Active, Active)]
 fn foo(x: f32) -> f32 { x * x }
 
@@ -15,9 +15,9 @@ fn main() {
 }
 ```
 
-The detailed documentation for the `std::autodiff` module is available at [std::autodiff](https://doc.rust-lang.org/std/autodiff/index.html).
+`std::autodiff`モジュールの詳細なドキュメントは、[std::autodiff](https://doc.rust-lang.org/std/autodiff/index.html)で利用できます。
 
-Differentiable programming is used in various fields like numerical computing, [solid mechanics][ratel], [computational chemistry][molpipx], [fluid dynamics][waterlily] or for Neural Network training via Backpropagation, [ODE solver][diffsol], [differentiable rendering][libigl], [quantum computing][catalyst], and climate simulations.
+微分可能プログラミングは、数値計算、[固体力学][ratel]、[計算化学][molpipx]、[流体力学][waterlily]、または誤差逆伝播によるニューラルネットワークのトレーニング、[ODEソルバー][diffsol]、[微分可能レンダリング][libigl]、[量子コンピューティング][catalyst]、気候シミュレーションなど、さまざまな分野で使用されています。
 
 [ratel]: https://gitlab.com/micromorph/ratel
 [molpipx]: https://arxiv.org/abs/2411.17011

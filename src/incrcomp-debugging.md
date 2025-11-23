@@ -1,17 +1,15 @@
-# Debugging and testing dependencies
+# 依存関係のデバッグとテスト
 
-## Testing the dependency graph
+## 依存グラフのテスト
 
-There are various ways to write tests against the dependency graph.  The
-simplest mechanisms are the `#[rustc_if_this_changed]` and
-`#[rustc_then_this_would_need]` annotations. These are used in [ui] tests to test
-whether the expected set of paths exist in the dependency graph.
+依存グラフに対してテストを書くには、さまざまな方法があります。最も簡単なメカニズムは、
+`#[rustc_if_this_changed]`と`#[rustc_then_this_would_need]`アノテーションです。
+これらは、[ui]テストで使用され、依存グラフに期待されるパスのセットが存在するかどうかをテストします。
 
 [`tests/ui/dep-graph/dep-graph-caller-callee.rs`]: https://github.com/rust-lang/rust/blob/HEAD/tests/ui/dep-graph/dep-graph-caller-callee.rs
 [ui]: tests/ui.html
 
-As an example, see [`tests/ui/dep-graph/dep-graph-caller-callee.rs`], or the
-tests below.
+例として、[`tests/ui/dep-graph/dep-graph-caller-callee.rs`]、または以下のテストを参照してください。
 
 ```rust,ignore
 #[rustc_if_this_changed]
@@ -21,46 +19,44 @@ fn foo() { }
 fn bar() { foo(); }
 ```
 
-This should be read as
-> If this (`foo`) is changed, then this (i.e. `bar`)'s TypeckTables would need to be changed.
+これは次のように読むべきです
+> これ（`foo`）が変更された場合、これ（つまり`bar`）のTypeckTablesは変更される必要があります。
 
-Technically, what occurs is that the test is expected to emit the string "OK" on
-stderr, associated to this line.
+技術的には、テストは、この行に関連付けられた文字列「OK」をstderrに出力することが期待されます。
 
-You could also add the lines
+次の行を追加することもできます
 
 ```rust,ignore
 #[rustc_then_this_would_need(TypeckTables)] //~ ERROR no path
 fn baz() { }
 ```
 
-Whose meaning is
-> If `foo` is changed, then `baz`'s TypeckTables does not need to be changed.
-> The macro must emit an error, and the error message must contains "no path".
+その意味は
+> `foo`が変更された場合、`baz`のTypeckTablesは変更される必要はありません。
+> マクロはエラーを出力する必要があり、エラーメッセージには「no path」が含まれている必要があります。
 
-Recall that the `//~ ERROR OK` is a comment from the point of view of the Rust
-code we test, but is meaningful from the point of view of the test itself.
+`//~ ERROR OK`は、テストするRustコードの観点からはコメントですが、
+テスト自体の観点からは意味があることを思い出してください。
 
-## Debugging the dependency graph
+## 依存グラフのデバッグ
 
-### Dumping the graph
+### グラフのダンプ
 
-The compiler is also capable of dumping the dependency graph for your
-debugging pleasure. To do so, pass the `-Z dump-dep-graph` flag. The
-graph will be dumped to `dep_graph.{txt,dot}` in the current
-directory.  You can override the filename with the `RUST_DEP_GRAPH`
-environment variable.
+コンパイラは、デバッグの楽しみのために依存グラフをダンプすることもできます。
+そのためには、`-Z dump-dep-graph`フラグを渡します。グラフは、
+現在のディレクトリの`dep_graph.{txt,dot}`にダンプされます。
+`RUST_DEP_GRAPH`環境変数でファイル名を上書きできます。
 
-Frequently, though, the full dep graph is quite overwhelming and not
-particularly helpful. Therefore, the compiler also allows you to filter
-the graph. You can filter in three ways:
+ただし、多くの場合、完全な依存グラフは非常に圧倒的で、
+特に役に立ちません。したがって、コンパイラはグラフをフィルタリングすることもできます。
+3つの方法でフィルタリングできます。
 
-1. All edges originating in a particular set of nodes (usually a single node).
-2. All edges reaching a particular set of nodes.
-3. All edges that lie between given start and end nodes.
+1. 特定のノードセット（通常は単一のノード）から発生するすべてのエッジ。
+2. 特定のノードセットに到達するすべてのエッジ。
+3. 指定された開始ノードと終了ノードの間にあるすべてのエッジ。
 
-To filter, use the `RUST_DEP_GRAPH_FILTER` environment variable, which should
-look like one of the following:
+フィルタリングするには、`RUST_DEP_GRAPH_FILTER`環境変数を使用します。
+これは、次のいずれかのようになります。
 
 ```text
 source_filter     // nodes originating from source_filter
@@ -68,62 +64,57 @@ source_filter     // nodes originating from source_filter
 source_filter -> target_filter // nodes in between source_filter and target_filter
 ```
 
-`source_filter` and `target_filter` are a `&`-separated list of strings.
-A node is considered to match a filter if all of those strings appear in its
-label. So, for example:
+`source_filter`と`target_filter`は、文字列の`&`区切りリストです。
+ノードは、それらの文字列がすべてラベルに表示される場合、フィルターに一致すると見なされます。
+したがって、例えば：
 
 ```text
 RUST_DEP_GRAPH_FILTER='-> TypeckTables'
 ```
 
-would select the predecessors of all `TypeckTables` nodes. Usually though you
-want the `TypeckTables` node for some particular fn, so you might write:
+すべての`TypeckTables`ノードの先行ノードを選択します。ただし、通常は
+特定のfnの`TypeckTables`ノードが必要なので、次のように書くかもしれません。
 
 ```text
 RUST_DEP_GRAPH_FILTER='-> TypeckTables & bar'
 ```
 
-This will select only the predecessors of `TypeckTables` nodes for functions
-with `bar` in their name.
+これは、名前に`bar`を含む関数の`TypeckTables`ノードの先行ノードのみを選択します。
 
-Perhaps you are finding that when you change `foo` you need to re-type-check
-`bar`, but you don't think you should have to. In that case, you might do:
+おそらく、`foo`を変更すると`bar`を再型チェックする必要があることがわかりますが、
+そうする必要はないと思います。その場合、次のようにするかもしれません。
 
 ```text
 RUST_DEP_GRAPH_FILTER='Hir & foo -> TypeckTables & bar'
 ```
 
-This will dump out all the nodes that lead from `Hir(foo)` to
-`TypeckTables(bar)`, from which you can (hopefully) see the source
-of the erroneous edge.
+これは、`Hir(foo)`から`TypeckTables(bar)`に至るすべてのノードをダンプします。
+そこから（うまくいけば）誤ったエッジのソースを見ることができます。
 
-### Tracking down incorrect edges
+### 誤ったエッジの追跡
 
-Sometimes, after you dump the dependency graph, you will find some
-path that should not exist, but you will not be quite sure how it came
-to be. **When the compiler is built with debug assertions,** it can
-help you track that down. Simply set the `RUST_FORBID_DEP_GRAPH_EDGE`
-environment variable to a filter. Every edge created in the dep-graph
-will be tested against that filter – if it matches, a `bug!` is
-reported, so you can easily see the backtrace (`RUST_BACKTRACE=1`).
+依存グラフをダンプした後、存在すべきではないパスを見つけることがありますが、
+それがどのように発生したかはよくわかりません。**コンパイラがデバッグアサーションでビルドされている場合、**
+それを追跡するのに役立ちます。`RUST_FORBID_DEP_GRAPH_EDGE`環境変数を
+フィルターに設定するだけです。依存グラフで作成されたすべてのエッジは、
+そのフィルターに対してテストされます。一致する場合、`bug!`が報告されるので、
+バックトレースを簡単に確認できます（`RUST_BACKTRACE=1`）。
 
-The syntax for these filters is the same as described in the previous
-section. However, note that this filter is applied to every **edge**
-and doesn't handle longer paths in the graph, unlike the previous
-section.
+これらのフィルターの構文は、前のセクションで説明したものと同じです。ただし、
+このフィルターは、すべての**エッジ**に適用され、
+前のセクションとは異なり、グラフ内のより長いパスを処理しないことに注意してください。
 
-Example:
+例：
 
-You find that there is a path from the `Hir` of `foo` to the type
-check of `bar` and you don't think there should be. You dump the
-dep-graph as described in the previous section and open `dep-graph.txt`
-to see something like:
+`foo`の`Hir`から`bar`の型チェックへのパスがあり、そうあるべきではないと思います。
+前のセクションで説明したように依存グラフをダンプし、`dep-graph.txt`を開いて
+次のようなものを見ます。
 
 ```text
 Hir(foo) -> Collect(bar)
 Collect(bar) -> TypeckTables(bar)
 ```
 
-That first edge looks suspicious to you. So you set
-`RUST_FORBID_DEP_GRAPH_EDGE` to `Hir&foo -> Collect&bar`, re-run, and
-then observe the backtrace. Voila, bug fixed!
+その最初のエッジは怪しいと思います。そこで、
+`RUST_FORBID_DEP_GRAPH_EDGE`を`Hir&foo -> Collect&bar`に設定し、再実行して、
+バックトレースを観察します。 Voila、バグが修正されました！

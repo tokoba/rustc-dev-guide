@@ -1,36 +1,33 @@
-# Name resolution
+# 名前解決
 
-In the previous chapters, we saw how the [*Abstract Syntax Tree* (`AST`)][ast]
-is built with all macros expanded. We saw how doing that requires doing some
-name resolution to resolve imports and macro names. In this chapter, we show
-how this is actually done and more.
+前の章では、すべてのマクロが展開された[*抽象構文木*（`AST`）][ast]がどのように構築されるかを見ました。
+それを行うには、インポートとマクロ名を解決するためにいくつかの名前解決を行う必要があることを見ました。
+この章では、これが実際にどのように行われ、さらに多くのことを示します。
 
 [ast]: ./ast-validation.md
 
-In fact, we don't do full name resolution during macro expansion -- we only
-resolve imports and macros at that time. This is required to know what to even
-expand. Later, after we have the whole AST, we do full name resolution to
-resolve all names in the crate. This happens in [`rustc_resolve::late`][late].
-Unlike during macro expansion, in this late expansion, we only need to try to
-resolve a name once, since no new names can be added. If we fail to resolve a
-name, then it is a compiler error.
+実際には、マクロ展開中に完全な名前解決は行いません。その時点では、
+インポートとマクロのみを解決します。これは、何を展開するかを知るために必要です。
+後で、AST全体ができた後、クレート内のすべての名前を解決するために完全な名前解決を行います。
+これは、[`rustc_resolve::late`][late]で行われます。マクロ展開中とは異なり、
+この遅延展開では、新しい名前を追加できないため、名前を解決しようとするのは1回だけで済みます。
+名前の解決に失敗した場合、それはコンパイラエラーです。
 
-Name resolution is complex. There are different namespaces (e.g.
-macros, values, types, lifetimes), and names may be valid at different (nested)
-scopes. Also, different types of names can fail resolution differently, and
-failures can happen differently at different scopes. For example, in a module
-scope, failure means no unexpanded macros and no unresolved glob imports in
-that module. On the other hand, in a function body scope, failure requires that a
-name be absent from the block we are in, all outer scopes, and the global
-scope.
+名前解決は複雑です。異なる名前空間（例：マクロ、値、型、ライフタイム）があり、
+名前はさまざまな（ネストされた）スコープで有効な場合があります。また、
+異なるタイプの名前は異なる方法で解決に失敗する可能性があり、
+失敗は異なるスコープで異なる方法で発生する可能性があります。たとえば、
+モジュールスコープでは、失敗は、そのモジュールに展開されていないマクロがなく、
+未解決のglobインポートがないことを意味します。一方、関数本体スコープでは、
+失敗には、私たちがいるブロック、すべての外部スコープ、およびグローバルスコープから
+名前が存在しないことが必要です。
 
 [late]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/late/index.html
 
-## Basics
+## 基本
 
-In our programs we refer to variables, types, functions, etc, by giving them
-a name. These names are not always unique. For example, take this valid Rust
-program:
+プログラムでは、変数、型、関数などを名前を付けて参照します。これらの名前は常に
+一意であるとは限りません。たとえば、次の有効なRustプログラムを見てください。
 
 ```rust
 type x = u32;
@@ -38,39 +35,36 @@ let x: x = 1;
 let y: x = 2;
 ```
 
-How do we know on line 3 whether `x` is a type (`u32`) or a value (1)? These
-conflicts are resolved during name resolution. In this specific case, name
-resolution defines that type names and variable names live in separate
-namespaces and therefore can co-exist.
+3行目の`x`が型（`u32`）か値（1）かをどのように知るのでしょうか？これらの
+競合は名前解決中に解決されます。この特定のケースでは、名前解決は、
+型名と変数名が別々の名前空間に住んでいるため、共存できると定義します。
 
-The name resolution in Rust is a two-phase process. In the first phase, which runs
-during `macro` expansion, we build a tree of modules and resolve imports. Macro
-expansion and name resolution communicate with each other via the
-[`ResolverAstLoweringExt`] trait.
+Rustの名前解決は2段階のプロセスです。最初のフェーズは、
+`macro`展開中に実行され、モジュールのツリーを構築し、インポートを解決します。
+マクロ展開と名前解決は、[`ResolverAstLoweringExt`]トレイトを介して互いに通信します。
 
-The input to the second phase is the syntax tree, produced by parsing input
-files and expanding `macros`. This phase produces links from all the names in the
-source to relevant places where the name was introduced. It also generates
-helpful error messages, like typo suggestions, traits to import or lints about
-unused items.
+2番目のフェーズへの入力は、入力ファイルを解析してマクロを展開することによって生成された
+構文木です。このフェーズは、ソース内のすべての名前から、
+名前が導入された関連する場所へのリンクを生成します。また、
+typoの提案、インポートするトレイト、または未使用のアイテムに関するlintなど、
+役立つエラーメッセージも生成します。
 
-A successful run of the second phase ([`Resolver::resolve_crate`]) creates kind
-of an index the rest of the compilation may use to ask about the present names
-(through the `hir::lowering::Resolver` interface).
+2番目のフェーズ（[`Resolver::resolve_crate`]）の実行が成功すると、
+コンパイルの残りが存在する名前（`hir::lowering::Resolver`インターフェース経由）について
+尋ねるために使用できるようなインデックスが作成されます。
 
-The name resolution lives in the [`rustc_resolve`] crate, with the bulk in
-`lib.rs` and some helpers or symbol-type specific logic in the other modules.
+名前解決は[`rustc_resolve`]クレートに存在し、主要部分は
+`lib.rs`にあり、いくつかのヘルパーまたはシンボルタイプ固有のロジックが他のモジュールにあります。
 
 [`Resolver::resolve_crate`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/struct.Resolver.html#method.resolve_crate
 [`ResolverAstLoweringExt`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast_lowering/trait.ResolverAstLoweringExt.html
 [`rustc_resolve`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/index.html
 
-## Namespaces
+## 名前空間
 
-Different kind of symbols live in different namespaces ‒ e.g. types don't
-clash with variables. This usually doesn't happen, because variables start with
-lower-case letter while types with upper-case one, but this is only a
-convention. This is legal Rust code that will compile (with warnings):
+さまざまな種類のシンボルは、さまざまな名前空間に住んでいます。たとえば、型は変数と
+衝突しません。これは通常発生しません。変数は小文字で始まり、型は大文字で始まるためですが、
+これは単なる慣例です。これは、警告付きでコンパイルされる有効なRustコードです。
 
 ```rust
 type x = u32;
@@ -78,39 +72,36 @@ let x: x = 1;
 let y: x = 2; // See? x is still a type here.
 ```
 
-To cope with this, and with slightly different scoping rules for these
-namespaces, the resolver keeps them separated and builds separate structures for
-them.
+これに対処するために、リゾルバーはそれらを分離して保持し、
+それらに対して別々の構造を構築します。
 
-In other words, when the code talks about namespaces, it doesn't mean the module
-hierarchy, it's types vs. values vs. macros.
+つまり、コードが名前空間について話すとき、それはモジュール階層を意味するのではなく、
+型対値対マクロを意味します。
 
-## Scopes and ribs
+## スコープとリブ
 
-A name is visible only in certain area in the source code. This forms a
-hierarchical structure, but not necessarily a simple one ‒ if one scope is
-part of another, it doesn't mean a name visible in the outer scope is also
-visible in the inner scope, or that it refers to the same thing.
+名前は、ソースコードの特定の領域でのみ表示されます。これは階層構造を形成しますが、
+必ずしも単純なものではありません。あるスコープが別のスコープの一部である場合、
+外部スコープに表示される名前が内部スコープにも表示されるとは限らず、
+同じものを指すとも限りません。
 
-To cope with that, the compiler introduces the concept of [`Rib`]s. This is
-an abstraction of a scope. Every time the set of visible names potentially changes,
-a new [`Rib`] is pushed onto a stack. The places where this can happen include for
-example:
+それに対処するために、コンパイラは[`Rib`]sの概念を導入します。これは、
+スコープの抽象化です。表示される名前のセットが潜在的に変更されるたびに、
+新しい[`Rib`]がスタックにプッシュされます。これが発生する可能性のある場所には、
+たとえば次のものがあります。
 
 [`Rib`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/late/struct.Rib.html
 
-* The obvious places ‒ curly braces enclosing a block, function boundaries,
-  modules.
-* Introducing a `let` binding ‒ this can shadow another binding with the same
-  name.
-* Macro expansion border ‒ to cope with macro hygiene.
+* ブロックを囲む中括弧、関数境界、モジュールなどの明白な場所。
+* `let`バインディングの導入 – これは、同じ名前の別のバインディングをシャドウできます。
+* マクロ展開境界 – マクロハイジーンに対処するため。
 
-When searching for a name, the stack of [`ribs`] is traversed from the innermost
-outwards. This helps to find the closest meaning of the name (the one not
-shadowed by anything else). The transition to outer [`Rib`] may also affect
-what names are usable ‒ if there are nested functions (not closures),
-the inner one can't access parameters and local bindings of the outer one,
-even though they should be visible by ordinary scoping rules. An example:
+名前を検索するとき、[`リブ`]のスタックは最も内側から外側に向かって走査されます。
+これは、名前の最も近い意味（他のものによってシャドウされていないもの）を見つけるのに役立ちます。
+外側の[`Rib`]への遷移は、使用可能な名前にも影響を与える可能性があります。
+ネストされた関数（クロージャではない）がある場合、
+内側の関数は、通常のスコープルールでは表示されるべきであっても、
+外側の関数のパラメータとローカルバインディングにアクセスできません。例：
 
 [`ribs`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/late/struct.LateResolutionVisitor.html#structfield.ribs
 
@@ -131,61 +122,57 @@ fn do_something<T: Default>(val: T) { // <- New rib in both types and values (1)
 } // End of (5), (3) and (1)
 ```
 
-Because the rules for different namespaces are a bit different, each namespace
-has its own independent [`Rib`] stack that is constructed in parallel to the others.
-In addition, there's also a [`Rib`] stack for local labels (e.g. names of loops or
-blocks), which isn't a full namespace in its own right.
+ルールは名前空間によって少し異なるため、各名前空間には、
+他のものと並行して構築される独自の独立した[`Rib`]スタックがあります。
+さらに、ローカルラベル（ループまたはブロックの名前など）の[`Rib`]スタックもあり、
+これ自体は完全な名前空間ではありません。
 
-## Overall strategy
+## 全体的な戦略
 
-To perform the name resolution of the whole crate, the syntax tree is traversed
-top-down and every encountered name is resolved. This works for most kinds of
-names, because at the point of use of a name it is already introduced in the [`Rib`]
-hierarchy.
+クレート全体の名前解決を実行するために、構文ツリーがトップダウンで走査され、
+遭遇したすべての名前が解決されます。これは、ほとんどの種類の名前で機能します。
+名前を使用する時点で、名前はすでに[`Rib`]階層に導入されているためです。
 
-There are some exceptions to this. Items are bit tricky, because they can be
-used even before encountered ‒ therefore every block needs to be first scanned
-for items to fill in its [`Rib`].
+これにはいくつかの例外があります。アイテムは使用する前に遭遇する必要がないため、
+少し厄介です。したがって、すべてのブロックは、
+その[`Rib`]を埋めるために、最初にアイテムをスキャンする必要があります。
 
-Other, even more problematic ones, are imports which need recursive fixed-point
-resolution and macros, that need to be resolved and expanded before the rest of
-the code can be processed.
+さらに問題のあるものとして、再帰的な固定点解決を必要とするインポートと、
+コードの残りを処理する前に解決して展開する必要があるマクロがあります。
 
-Therefore, the resolution is performed in multiple stages.
+したがって、解決は複数の段階で実行されます。
 
-## Speculative crate loading
+## 投機的なクレートロード
 
-To give useful errors, rustc suggests importing paths into scope if they're
-not found. How does it do this? It looks through every module of every crate
-and looks for possible matches. This even includes crates that haven't yet
-been loaded!
+便利なエラーを提供するために、rustcは、まだロードされていない場合でも、
+スコープにインポートするパスを探すために、すべてのクレートのすべてのモジュールを調べて、
+可能な一致を探します。これには、まだロードされていないクレートさえ含まれます！
 
-Eagerly loading crates to include import suggestions that haven't yet been
-loaded is called _speculative crate loading_, because any errors it encounters
-shouldn't be reported: [`rustc_resolve`] decided to load them, not the user. The function
-that does this is [`lookup_import_candidates`] and lives in
-[`rustc_resolve::diagnostics`].
+エラーに遭遇したときに、まだロードされていないクレートをイーガーロードしてインポート提案を含めることは、
+_投機的なクレートロード_と呼ばれます。エラーに遭遇したのは[`rustc_resolve`]であり、
+ユーザーではないため、遭遇したエラーは報告されるべきではありません。
+これを行う関数は[`lookup_import_candidates`]であり、
+[`rustc_resolve::diagnostics`]に存在します。
 
 [`rustc_resolve`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/index.html
 [`lookup_import_candidates`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/struct.Resolver.html#method.lookup_import_candidates
 [`rustc_resolve::diagnostics`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_resolve/diagnostics/index.html
 
-To tell the difference between speculative loads and loads initiated by the
-user, [`rustc_resolve`] passes around a `record_used` parameter, which is `false` when
-the load is speculative.
+投機的なロードとユーザーが開始したロードを区別するために、
+[`rustc_resolve`]は`record_used`パラメータを渡します。
+これは、ロードが投機的である場合は`false`です。
 
 ## TODO: [#16](https://github.com/rust-lang/rustc-dev-guide/issues/16)
 
-This is a result of the first pass of learning the code. It is definitely
-incomplete and not detailed enough. It also might be inaccurate in places.
-Still, it probably provides useful first guidepost to what happens in there.
+これは、コードを学習する最初のパスの結果です。確かに
+不完全で、十分に詳細ではありません。場所によっては不正確な可能性もあります。
+それでも、そこで何が起こっているかについての有用な最初の道しるべを提供しているかもしれません。
 
-* What exactly does it link to and how is that published and consumed by
-  following stages of compilation?
-* Who calls it and how it is actually used.
-* Is it a pass and then the result is only used, or can it be computed
-  incrementally?
-* The overall strategy description is a bit vague.
-* Where does the name `Rib` come from?
-* Does this thing have its own tests, or is it tested only as part of some e2e
-  testing?
+* 正確に何にリンクし、それがどのように公開され、
+  コンパイルの次の段階でどのように消費されるか？
+* 誰がそれを呼び出し、実際にどのように使用されるか。
+* それはパスであり、その後結果のみが使用されるのか、
+  それとも段階的に計算できるのか？
+* 全体的な戦略の説明は少し曖昧です。
+* `Rib`という名前はどこから来たのか？
+* これには独自のテストがあるのか、それともe2eテストの一部としてのみテストされるのか？

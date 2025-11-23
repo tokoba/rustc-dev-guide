@@ -1,23 +1,33 @@
-# Aliases and Normalization
+# エイリアスと正規化
 
-## Aliases
+## エイリアス
 
-In Rust there are a number of types that are considered equal to some "underlying" type, for example inherent associated types, trait associated types, free type aliases (`type Foo = u32`), and opaque types (`-> impl RPIT`). We consider such types to be "aliases", alias types are represented by the [`TyKind::Alias`][tykind_alias] variant, with the kind of alias tracked by the [`AliasTyKind`][aliaskind] enum.
+Rustには、ある「基礎となる」型と等しいと見なされる多くの型があります。
+たとえば、固有関連型、トレイト関連型、自由型エイリアス（`type Foo = u32`）、
+不透明型（`-> impl RPIT`）などです。このような型を「エイリアス」と見なし、
+エイリアス型は[`TyKind::Alias`][tykind_alias]バリアントで表され、
+エイリアスの種類は[`AliasTyKind`][aliaskind]列挙型で追跡されます。
 
-Normalization is the process of taking these alias types and replacing them with the underlying type that they are equal to. For example given some type alias `type Foo = u32`, normalizing `Foo` would give `u32`.
+正規化は、これらのエイリアス型を取り、それらが等しい基礎となる型に置き換えるプロセスです。
+たとえば、ある型エイリアス`type Foo = u32`が与えられた場合、`Foo`を正規化すると`u32`が得られます。
 
-The concept of an alias is not unique to *types* and the concept also applies to constants/const generics. However, right now in the compiler we don't really treat const aliases as a "first class concept" so this chapter mostly discusses things in the context of types (even though the concepts transfer just fine).
+エイリアスの概念は*型*に固有ではなく、概念は定数/const genericsにも適用されます。
+ただし、現在、コンパイラでは、const エイリアスを「第一級の概念」として扱っていないため、
+この章では主に型のコンテキストで物事を説明します（概念は問題なく転送されますが）。
 
 [tykind_alias]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_type_ir/enum.TyKind.html#variant.Alias
 [aliaskind]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_type_ir/enum.AliasTyKind.html
 
-### Rigid, Ambiguous and Unnormalized Aliases
+### Rigid、Ambiguous、Unnormalized エイリアス
 
-Aliases can either be "rigid", "ambiguous", or simply unnormalized.
+エイリアスは「rigid」、「ambiguous」、または単に unnormalized のいずれかです。
 
-We consider types to be rigid if their "shape" isn't going to change, for example `Box` is rigid as no amount of normalization can turn a `Box` into a `u32`, whereas `<vec::IntoIter<u32> as Iterator>::Item` is not rigid as it can be normalized to `u32`.
+型の「形状」が変更されない場合、型を rigid と見なします。たとえば、`Box`は rigid です。
+正規化しても`Box`が`u32`になることはないためです。一方、`<vec::IntoIter<u32> as Iterator>::Item`は
+rigid ではありません。`u32`に正規化できるためです。
 
-Aliases are rigid when we will never be able to normalize them further. A concrete example of a *rigid* alias would be `<T as Iterator>::Item` in an environment where there is no `T: Iterator<Item = ...>` bound, only a `T: Iterator` bound:
+エイリアスは、さらに正規化できない場合に rigid です。*rigid*エイリアスの具体的な例は、
+`T: Iterator<Item = ...>`境界がなく、`T: Iterator`境界のみがある環境の`<T as Iterator>::Item`です。
 ```rust
 fn foo<T: Iterator>() {
     // This alias is *rigid*
@@ -30,7 +40,9 @@ fn bar<T: Iterator<Item = u32>>() {
 }
 ```
 
-When an alias can't yet be normalized but may wind up normalizable in the [current environment](./typing_parameter_envs.md), we consider it to be an "ambiguous" alias. This can occur when an alias contains inference variables which prevent being able to determine how the trait is implemented:
+エイリアスがまだ正規化できないが、[現在の環境](./typing_parameter_envs.md)で正規化可能になる可能性がある場合、
+「ambiguous」エイリアスと見なします。これは、エイリアスにトレイトの実装方法を判断できない
+推論変数が含まれている場合に発生する可能性があります。
 ```rust
 fn foo<T: Iterator, U: Iterator>() {
     // This alias is considered to be "ambiguous"
@@ -38,19 +50,25 @@ fn foo<T: Iterator, U: Iterator>() {
 }
 ```
 
-The reason we call them "ambiguous" aliases is because its *ambiguous* whether this is a rigid alias or not.
+これらを「ambiguous」エイリアスと呼ぶ理由は、これが rigid エイリアスかどうかが*あいまい*だからです。
 
-The source of the `_: Iterator` trait impl is *ambiguous* (i.e. unknown), it could be some `impl Iterator for u32` or it could be some `T: Iterator` trait bound, we don't know yet. Depending on why `_: Iterator` holds the alias could be an unnormalized alias or it could be a rigid alias; it's *ambiguous* what kind of alias this is.
+`_: Iterator`トレイト impl のソースは*あいまい*（つまり不明）です。
+`impl Iterator for u32`や`T: Iterator`トレイト境界など、いろいろなものがある可能性があります。まだわかりません。
+`_: Iterator`が保持される理由に応じて、エイリアスは unnormalized エイリアスまたは rigid エイリアスである可能性があります。
+これはどのようなエイリアスであるかが*あいまい*です。
 
-Finally, an alias can just be unnormalized, `<Vec<u32> as IntoIterator>::Iter` is an unnormalized alias as it can already be normalized to `std::vec::IntoIter<u32>`, it just hasn't been done yet.
+最後に、エイリアスは単に unnormalized である可能性があります。`<Vec<u32> as IntoIterator>::Iter`は unnormalized エイリアスです。
+すでに`std::vec::IntoIter<u32>`に正規化できますが、まだ行われていません。
 
 ---
 
-It is worth noting that Free and Inherent aliases cannot be rigid or ambiguous as naming them also implies having resolved the definition of the alias, which specifies the underlying type of the alias.
+FreeおよびInherentエイリアスは、名前を付けることもエイリアスの定義を解決したことを意味し、
+エイリアスの基礎となる型を指定するため、rigid または ambiguous にはなり得ないことに注意してください。
 
-### Diverging Aliases
+### 発散エイリアス
 
-An alias is considered to "diverge" if its definition does not specify an underlying non-alias type to normalize to. A concrete example of diverging aliases:
+エイリアスは、その定義が正規化する基礎となる非エイリアス型を指定しない場合、「発散」すると見なされます。
+発散エイリアスの具体的な例：
 ```rust
 type Diverges = Diverges;
 
@@ -61,9 +79,13 @@ impl Trait for () {
     type DivergingAssoc = <() as Trait>::DivergingAssoc;
 }
 ```
-In this example both `Diverges` and `DivergingAssoc` are "trivial" cases of diverging type aliases where they have been defined as being equal to themselves. There is no underlying type that `Diverges` can ever be normalized to.
+この例では、`Diverges`と`DivergingAssoc`はどちらも、自分自身と等しいと定義されている
+発散型エイリアスの「自明な」ケースです。`Diverges`が正規化できる基礎となる型はありません。
 
-We generally try to error when diverging aliases are defined, but this is entirely a "best effort" check. In the previous example the definitions are "simple enough" to be detected and so errors are emitted. However, in more complex cases, or cases where only some instantiations of generic parameters would result in a diverging alias, we don't emit an error:
+発散エイリアスが定義されたときに一般的にエラーを出そうとしますが、これは完全に「ベストエフォート」チェックです。
+前の例では、定義は「十分に単純」で検出されるため、エラーが出力されます。
+ただし、より複雑なケース、またはジェネリックパラメータの一部のインスタンス化のみが
+発散エイリアスになるケースでは、エラーを出力しません。
 ```rust
 trait Trait {
     type DivergingAssoc<U: Trait>;
@@ -75,7 +97,10 @@ impl<T: ?Sized> Trait for T {
 }
 ```
 
-Ultimately this means that we have no guarantee that aliases in the type system are non-diverging. As aliases may only diverge for some specific generic arguments, it also means that we only know whether an alias diverges once it is fully concrete. This means that codegen/const-evaluation also has to handle diverging aliases:
+最終的に、これは型システム内のエイリアスが非発散であるという保証がないことを意味します。
+エイリアスは、特定のジェネリック引数に対してのみ発散する可能性があるため、
+エイリアスが発散するかどうかは、完全に具体的な場合にのみわかります。
+これは、codegenまたは const-evaluation も発散エイリアスを処理する必要があることを意味します。
 ```rust
 trait Trait {
     type Diverges<U: Trait>;
@@ -92,17 +117,21 @@ fn main() {
     foo::<()>();
 }
 ```
-In this example we only encounter an error from the diverging alias during codegen of `foo::<()>`, if the call to `foo` is removed then no compilation error will be emitted.
+この例では、`foo::<()>`の codegen 中にのみ発散エイリアスからエラーが発生します。
+`foo`への呼び出しが削除されると、コンパイルエラーは出力されません。
 
-### Opaque Types
+### 不透明型
 
-Opaque types are a relatively special kind of alias, and are covered in their own chapter: [Opaque types](./opaque-types-type-alias-impl-trait.md).
+不透明型は、比較的特別な種類のエイリアスであり、独自の章で説明されています：[不透明型](./opaque-types-type-alias-impl-trait.md)。
 
-### Const Aliases
+### Const エイリアス
 
-Unlike type aliases, const aliases are not represented directly in the type system, instead const aliases are always an anonymous body containing a path expression to a const item. This means that the only "const alias" in the type system is an anonymous unevaluated const body.
+型エイリアスとは異なり、const エイリアスは型システムで直接表されません。
+代わりに、const エイリアスは常に const アイテムへのパス式を含む匿名本体です。
+これは、型システムの唯一の「const エイリアス」が、未評価の匿名 const 本体であることを意味します。
 
-As such there is no `ConstKind::Alias(AliasCtKind::Projection/Inherent/Free, _)`, instead we only have `ConstKind::Unevaluated` which is used for representing anonymous constants.
+そのため、`ConstKind::Alias(AliasCtKind::Projection/Inherent/Free, _)`はなく、
+代わりに匿名定数を表すために使用される`ConstKind::Unevaluated`のみがあります。
 
 ```rust
 fn foo<const N: usize>() {}
@@ -113,35 +142,51 @@ fn bar() {
     foo::<{ FREE_CONST }>();
     // The const arg is represented with some anonymous constant:
     // ```pseudo-rust
-    // const ANON: usize = FREE_CONST; 
+    // const ANON: usize = FREE_CONST;
     // foo::<ConstKind::Unevaluated(DefId(ANON), [])>();
     // ```
 }
 ```
 
-This is likely to change as const generics functionality is improved, for example `feature(associated_const_equality)` and `feature(min_generic_const_args)` both require handling const aliases similarly to types (without an anonymous constant wrapping all const args).
+これは、const generics 機能が改善されるにつれて変更される可能性があります。
+たとえば、`feature(associated_const_equality)`と`feature(min_generic_const_args)`はどちらも、
+型と同様に（すべての const 引数をラップする匿名定数なしで）const エイリアスを処理する必要があります。
 
-## What is Normalization
+## 正規化とは
 
-### Structural vs Deep normalization
+### 構造的正規化と深い正規化
 
-There are two forms of normalization, structural (sometimes called *shallow*) and deep. Structural normalization should be thought of as only normalizing the "outermost" part of a type. On the other hand deep normalization will normalize *all* aliases in a type.
+正規化には、構造的（*浅い*とも呼ばれることがある）と深いという2つの形式があります。
+構造的正規化は、型の「最も外側の」部分のみを正規化すると考えるべきです。
+一方、深い正規化は、型内の*すべての*エイリアスを正規化します。
 
-In practice structural normalization can result in more than just the outer layer of the type being normalized, but this behaviour should not be relied upon. Unnormalizable non-rigid aliases making use of bound variables (`for<'a>`) cannot be normalized by either kind of normalization. 
+実際には、構造的正規化は、型の外側の層だけでなく、正規化される可能性がありますが、
+この動作に依存すべきではありません。境界変数（`for<'a>`）を使用する
+正規化できない非 rigid エイリアスは、どちらの種類の正規化でも正規化できません。
 
-As an example: conceptually, structurally normalizing the type `Vec<<u8 as Identity>::Assoc>` would be a no-op, whereas deeply normalizing would give `Vec<u8>`. In practice even structural normalization would give `Vec<u8>`, though, again, this should not be relied upon.
+例として：概念的には、型`Vec<<u8 as Identity>::Assoc>`を構造的に正規化すると no-op になりますが、
+深く正規化すると`Vec<u8>`が得られます。ただし、実際には構造的正規化でも`Vec<u8>`が得られますが、
+繰り返しますが、これに依存すべきではありません。
 
-Changing the alias to use bound variables will result in different behaviour; `Vec<for<'a> fn(<&'a u8 as Identity>::Assoc)>` would result in no change when structurally normalized, but would result in `Vec<for<'a> fn(&'a u8)>` when deeply normalized.
+エイリアスを境界変数を使用するように変更すると、動作が異なります。
+`Vec<for<'a> fn(<&'a u8 as Identity>::Assoc)>`は構造的に正規化されても変更されませんが、
+深く正規化されると`Vec<for<'a> fn(&'a u8)>`になります。
 
-### Core normalization logic
+### コア正規化ロジック
 
-Structurally normalizing aliases is a little bit more nuanced than replacing the alias with whatever it is defined as being equal to in its definition; the result of normalizing an alias should either be a rigid type or an inference variable (which will later be inferred to a rigid type). To accomplish this we do two things:
+エイリアスを構造的に正規化することは、エイリアスをその定義で等しいと定義されているものに置き換えるよりも
+少し微妙です。エイリアスを正規化した結果は、rigid 型または推論変数
+（後で rigid 型に推論されます）のいずれかである必要があります。これを達成するために、2つのことを行います。
 
-First, when normalizing an ambiguous alias it is normalized to an inference variable instead of leaving it as-is, this has two main effects: 
-- Even though an inference variable is not a rigid type, it will always wind up inferred *to* a rigid type so we ensure that the result of normalization will not need to be normalized again
-- Inference variables are used in all cases where a type is non-rigid, allowing the rest of the compiler to not have to deal with *both* ambiguous aliases *and* inference variables 
+まず、ambiguous エイリアスを正規化するとき、そのままにするのではなく推論変数に正規化します。
+これには2つの主な効果があります。
+- 推論変数は rigid 型ではありませんが、常に rigid 型に推論されるため、
+  正規化の結果が再び正規化される必要がないことを保証します
+- 推論変数は、型が非 rigid であるすべてのケースで使用され、
+  コンパイラの残りの部分が*両方の* ambiguous エイリアス*と*推論変数を処理する必要がないようにします
 
-Secondly, instead of having normalization directly return the type specified in the definition of the alias, we normalize the type first before returning it[^1]. We do this so that normalization is idempotent/callers do not need to run it in a loop.
+第二に、正規化がエイリアスの定義で指定された型を直接返すのではなく、
+返す前にまず型を正規化します[^1]。正規化が冪等/呼び出し元がループで実行する必要がないようにこれを行います。
 
 ```rust
 #![feature(lazy_type_alias)]
@@ -154,22 +199,28 @@ fn foo() {
 }
 ```
 
-In this example:
-- Normalizing `Foo<?x>` would result in `Bar<?x>`, except we want to normalize aliases in the type `Foo` is defined as equal to
-- Normalizing `Bar<?x>` would result in `<?x as Iterator>::Item`, except, again, we want to normalize aliases in the type `Bar` is defined as equal to
-- Normalizing `<?x as Iterator>::Item` results in some new inference variable `?y`, as `<?x as Iterator>::Item` is an ambiguous alias
-- The final result is that normalizing `Foo<?x>` results in `?y`
+この例では：
+- `Foo<?x>`を正規化すると`Bar<?x>`になりますが、`Foo`が等しいと定義されている型のエイリアスを正規化したいです
+- `Bar<?x>`を正規化すると`<?x as Iterator>::Item`になりますが、繰り返しますが、
+  `Bar`が等しいと定義されている型のエイリアスを正規化したいです
+- `<?x as Iterator>::Item`を正規化すると、`<?x as Iterator>::Item`が ambiguous エイリアスであるため、
+  新しい推論変数`?y`が生成されます
+- 最終的な結果は、`Foo<?x>`を正規化すると`?y`になることです
 
-## How to normalize
+## 正規化の方法
 
-When interfacing with the type system it will often be the case that it's necessary to request a type be normalized. There are a number of different entry points to the underlying normalization logic and each entry point should only be used in specific parts of the compiler.
+型システムとのインターフェース時には、型を正規化するよう要求する必要があることがよくあります。
+基礎となる正規化ロジックへのエントリポイントは多数あり、
+各エントリポイントはコンパイラの特定の部分でのみ使用する必要があります。
 
 <!-- date-check: May 2025 -->
-An additional complication is that the compiler is currently undergoing a transition from the old trait solver to the new trait solver.
-As part of this transition our approach to normalization in the compiler has changed somewhat significantly, resulting in some normalization entry points being "old solver only" slated for removal in the long-term once the new solver has stabilized.
-The transition can be tracked via the [WG-trait-system-refactor](https://github.com/rust-lang/rust/labels/WG-trait-system-refactor) label in Github.
+追加の複雑さとして、コンパイラは現在、古いトレイトソルバーから新しいトレイトソルバーへの
+移行を進めています。この移行の一環として、コンパイラでの正規化へのアプローチは大幅に変更されており、
+一部の正規化エントリポイントは「古いソルバーのみ」であり、新しいソルバーが安定したら
+長期的に削除される予定です。
+移行は、Github の [WG-trait-system-refactor](https://github.com/rust-lang/rust/labels/WG-trait-system-refactor) ラベルで追跡できます。
 
-Here is a rough overview of the different entry points to normalization in the compiler:
+コンパイラのさまざまな正規化エントリポイントの概要は次のとおりです。
 - `infcx.at.structurally_normalize`
 - `infcx.at.(deeply_)?normalize`
 - `infcx.query_normalize`
@@ -177,37 +228,69 @@ Here is a rough overview of the different entry points to normalization in the c
 - `traits::normalize_with_depth(_to)`
 - `EvalCtxt::structurally_normalize`
 
-### Outside of the trait solver
+### トレイトソルバーの外側
 
-The [`InferCtxt`][infcx] type exposes the "main" ways to normalize during analysis: [`normalize`][normalize], [`deeply_normalize`][deeply_normalize] and [`structurally_normalize`][structurally_normalize]. These functions are often wrapped and re-exposed on various `InferCtxt` wrapper types, such as [`FnCtxt`][fcx] or [`ObligationCtxt`][ocx] with minor API tweaks to handle some arguments or parts of the return type automatically.
+[`InferCtxt`][infcx]型は、分析中に正規化する「主な」方法を公開します：
+[`normalize`][normalize]、[`deeply_normalize`][deeply_normalize]、[`structurally_normalize`][structurally_normalize]。
+これらの関数は、[`FnCtxt`][fcx]や[`ObligationCtxt`][ocx]などのさまざまな`InferCtxt`ラッパー型で
+ラップされて再公開されることが多く、一部の引数または戻り値の一部を自動的に処理するために
+APIの微調整が行われます。
 
-#### Structural `InferCtxt` normalization
+#### 構造的`InferCtxt`正規化
 
-[`infcx.at.structurally_normalize`][structurally_normalize] exposes structural normalization that is able to handle inference variables and regions. It should generally be used whenever inspecting the kind of a type.
+[`infcx.at.structurally_normalize`][structurally_normalize]は、推論変数と領域を処理できる
+構造的正規化を公開します。型の種類を調べるときは一般的に使用する必要があります。
 
-Inside of HIR Typeck there is a related method of normalization- [`fcx.structurally_resolve`][structurally_resolve], which will error if the type being resolved is an unresolved inference variable. When the new solver is enabled it will also attempt to structurally normalize the type.
+HIR Typeck 内には、関連する正規化メソッド- [`fcx.structurally_resolve`][structurally_resolve]があります。
+これは、解決される型が未解決の推論変数である場合にエラーを出します。
+新しいソルバーが有効になっている場合、型を構造的に正規化しようともします。
 
-Due to this there is a pattern in HIR typeck where a type is first normalized via `normalize` (only normalizing in the old solver), and then `structurally_resolve`'d (only normalizing in the new solver). This pattern should be preferred over calling `structurally_normalize` during HIR typeck as `structurally_resolve` will attempt to make inference progress by evaluating goals whereas `structurally_normalize` does not.
+このため、HIR typeck には、型が最初に`normalize`を介して正規化される
+（古いソルバーでのみ正規化）パターンがあり、次に`structurally_resolve`される
+（新しいソルバーでのみ正規化）パターンがあります。このパターンは、
+HIR typeck 中に`structurally_normalize`を呼び出すよりも優先されるべきです。
+`structurally_resolve`は、`structurally_normalize`がゴールを評価しないのに対し、
+ゴールを評価して推論の進行を試みるためです。
 
-#### Deep `InferCtxt` normalization
+#### 深い`InferCtxt`正規化
 
 ##### `infcx.at.(deeply_)?normalize`
 
-There are two ways to deeply normalize with an `InferCtxt`, `normalize` and `deeply_normalize`. The reason for this is that `normalize` is a "legacy" normalization entry point used only by the old solver, whereas `deeply_normalize` is intended to be the long term way to deeply normalize. Both of these methods can handle regions.
+`InferCtxt`で深く正規化するには、`normalize`と`deeply_normalize`の2つの方法があります。
+この理由は、`normalize`は古いソルバーでのみ使用される「レガシー」正規化エントリポイントであるのに対し、
+`deeply_normalize`は長期的に深く正規化する方法であることを意図しているためです。
+これらのメソッドはどちらも領域を処理できます。
 
-When the new solver is stabilized the `infcx.at.normalize` function will be removed and everything will have been migrated to the new deep or structural normalization methods. For this reason the `normalize` function is a no-op under the new solver, making it suitable only when the old solver needs normalization but the new solver does not.
+新しいソルバーが安定すると、`infcx.at.normalize`関数は削除され、
+すべてが新しい深いまたは構造的正規化メソッドに移行されます。このため、
+`normalize`関数は新しいソルバーでは no-op であり、
+古いソルバーが正規化を必要とするが新しいソルバーは必要としない場合にのみ適しています。
 
-Using `deeply_normalize` will result in errors being emitted when encountering ambiguous aliases[^2] as it is not possible to support normalizing *all* ambiguous aliases to inference variables[^3]. `deeply_normalize` should generally only be used in cases where we do not expect to encounter ambiguous aliases, for example when working with types from item signatures.
+`deeply_normalize`を使用すると、ambiguous エイリアス[^2]に遭遇したときにエラーが出力されます。
+*すべての* ambiguous エイリアスを推論変数に正規化することをサポートすることは不可能だからです[^3]。
+`deeply_normalize`は一般的に、ambiguous エイリアスに遭遇することが予想されない場合にのみ使用する必要があります。
+たとえば、アイテムシグネチャの型を処理する場合などです。
 
 ##### `infcx.query_normalize`
 
-[`infcx.query_normalize`][query_norm] is very rarely used, it has almost all the same restrictions as `normalize_erasing_regions` (cannot handle inference variables, no diagnostics support) with the main difference being that it retains lifetime information. For this reason `normalize_erasing_regions` is the better choice in almost all circumstances as it is more efficient due to caching lifetime-erased queries.
+[`infcx.query_normalize`][query_norm]はほとんど使用されず、`normalize_erasing_regions`とほぼ同じ制限があります
+（推論変数を処理できない、診断サポートなし）。主な違いは、ライフタイム情報を保持することです。
+このため、ライフタイム消去クエリをキャッシュする方がより効率的であるため、
+`normalize_erasing_regions`はほぼすべての状況でより良い選択です。
 
-In practice `query_normalize` is used for normalization in the borrow checker, and elsewhere as a performance optimization over `infcx.normalize`. Once the new solver is stabilized it is expected that `query_normalize` can be removed from the compiler as the new solvers normalization implementation should be performant enough for it to not be a performance regression.
+実際には、`query_normalize`は borrow checker での正規化に使用され、
+`infcx.normalize`のパフォーマンス最適化として他の場所で使用されます。
+新しいソルバーが安定すると、新しいソルバーの正規化実装は十分にパフォーマンスが高いため、
+パフォーマンス回帰にならないため、`query_normalize`をコンパイラから削除できることが期待されます。
 
 ##### `tcx.normalize_erasing_regions`
 
-[`normalize_erasing_regions`][norm_erasing_regions] is generally used by parts of the compiler that are not doing type system analysis. This normalization entry point does not handle inference variables, lifetimes, or any diagnostics. Lints and codegen make heavy use of this entry point as they typically are working with fully inferred aliases that can be assumed to be well formed (or at least, are not responsible for erroring on). 
+[`normalize_erasing_regions`][norm_erasing_regions]は一般的に、型システム分析を行っていない
+コンパイラの部分で使用されます。この正規化エントリポイントは、
+推論変数、ライフタイム、または診断を処理しません。
+Lintsとcodegenは、通常、完全に推論されたエイリアスで作業しており、
+適格であると仮定できる（または少なくともエラーを出す責任がない）ため、
+このエントリポイントを多用します。
 
 [query_norm]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_trait_selection/infer/at/struct.At.html#method.query_normalize
 [norm_erasing_regions]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html#method.normalize_erasing_regions
@@ -219,68 +302,105 @@ In practice `query_normalize` is used for normalization in the borrow checker, a
 [ocx]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_trait_selection/traits/struct.ObligationCtxt.html
 [structurally_resolve]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir_typeck/fn_ctxt/struct.FnCtxt.html#method.structurally_resolve_type
 
-### Inside of the trait solver
+### トレイトソルバーの内側
 
-[`traits::normalize_with_depth(_to)`][norm_with_depth] and [`EvalCtxt::structurally_normalize`][eval_ctxt_structural_norm] are only used by the internals of the trait solvers (old and new respectively). It is effectively a raw entry point to the internals of how normalization is implemented by each trait solver. Other normalization entry points cannot be used from within the internals of trait solving as it wouldn't handle goal cycles and recursion depth correctly.
+[`traits::normalize_with_depth(_to)`][norm_with_depth]と[`EvalCtxt::structurally_normalize`][eval_ctxt_structural_norm]は、
+トレイトソルバー（それぞれ古いものと新しいもの）の内部でのみ使用されます。
+これは、正規化が各トレイトソルバーによってどのように実装されるかの内部への
+事実上の生のエントリポイントです。他の正規化エントリポイントは、
+ゴールサイクルと再帰深度を正しく処理しないため、トレイトソルビングの内部から使用できません。
 
 [norm_with_depth]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_trait_selection/traits/normalize/fn.normalize_with_depth.html
 [eval_ctxt_structural_norm]:  https://doc.rust-lang.org/nightly/nightly-rustc/rustc_next_trait_solver/solve/struct.EvalCtxt.html#method.structurally_normalize_term
 
-## When/Where to normalize (Old vs New solver)
+## いつ/どこで正規化するか（古いソルバー vs 新しいソルバー）
 
-One of the big changes between the old and new solver is our approach to when we expect aliases to be normalized.
+古いソルバーと新しいソルバーの間の大きな変更の1つは、エイリアスを正規化することが期待される時期へのアプローチです。
 
-### Old solver
+### 古いソルバー
 
-All types are expected to be normalized as soon as possible, so that all types encountered in the type system are either rigid or an inference variable (which will later be inferred to a rigid term). 
+すべての型は、できるだけ早く正規化されることが期待されるため、
+型システムで遭遇するすべての型は、rigid または推論変数（後で rigid 項に推論される）のいずれかです。
 
-As a concrete example: equality of aliases is implemented by assuming they're rigid and recursively equating the generic arguments of the alias.
+具体例として：エイリアスの等価性は、それらが rigid であると仮定し、
+エイリアスのジェネリック引数を再帰的に等価にすることによって実装されます。
 
-### New solver
+### 新しいソルバー
 
-It's expected that all types potentially contain ambiguous or unnormalized aliases. Whenever an operation is performed that requires aliases to be normalized, it's the responsibility of that logic to normalize the alias (this means that matching on `ty.kind()` pretty much always has to structurally normalize first).
+すべての型には、ambiguous または unnormalized エイリアスが含まれている可能性があると予想されます。
+エイリアスを正規化する必要がある操作が実行されるたびに、
+そのロジックがエイリアスを正規化する責任があります
+（これは、`ty.kind()`で一致させるには、ほぼ常に最初に構造的に正規化する必要があることを意味します）。
 
-As a concrete example: equality of aliases is implemented by a custom goal kind ([`PredicateKind::AliasRelate`][aliasrelate]) so that it can handle normalization of the aliases itself instead of assuming all alias types being equated are rigid.
+具体例として：エイリアスの等価性は、エイリアス自体の正規化を処理できるように、
+カスタムゴールカインド（[`PredicateKind::AliasRelate`][aliasrelate]）によって実装されます。
+これは、等価にされるすべてのエイリアス型が rigid であると仮定する代わりに行われます。
 
-Despite this approach we still deeply normalize during [writeback][writeback] for performance/simplicity, so that types in the MIR can still be assumed to have been deeply normalized. 
+このアプローチにもかかわらず、パフォーマンス/簡潔さのために[writeback][writeback]中に
+まだ深く正規化するため、MIRの型はまだ深く正規化されていると仮定できます。
 
 [aliasrelate]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/type.PredicateKind.html#variant.AliasRelate
 [writeback]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir_typeck/writeback/index.html
 
 ---
 
-There were a few main issues with the old solver's approach to normalization that motivated changing things in the new solver:
+古いソルバーの正規化アプローチに関するいくつかの主な問題があり、
+新しいソルバーで物事を変更する動機となりました。
 
-### Missing normalization calls
+### 正規化呼び出しの欠落
 
-It was a frequent occurrence that normalization calls would be missing, resulting in passing unnormalized types to APIs expecting everything to already be normalized. Treating ambiguous or unnormalized aliases as rigid would result in all sorts of weird errors from aliases not being considered equal to one another, or surprising inference guidance from equating unnormalized aliases' generic arguments.
+正規化呼び出しが欠落していることが頻繁に発生し、
+すべてがすでに正規化されていることを期待するAPIに unnormalized 型を渡すことになりました。
+unnormalized エイリアスを rigid として扱うと、エイリアスが互いに等しいと見なされないか、
+unnormalized エイリアスのジェネリック引数を等価にすることから驚くべき推論ガイダンスが得られるなど、
+あらゆる種類の奇妙なエラーが発生します。
 
-### Normalizing parameter environments
+### パラメータ環境の正規化
 
-Another problem was that it was not possible to normalize `ParamEnv`s correctly in the old solver as normalization itself would expect a normalized `ParamEnv` in order to give correct results. See the chapter on `ParamEnv`s for more information: [`Typing/ParamEnv`s: Normalizing all bounds](./typing_parameter_envs.md#normalizing-all-bounds)
+もう1つの問題は、古いソルバーでは`ParamEnv`を正しく正規化できなかったことです。
+正規化自体が正しい結果を与えるために正規化された`ParamEnv`を期待するためです。
+詳細については、`ParamEnv`に関する章を参照してください：[`Typing/ParamEnv`s: すべての境界の正規化](./typing_parameter_envs.md#normalizing-all-bounds)
 
-### Unnormalizable non-rigid aliases in higher ranked types
+### 高ランク型の正規化できない非 rigid エイリアス
 
-Given a type such as `for<'a> fn(<?x as Trait<'a>::Assoc>)`, it is not possible to correctly handle this with the old solver's approach to normalization.
+`for<'a> fn(<?x as Trait<'a>::Assoc>)`のような型が与えられた場合、
+古いソルバーの正規化アプローチでこれを正しく処理することはできません。
 
-If we were to normalize it to `for<'a> fn(?y)` and register a goal to normalize `for<'a> <?x as Trait<'a>>::Assoc -> ?y`, this would result in errors in cases where `<?x as Trait<'a>>::Assoc` normalized to `&'a u32`. The inference variable `?y` would be in a lower [universe] than the placeholders made when instantiating the `for<'a>` binder.
+`for<'a> fn(?y)`に正規化し、`for<'a> <?x as Trait<'a>>::Assoc -> ?y`を正規化するゴールを登録すると、
+`<?x as Trait<'a>>::Assoc`が`&'a u32`に正規化されるケースでエラーが発生します。
+推論変数`?y`は、`for<'a>`バインダーをインスタンス化するときに作成されたプレースホルダーよりも
+低い[ユニバース]にあります。
 
-Leaving the alias unnormalized would also be wrong as the old solver expects all aliases to be rigid. This was a soundness bug before the new solver was stabilized in coherence: [relating projection substs is unsound during coherence](https://github.com/rust-lang/rust/issues/102048).
+エイリアスを unnormalized のままにすることも間違っています。
+古いソルバーはすべてのエイリアスが rigid であることを期待しているためです。
+これは、新しいソルバーがコヒーレンスで安定する前の健全性バグでした：
+[relating projection substs is unsound during coherence](https://github.com/rust-lang/rust/issues/102048)。
 
-Ultimately this means that it is not always possible to ensure all aliases inside of a value are rigid.
+最終的に、これは値内のすべてのエイリアスが rigid であることを保証することが
+常に可能であるとは限らないことを意味します。
 
 [universe]: borrow_check/region_inference/placeholders_and_universes.md#what-is-a-universe
 [deeply_normalize]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_trait_selection/traits/normalize/trait.NormalizeExt.html#tymethod.deeply_normalize
 
-## Handling uses of diverging aliases
+## 発散エイリアスの使用の処理
 
-Diverging aliases, like ambiguous aliases, are normalized to inference variables. As normalizing diverging aliases results in trait solver cycles, it always results in an error in the old solver. In the new solver it only results in an error if we wind up requiring all goals to hold in the current context. E.g. normalizing diverging aliases during HIR typeck will result in an error in both solvers.
+発散エイリアスは、ambiguous エイリアスと同様に、推論変数に正規化されます。
+発散エイリアスを正規化すると、トレイトソルバーサイクルが発生するため、
+古いソルバーでは常にエラーになります。新しいソルバーでは、
+現在のコンテキストですべてのゴールが保持される必要がある場合にのみエラーになります。
+たとえば、HIR typeck 中に発散エイリアスを正規化すると、
+両方のソルバーでエラーになります。
 
-Alias well formedness doesn't require that the alias doesn't diverge[^4], this means that checking an alias is well formed isn't sufficient to cause an error to be emitted for diverging aliases; actually attempting to normalize the alias is required.
+エイリアス well-formedness は、エイリアスが発散しないことを要求しません[^4]。
+これは、エイリアスが well-formed であることをチェックすることが、
+発散エイリアスに対してエラーを出すのに十分ではないことを意味します。
+実際にエイリアスを正規化しようとする必要があります。
 
-Erroring on diverging aliases being a side effect of normalization means that it is very *arbitrary* whether we actually emit an error, it also differs between the old and new solver as we now normalize in less places.
+発散エイリアスのエラーが正規化の副作用であることは、
+実際にエラーを出すかどうかが非常に*恣意的*であることを意味し、
+古いソルバーと新しいソルバーでは、今は正規化する場所が少ないため異なります。
 
-An example of the ad-hoc nature of erroring on diverging aliases causing "problems":
+発散エイリアスが恣意的にエラーを引き起こすことの「問題」の例：
 ```rust
 trait Trait {
     type Diverges<D: Trait>;
@@ -293,18 +413,29 @@ impl<T> Trait for T {
 struct Bar<T: ?Sized = <u8 as Trait>::Diverges<u8>>(Box<T>);
 ```
 
-In this example a diverging alias is used but we happen to not emit an error as we never explicitly normalize the defaults of generic parameters. If the `?Sized` opt out is removed then an error is emitted because we wind up happening to normalize a `<u8 as Trait>::Diverges<u8>: Sized` goal which as a side effect results in erroring about the diverging alias.
+この例では、発散エイリアスが使用されていますが、
+ジェネリックパラメータのデフォルトを明示的に正規化しないため、
+エラーを出しません。`?Sized`オプトアウトが削除されると、
+`<u8 as Trait>::Diverges<u8>: Sized`ゴールを正規化することになるため、
+エラーが出力されます。これは、副作用として発散エイリアスに関するエラーになります。
 
-Const aliases differ from type aliases a bit here; well formedness of const aliases requires that they can be successfully evaluated (via [`ConstEvaluatable`][const_evaluatable] goals). This means that simply checking well formedness of const arguments is sufficient to error if they would fail to evaluate. It is somewhat unclear whether it would make sense to adopt this for type aliases too or if const aliases should stop requiring this for well formedness[^5].
+Const エイリアスは、型エイリアスとはここで少し異なります。
+const エイリアスの well-formedness は、それらが正常に評価できることを要求します
+（[`ConstEvaluatable`][const_evaluatable]ゴール経由）。これは、
+const 引数の well-formedness を単純にチェックするだけで、
+評価に失敗した場合にエラーを出すのに十分であることを意味します。
+これが型エイリアスにも意味があるかどうか、または
+const エイリアスが well-formedness のためにこれを要求するのをやめるべきかどうかは、
+やや不明確です[^5]。
 
-[^1]: In the new solver this is done implicitly
+[^1]: 新しいソルバーでは、これは暗黙的に行われます
 
-[^2]: There is a subtle difference in how ambiguous aliases in binders are handled between old and new solver. In the old solver we fail to error on some ambiguous aliases inside of higher ranked types whereas the new solver correctly errors.
+[^2]: バインダー内の ambiguous エイリアスの処理方法には、古いソルバーと新しいソルバーの間で微妙な違いがあります。古いソルバーでは、高ランク型内の一部の ambiguous エイリアスでエラーを出さないのに対し、新しいソルバーは正しくエラーを出します。
 
-[^3]: Ambiguous aliases inside of binders cannot be normalized to inference variables, this will be covered more later.
+[^3]: バインダー内の ambiguous エイリアスは推論変数に正規化できません。これについては後で詳しく説明します。
 
-[^4]: As checking aliases are non-diverging cannot be done until they are fully concrete, this would either imply that we cant check aliases are well formed before codegen/const-evaluation or that aliases would go from being well-formed to not well-formed after monomorphization.
+[^4]: エイリアスが非発散であることをチェックすることは、完全に具体的になるまで実行できないため、codegen/const-evaluation の前にエイリアスが well-formed であることをチェックできないか、エイリアスがモノモーフィゼーション後に well-formed から非 well-formed になることを意味します。
 
-[^5]: Const aliases certainly wouldn't be *less* sound than type aliases if we stopped doing this
+[^5]: Const エイリアスがこれを行うのをやめた場合、確かに型エイリアスより*健全性が低い*ことはありません
 
 [const_evaluatable]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/type.ClauseKind.html#variant.ConstEvaluatable

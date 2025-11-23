@@ -1,22 +1,15 @@
-# WASI notification group
+# WASI通知グループ
 
-**Github Label:** [O-wasi] <br>
-**Ping command:** `@rustbot ping wasi`
+**Githubラベル:** [O-wasi] <br>
+**Pingコマンド:** `@rustbot ping wasi`
 
 [O-wasi]: https://github.com/rust-lang/rust/labels/O-wasi
 
-This list will be used to ask for help both in diagnosing and testing
-WASI-related issues as well as suggestions on how to resolve
-interesting questions regarding our WASI support.
+このリストは、WASI関連の問題の診断とテストの両方の支援を求めるだけでなく、WASIサポートに関する興味深い質問の解決方法についての提案を求めるために使用されます。
 
-The group also has an associated Zulip channel ([`#t-compiler/wasm`])
-where people can go to pose questions and discuss WASI-specific
-topics.
+グループには関連するZulipチャンネル（[`#t-compiler/wasm`]）もあり、そこで質問を投げかけたり、WASI固有のトピックについて議論したりできます。
 
-So, if you are interested in participating, please sign up for the
-WASI group! To do so, open a PR against the [rust-lang/team]
-repository. Just [follow this example][eg], but change the username to
-your own!
+参加に興味がある方は、WASIグループにサインアップしてください！そのためには、[rust-lang/team]リポジトリに対してPRを開いてください。[この例][eg]に従って、ユーザー名を自分のものに変更するだけです！
 
 [`#t-compiler/wasm`]: https://rust-lang.zulipchat.com/#narrow/stream/463513-t-compiler.2Fwasm
 [rust-lang/team]: https://github.com/rust-lang/team

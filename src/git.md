@@ -1,21 +1,12 @@
-# Using Git
+# Git の使用
 
-The Rust project uses [Git] to manage its source code. In order to
-contribute, you'll need some familiarity with its features so that your changes
-can be incorporated into the compiler.
+Rust プロジェクトは、ソースコードを管理するために [Git] を使用しています。貢献するには、変更がコンパイラに組み込まれるように、その機能にある程度精通している必要があります。
 
 [Git]: https://git-scm.com
 
-The goal of this page is to cover some of the more common questions and
-problems new contributors face. Although some Git basics will be covered here,
-if you find that this is still a little too fast for you, it might make sense
-to first read some introductions to Git, such as the Beginner and Getting
-started sections of [this tutorial from Atlassian][atlassian-git]. GitHub also
-provides [documentation] and [guides] for beginners, or you can consult the
-more in depth [book from Git].
+このページの目標は、新しいコントリビューターが直面するより一般的な質問や問題のいくつかをカバーすることです。ここではいくつかの Git の基本について説明しますが、これがまだ少し速すぎると感じる場合は、[Atlassian のこのチュートリアル][atlassian-git]の Beginner と Getting started セクションなど、Git の入門記事をまず読むことをお勧めします。GitHub も初心者向けの[ドキュメント][documentation]と[ガイド][guides]を提供しています。あるいは、より詳しい [Git の本][book from Git]を参照することもできます。
 
-This guide is incomplete. If you run into trouble with git that this page doesn't help with,
-please [open an issue] so we can document how to fix it.
+このガイドは不完全です。このページが役に立たない Git の問題に遭遇した場合は、[issue を開いて][open an issue]、修正方法を文書化できるようにしてください。
 
 [open an issue]: https://github.com/rust-lang/rustc-dev-guide/issues/new
 [book from Git]: https://git-scm.com/book/en/v2/
@@ -23,92 +14,66 @@ please [open an issue] so we can document how to fix it.
 [documentation]: https://docs.github.com/en/get-started/quickstart/set-up-git
 [guides]: https://guides.github.com/introduction/git-handbook/
 
-## Prerequisites
+## 前提条件
 
-We'll assume that you've installed Git, forked [rust-lang/rust], and cloned the
-forked repo to your PC. We'll use the command line interface to interact
-with Git; there are also a number of GUIs and IDE integrations that can
-generally do the same things.
+Git をインストールし、[rust-lang/rust] をフォークし、フォークされたリポジトリを PC にクローンしたと仮定します。Git とのやり取りにはコマンドラインインターフェイスを使用します。一般的に同じことができる GUI や IDE 統合も多数あります。
 
 [rust-lang/rust]: https://github.com/rust-lang/rust
 
-If you've cloned your fork, then you will be able to reference it with `origin`
-in your local repo. It may be helpful to also set up a remote for the official
-rust-lang/rust repo via
+フォークをクローンした場合、ローカルリポジトリで `origin` を使用して参照できます。公式の rust-lang/rust リポジトリのリモートも設定すると便利です。
 
 ```console
 git remote add upstream https://github.com/rust-lang/rust.git
 ```
 
-if you're using HTTPS, or
+HTTPS を使用している場合、または
 
 ```console
 git remote add upstream git@github.com:rust-lang/rust.git
 ```
 
-if you're using SSH.
+SSH を使用している場合です。
 
-**NOTE:** This page is dedicated to workflows for `rust-lang/rust`, but will likely be
-useful when contributing to other repositories in the Rust project.
+**注意**：このページは `rust-lang/rust` のワークフローに特化していますが、Rust プロジェクトの他のリポジトリに貢献する際にも役立つでしょう。
 
 
-## Standard Process
+## 標準プロセス
 
-Below is the normal procedure that you're likely to use for most minor changes
-and PRs:
+以下は、ほとんどの小さな変更と PR に使用する可能性が高い通常の手順です：
 
- 1. Ensure that you're making your changes on top of `main`:
- `git checkout main`.
- 2. Get the latest changes from the Rust repo: `git pull upstream main --ff-only`.
- (see [No-Merge Policy][no-merge-policy] for more info about this).
- 3. Make a new branch for your change: `git checkout -b issue-12345-fix`.
- 4. Make some changes to the repo and test them.
- 5. Stage your changes via `git add src/changed/file.rs src/another/change.rs`
- and then commit them with `git commit`. Of course, making intermediate commits
- may be a good idea as well. Avoid `git add .`, as it makes it too easy to
- unintentionally commit changes that should not be committed, such as submodule
- updates. You can use `git status` to check if there are any files you forgot
- to stage.
- 6. Push your changes to your fork: `git push --set-upstream origin issue-12345-fix`
- (After adding commits, you can use `git push` and after rebasing or
-pulling-and-rebasing, you can use `git push --force-with-lease`).
- 7. [Open a PR][ghpullrequest] from your fork to `rust-lang/rust`'s `main` branch.
+ 1. 変更が `main` の上で行われていることを確認します：`git checkout main`。
+ 2. Rust リポジトリから最新の変更を取得します：`git pull upstream main --ff-only`（詳細については [No-Merge Policy][no-merge-policy] を参照してください）。
+ 3. 変更用の新しいブランチを作成します：`git checkout -b issue-12345-fix`。
+ 4. リポジトリに変更を加えてテストします。
+ 5. `git add src/changed/file.rs src/another/change.rs` で変更をステージし、`git commit` でコミットします。もちろん、途中でコミットを作成することも良い考えです。`git add .` は避けてください。サブモジュールの更新など、コミットすべきでない変更を誤ってコミットしやすくなるためです。`git status` を使用して、ステージし忘れたファイルがあるかどうかを確認できます。
+ 6. 変更をフォークにプッシュします：`git push --set-upstream origin issue-12345-fix`（コミットを追加した後は `git push` を使用でき、リベースまたはプルアンドリベース後は `git push --force-with-lease` を使用できます）。
+ 7. フォークから `rust-lang/rust` の `main` ブランチへの [PR を開きます][ghpullrequest]。
 
 [ghpullrequest]: https://guides.github.com/activities/forking/#making-a-pull-request
 
-If you end up needing to rebase and are hitting conflicts, see [Rebasing](#rebasing).
-If you want to track upstream while working on long-running feature/issue, see
-[Keeping things up to date][no-merge-policy].
+リベースが必要で競合が発生している場合は、[リベース](#rebasing)を参照してください。長期実行中の機能/issue で作業している間に upstream を追跡したい場合は、[最新の状態に保つ][no-merge-policy]を参照してください。
 
-If your reviewer requests changes, the procedure for those changes looks much
-the same, with some steps skipped:
+レビュアーが変更を要求した場合、変更の手順は同じですが、いくつかのステップがスキップされます：
 
- 1. Ensure that you're making changes to the most recent version of your code:
- `git checkout issue-12345-fix`.
- 2. Make, stage, and commit your additional changes just like before.
- 3. Push those changes to your fork: `git push`.
+ 1. コードの最新バージョンに変更を加えていることを確認します：`git checkout issue-12345-fix`。
+ 2. 以前と同じように、追加の変更を行い、ステージし、コミットします。
+ 3. これらの変更をフォークにプッシュします：`git push`。
 
  [no-merge-policy]: #keeping-things-up-to-date
 
-## Troubleshooting git issues
+## Git の問題のトラブルシューティング
 
-You don't need to clone `rust-lang/rust` from scratch if it's out of date!
-Even if you think you've messed it up beyond repair, there are ways to fix
-the git state that don't require downloading the whole repository again.
-Here are some common issues you might run into:
+古くなっている場合、`rust-lang/rust` をゼロからクローンする必要はありません！修復不可能なほど混乱させたと思っても、リポジトリ全体を再度ダウンロードする必要のない Git の状態を修正する方法があります。以下は、遭遇する可能性のある一般的な問題です：
 
-### I made a merge commit by accident.
+### 誤ってマージコミットを作成してしまいました。
 
-Git has two ways to update your branch with the newest changes: merging and rebasing.
-Rust [uses rebasing][no-merge-policy]. If you make a merge commit, it's not too hard to fix:
-`git rebase -i upstream/main`.
+Git には、ブランチを最新の変更で更新する2つの方法があります：マージとリベースです。Rust は[リベースを使用します][no-merge-policy]。マージコミットを作成してしまった場合、修正するのはそれほど難しくありません：`git rebase -i upstream/main`。
 
-See [Rebasing](#rebasing) for more about rebasing.
+リベースの詳細については、[リベース](#rebasing)を参照してください。
 
-### I deleted my fork on GitHub!
+### GitHub でフォークを削除してしまいました！
 
-This is not a problem from git's perspective. If you run `git remote -v`,
-it will say something like this:
+これは Git の観点からは問題ではありません。`git remote -v` を実行すると、次のように表示されます：
 
 ```console
 $ git remote -v
@@ -118,45 +83,39 @@ upstream        https://github.com/rust-lang/rust (fetch)
 upstream        https://github.com/rust-lang/rust (fetch)
 ```
 
-If you renamed your fork, you can change the URL like this:
+フォークの名前を変更した場合は、次のように URL を変更できます：
 
 ```console
 git remote set-url origin <URL>
 ```
 
-where the `<URL>` is your new fork.
+ここで `<URL>` は新しいフォークです。
 
-### I changed a submodule by accident
+### 誤ってサブモジュールを変更してしまいました
 
-Usually people notice this when rustbot posts a comment on github that `cargo` has been modified:
+通常、人々は rustbot が `cargo` が変更されたというコメントを GitHub に投稿したときにこれに気付きます：
 
 ![rustbot submodule comment](./img/rustbot-submodules.png)
 
-You might also notice conflicts in the web UI:
+Web UI で競合に気付くこともあります：
 
 ![conflict in src/tools/cargo](./img/submodule-conflicts.png)
 
-The most common cause is that you rebased after a change and ran `git add .` without first running
-`x` to update the submodules.  Alternatively, you might have run `cargo fmt` instead of `x fmt`
-and modified files in a submodule, then committed the changes.
+最も一般的な原因は、変更後にリベースし、最初に `x` を実行してサブモジュールを更新せずに `git add .` を実行したことです。あるいは、`x fmt` の代わりに `cargo fmt` を実行してサブモジュール内のファイルを変更し、その後変更をコミットした可能性があります。
 
-To fix it, do the following things (if you changed a submodule other than cargo,
-replace `src/tools/cargo` with the path to that submodule):
+修正するには、次のことを行います（cargo 以外のサブモジュールを変更した場合は、`src/tools/cargo` をそのサブモジュールへのパスに置き換えてください）：
 
-1. See which commit has the accidental changes: `git log --stat -n1 src/tools/cargo`
-2. Revert the changes to that commit: `git checkout <my-commit>~ src/tools/cargo`. Type `~`
-   literally but replace `<my-commit>` with the output from step 1.
-3. Tell git to commit the changes: `git commit --fixup <my-commit>`
-4. Repeat steps 1-3 for all the submodules you modified.
-    - If you modified the submodule in several different commits, you will need to repeat steps 1-3
-    for each commit you modified. You'll know when to stop when the `git log` command shows a commit
-    that's not authored by you.
-5. Squash your changes into the existing commits: `git rebase --autosquash -i upstream/main`
-6. [Push your changes](#standard-process).
+1. どのコミットに誤った変更があるかを確認します：`git log --stat -n1 src/tools/cargo`
+2. そのコミットへの変更を元に戻します：`git checkout <my-commit>~ src/tools/cargo`。`~` を文字通り入力しますが、`<my-commit>` はステップ 1 の出力に置き換えます。
+3. Git に変更をコミットするよう伝えます：`git commit --fixup <my-commit>`
+4. 変更したすべてのサブモジュールについて、ステップ 1〜3 を繰り返します。
+    - 複数の異なるコミットでサブモジュールを変更した場合は、変更した各コミットに対してステップ 1〜3 を繰り返す必要があります。`git log` コマンドが自分が作成していないコミットを表示したときに停止する必要があります。
+5. 既存のコミットに変更をスカッシュします：`git rebase --autosquash -i upstream/main`
+6. [変更をプッシュします](#standard-process)。
 
-### I see "error: cannot rebase" when I try to rebase
+### リベースしようとすると「error: cannot rebase」と表示されます
 
-These are two common errors to see when rebasing:
+リベースするときによく見られる2つのエラー：
 ```console
 error: cannot rebase: Your index contains uncommitted changes.
 error: Please commit or stash them.
@@ -166,43 +125,36 @@ error: cannot rebase: You have unstaged changes.
 error: Please commit or stash them.
 ```
 
-(See <https://git-scm.com/book/en/v2/Getting-Started-What-is-Git%3F#_the_three_states> for the difference between the two.)
+（2つの違いについては、<https://git-scm.com/book/en/v2/Getting-Started-What-is-Git%3F#_the_three_states> を参照してください。）
 
-This means you have made changes since the last time you made a commit. To be able to rebase, either
-commit your changes, or make a temporary commit called a "stash" to have them still not be committed
-when you finish rebasing. You may want to configure git to make this "stash" automatically, which
-will prevent the "cannot rebase" error in nearly all cases:
+これは、最後にコミットを作成してから変更を加えたことを意味します。リベースできるようにするには、変更をコミットするか、リベースを終了したときにまだコミットされないようにする「スタッシュ」と呼ばれる一時的なコミットを作成します。Git がこの「スタッシュ」を自動的に作成するように設定することをお勧めします。これにより、ほぼすべての場合に「cannot rebase」エラーを防ぐことができます：
 
 ```console
 git config --global rebase.autostash true
 ```
 
-See <https://git-scm.com/book/en/v2/Git-Tools-Stashing-and-Cleaning> for more info about stashing.
+スタッシュの詳細については、<https://git-scm.com/book/en/v2/Git-Tools-Stashing-and-Cleaning> を参照してください。
 
-### I see 'Untracked Files: src/stdarch'?
+### 'Untracked Files: src/stdarch' と表示されます。
 
-This is left over from the move to the `library/` directory.
-Unfortunately, `git rebase` does not follow renames for submodules, so you
-have to delete the directory yourself:
+これは `library/` ディレクトリへの移動から残されたものです。残念ながら、`git rebase` はサブモジュールの名前変更に従わないため、ディレクトリを自分で削除する必要があります：
 
 ```console
 rm -r src/stdarch
 ```
 
-### I see `<<< HEAD`?
+### `<<< HEAD` と表示されます。
 
-You were probably in the middle of a rebase or merge conflict. See
-[Conflicts](#rebasing-and-conflicts) for how to fix the conflict. If you don't care about the changes
-and just want to get a clean copy of the repository back, you can use `git reset`:
+おそらくリベースまたはマージ競合の最中です。競合を修正する方法については、[競合](#rebasing-and-conflicts)を参照してください。変更を気にせず、リポジトリのクリーンなコピーを取得したいだけの場合は、`git reset` を使用できます：
 
 ```console
-# WARNING: this throws out any local changes you've made! Consider resolving the conflicts instead.
+# 警告: これはローカルの変更をすべて破棄します！代わりに競合を解決することを検討してください。
 git reset --hard main
 ```
 
 ### failed to push some refs
 
-`git push` will not work properly and say something like this:
+`git push` は正しく機能せず、次のように表示されます：
 
 ```console
  ! [rejected]        issue-xxxxx -> issue-xxxxx (non-fast-forward)
@@ -213,34 +165,26 @@ hint: 'git pull ...') before pushing again.
 hint: See the 'Note about fast-forwards' in 'git push --help' for details.
 ```
 
-The advice this gives is incorrect! Because of Rust's
-["no-merge" policy](#no-merge-policy) the merge commit created by `git pull`
-will not be allowed in the final PR, in addition to defeating the point of the
-rebase! Use `git push --force-with-lease` instead.
+これが提供するアドバイスは正しくありません！Rust の [「no-merge」ポリシー](#no-merge-policy)のため、`git pull` によって作成されるマージコミットは最終的な PR では許可されず、リベースの目的を無効にします！代わりに `git push --force-with-lease` を使用してください。
 
-### Git is trying to rebase commits I didn't write?
+### Git が自分が書いていないコミットをリベースしようとします。
 
-If you see many commits in your rebase list, or merge commits, or commits by other people that you
-didn't write, it likely means you're trying to rebase over the wrong branch. For example, you may
-have a `rust-lang/rust` remote `upstream`, but ran `git rebase origin/main` instead of `git rebase
-upstream/main`. The fix is to abort the rebase and use the correct branch instead:
+リベースリストに多数のコミット、マージコミット、または自分が書いていない他の人のコミットが表示される場合は、間違ったブランチにリベースしようとしている可能性があります。例えば、`rust-lang/rust` リモート `upstream` があるのに、`git rebase upstream/main` の代わりに `git rebase origin/main` を実行した可能性があります。修正するには、リベースを中止して代わりに正しいブランチを使用します：
 
 ```console
 git rebase --abort
 git rebase --interactive upstream/main
 ```
 
-<details><summary>Click here to see an example of rebasing over the wrong branch</summary>
+<details><summary>間違ったブランチにリベースする例を表示するにはここをクリックしてください</summary>
 
 ![Interactive rebase over the wrong branch](img/other-peoples-commits.png)
 
 </details>
 
-### Quick note about submodules
+### サブモジュールに関するクイックノート
 
-When updating your local repository with `git pull`, you may notice that sometimes
-Git says you have modified some files that you have never edited. For example,
-running `git status` gives you something like (note the `new commits` mention):
+`git pull` でローカルリポジトリを更新すると、編集したことのないファイルが変更されたと Git が言うことがあります。例えば、`git status` を実行すると次のように表示されます（`new commits` の言及に注意してください）：
 
 ```console
 On branch main
@@ -255,58 +199,40 @@ Changes not staged for commit:
 no changes added to commit (use "git add" and/or "git commit -a")
 ```
 
-These changes are not changes to files: they are changes to submodules (more on this [later](#git-submodules)).
-To get rid of those:
+これらの変更はファイルへの変更ではありません：サブモジュールへの変更です（詳細は[後で](#git-submodules)）。これらを取り除くには：
 
 ```console
 git submodule update
 ```
 
-Some submodules are not actually needed; for example, `src/llvm-project` doesn't need to be checked
-out if you're using `download-ci-llvm`.  To avoid having to keep fetching its history, you can use
-`git submodule deinit -f src/llvm-project`, which will also avoid it showing as modified again.
+一部のサブモジュールは実際には必要ありません。例えば、`download-ci-llvm` を使用している場合、`src/llvm-project` をチェックアウトする必要はありません。履歴を継続的にフェッチする必要を避けるために、`git submodule deinit -f src/llvm-project` を使用できます。これにより、再度変更されたものとして表示されることも回避されます。
 
-## Rebasing and Conflicts
+## リベースと競合
 
-When you edit your code locally, you are making changes to the version of
-rust-lang/rust that existed when you created your feature branch. As such, when
-you submit your PR it is possible that some of the changes that have been made
-to rust-lang/rust since then are in conflict with the changes you've made.
-When this happens, you need to resolve the conflicts before your changes can be
-merged. To do that, you need to rebase your work on top of rust-lang/rust.
+ローカルでコードを編集するとき、フィーチャーブランチを作成したときに存在していた rust-lang/rust のバージョンに変更を加えています。そのため、PR を送信するときに、その後 rust-lang/rust に加えられた変更の一部が、加えた変更と競合している可能性があります。これが発生した場合、変更をマージする前に競合を解決する必要があります。そのためには、rust-lang/rust の上に作業をリベースする必要があります。
 
-### Rebasing
+### リベース
 
-To rebase your feature branch on top of the newest version of the `main` branch
-of rust-lang/rust, checkout your branch, and then run this command:
+フィーチャーブランチを rust-lang/rust の `main` ブランチの最新バージョンの上にリベースするには、ブランチをチェックアウトし、次のコマンドを実行します：
 
 ```console
 git pull --rebase https://github.com/rust-lang/rust.git main
 ```
 
-> If you are met with the following error:
+> 次のエラーが表示された場合：
 > ```console
 > error: cannot pull with rebase: Your index contains uncommitted changes.
 > error: please commit or stash them.
 > ```
-> it means that you have some uncommitted work in your working tree. In that
-> case, run `git stash` before rebasing, and then `git stash pop` after you
-> have rebased and fixed all conflicts.
+> これは、作業ツリーにコミットされていない作業があることを意味します。その場合、リベースする前に `git stash` を実行し、リベースしてすべての競合を修正した後に `git stash pop` を実行します。
 
-When you rebase a branch on main, all the changes on your branch are
-reapplied to the most recent version of `main`. In other words, Git tries to
-pretend that the changes you made to the old version of `main` were instead
-made to the new version of `main`. During this process, you should expect to
-encounter at least one "rebase conflict." This happens when Git's attempt to
-reapply the changes fails because your changes conflicted with other changes
-that have been made. You can tell that this happened because you'll see
-lines in the output that look like
+main でブランチをリベースすると、ブランチのすべての変更が `main` の最新バージョンに再適用されます。言い換えれば、Git は古いバージョンの `main` に加えた変更が、代わりに新しいバージョンの `main` に加えられたふりをしようとします。このプロセス中に、少なくとも1つの「リベース競合」に遭遇することが予想されます。これは、Git が変更を再適用しようとする試みが、他の変更と競合したため失敗したときに発生します。次のような行が出力に表示されるため、これが発生したことがわかります：
 
 ```console
 CONFLICT (content): Merge conflict in file.rs
 ```
 
-When you open these files, you'll see sections of the form
+これらのファイルを開くと、次のような形式のセクションが表示されます：
 
 ```console
 <<<<<<< HEAD
@@ -316,113 +242,64 @@ Your code
 >>>>>>> 8fbf656... Commit fixes 12345
 ```
 
-This represents the lines in the file that Git could not figure out how to
-rebase. The section between `<<<<<<< HEAD` and `=======` has the code from
-`main`, while the other side has your version of the code. You'll need to
-decide how to deal with the conflict. You may want to keep your changes,
-keep the changes on `main`, or combine the two.
+これは、Git がリベース方法を理解できなかったファイル内の行を表します。`<<<<<<< HEAD` と `=======` の間のセクションには `main` のコードがあり、もう一方の側にはあなたのバージョンのコードがあります。競合にどのように対処するかを決定する必要があります。変更を保持するか、`main` の変更を保持するか、2つを組み合わせることができます。
 
-Generally, resolving the conflict consists of two steps: First, fix the
-particular conflict. Edit the file to make the changes you want and remove the
-`<<<<<<<`, `=======` and `>>>>>>>` lines in the process. Second, check the
-surrounding code. If there was a conflict, its likely there are some logical
-errors lying around too! It's a good idea to run `x check` here to make sure
-there are no glaring errors.
+一般的に、競合の解決は2つのステップで構成されます：まず、特定の競合を修正します。ファイルを編集して必要な変更を加え、そのプロセスで `<<<<<<<`、`=======`、`>>>>>>>` 行を削除します。次に、周囲のコードを確認します。競合があった場合、論理的なエラーも存在する可能性があります！ここで `x check` を実行して、明らかなエラーがないことを確認することをお勧めします。
 
-Once you're all done fixing the conflicts, you need to stage the files that had
-conflicts in them via `git add`. Afterwards, run `git rebase --continue` to let
-Git know that you've resolved the conflicts and it should finish the rebase.
+すべての競合の修正が完了したら、`git add` を介して競合があったファイルをステージする必要があります。その後、`git rebase --continue` を実行して、競合を解決したことを Git に知らせ、リベースを終了する必要があります。
 
-Once the rebase has succeeded, you'll want to update the associated branch on
-your fork with `git push --force-with-lease`.
+リベースが成功したら、`git push --force-with-lease` でフォークの関連ブランチを更新します。
 
-### Keeping things up to date
+### 最新の状態に保つ
 
-The [above section](#rebasing) is a specific
-guide on rebasing work and dealing with merge conflicts.
-Here is some general advice about how to keep your local repo
-up-to-date with upstream changes:
+[上記のセクション](#rebasing)は、リベース作業とマージ競合の処理に関する特定のガイドです。ローカルリポジトリを upstream の変更で最新の状態に保つ方法に関する一般的なアドバイスを以下に示します：
 
-Using `git pull upstream main` while on your local `main` branch regularly
-will keep it up-to-date. You will also want to keep your feature branches
-up-to-date as well. After pulling, you can checkout the feature branches
-and rebase them:
+ローカルの `main` ブランチにいる間に定期的に `git pull upstream main` を使用すると、最新の状態が保たれます。フィーチャーブランチも最新の状態に保つ必要があります。プルした後、フィーチャーブランチをチェックアウトしてリベースできます：
 
 ```console
 git checkout main
-git pull upstream main --ff-only # to make certain there are no merge commits
+git pull upstream main --ff-only # マージコミットがないことを確認する
 git rebase main feature_branch
-git push --force-with-lease # (set origin to be the same as local)
+git push --force-with-lease # （origin をローカルと同じに設定）
 ```
 
-To avoid merges as per the [No-Merge Policy](#no-merge-policy), you may want to use
-`git config pull.ff only` (this will apply the config only to the local repo)
-to ensure that Git doesn't create merge commits when `git pull`ing, without
-needing to pass `--ff-only` or `--rebase` every time.
+[No-Merge Policy](#no-merge-policy) に従ってマージを回避するために、`git config pull.ff only`（これはローカルリポジトリにのみ設定を適用します）を使用して、`--ff-only` または `--rebase` を毎回渡す必要なく、`git pull` 時に Git がマージコミットを作成しないようにすることをお勧めします。
 
-You can also `git push --force-with-lease` from main to double-check that your
-feature branches are in sync with their state on the Github side.
+main から `git push --force-with-lease` を使用して、フィーチャーブランチが GitHub 側の状態と同期していることを再確認することもできます。
 
-## Advanced Rebasing
+## 高度なリベース
 
-### Squash your commits
+### コミットをスカッシュする
 
-"Squashing" commits into each other causes them to be merged into a single
-commit. Both the upside and downside of this is that it simplifies the history.
-On the one hand, you lose track of the steps in which changes were made, but
-the history becomes easier to work with.
+コミットを互いに「スカッシュ」すると、それらが単一のコミットにマージされます。これの良い点と悪い点は、履歴を簡素化することです。一方で、変更が行われたステップを追跡できなくなりますが、履歴は扱いやすくなります。
 
-If there are no conflicts and you are just squashing to clean up the history,
-use `git rebase --interactive --keep-base main`. This keeps the fork point
-of your PR the same, making it easier to review the diff of what happened
-across your rebases.
+競合がなく、履歴をクリーンアップするためにスカッシュするだけの場合は、`git rebase --interactive --keep-base main` を使用します。これにより、PR のフォークポイントが同じままになり、リベース間で何が起こったかの差分を確認しやすくなります。
 
-Squashing can also be useful as part of conflict resolution.
-If your branch contains multiple consecutive rewrites of the same code, or if
-the rebase conflicts are extremely severe, you can use
-`git rebase --interactive main` to gain more control over the process. This
-allows you to choose to skip commits, edit the commits that you do not skip,
-change the order in which they are applied, or "squash" them into each other.
+スカッシュは、競合解決の一部としても役立つ場合があります。ブランチに同じコードの連続した複数の書き換えが含まれている場合、またはリベース競合が非常に深刻な場合、`git rebase --interactive main` を使用してプロセスをより細かく制御できます。これにより、コミットをスキップしたり、スキップしないコミットを編集したり、適用される順序を変更したり、互いに「スカッシュ」したりすることができます。
 
-Alternatively, you can sacrifice the commit history like this:
+あるいは、次のようにコミット履歴を犠牲にすることもできます：
 
 ```console
-# squash all the changes into one commit so you only have to worry about conflicts once
-git rebase --interactive --keep-base main  # and squash all changes along the way
+# すべての変更を1つのコミットにスカッシュして、競合に1回だけ対処すればよいようにします
+git rebase --interactive --keep-base main  # そしてすべての変更をスカッシュします
 git rebase main
-# fix all merge conflicts
+# すべてのマージ競合を修正します
 git rebase --continue
 ```
 
-You also may want to squash just the last few commits together, possibly
-because they only represent "fixups" and not real changes. For example,
-`git rebase --interactive HEAD~2` will allow you to edit the two commits only.
+最後のいくつかのコミットだけをまとめたい場合もあります。おそらく、それらが「fixup」を表すだけで実際の変更ではないためです。例えば、`git rebase --interactive HEAD~2` を使用すると、2つのコミットのみを編集できます。
 
 ### `git range-diff`
 
-After completing a rebase, and before pushing up your changes, you may want to
-review the changes between your old branch and your new one. You can do that
-with `git range-diff main @{upstream} HEAD`.
+リベースを完了し、変更をプッシュアップする前に、古いブランチと新しいブランチの間の変更を確認することをお勧めします。これは `git range-diff main @{upstream} HEAD` で行うことができます。
 
-The first argument to `range-diff`, `main` in this case, is the base revision
-that you're comparing your old and new branch against. The second argument is
-the old version of your branch; in this case, `@upstream` means the version that
-you've pushed to GitHub, which is the same as what people will see in your pull
-request. Finally, the third argument to `range-diff` is the *new* version of
-your branch; in this case, it is `HEAD`, which is the commit that is currently
-checked-out in your local repo.
+`range-diff` の最初の引数（この場合は `main`）は、古いブランチと新しいブランチを比較する基準となるリビジョンです。2番目の引数は、ブランチの古いバージョンです。この場合、`@upstream` は GitHub にプッシュしたバージョンを意味し、これはプルリクエストで人々が見るものと同じです。最後に、`range-diff` の3番目の引数は、ブランチの*新しい*バージョンです。この場合、これは `HEAD` で、ローカルリポジトリで現在チェックアウトされているコミットです。
 
-Note that you can also use the equivalent, abbreviated form `git range-diff
-main @{u} HEAD`.
+同等の省略形 `git range-diff main @{u} HEAD` も使用できることに注意してください。
 
-Unlike in regular Git diffs, you'll see a `-` or `+` next to another `-` or `+`
-in the range-diff output. The marker on the left indicates a change between the
-old branch and the new branch, and the marker on the right indicates a change
-you've committed. So, you can think of a range-diff as a "diff of diffs" since
-it shows you the differences between your old diff and your new diff.
+通常の Git diff とは異なり、range-diff 出力では、別の `-` または `+` の隣に `-` または `+` が表示されます。左側のマーカーは、古いブランチと新しいブランチの間の変更を示し、右側のマーカーは、コミットした変更を示します。したがって、range-diff は古い diff と新しい diff の間の違いを示すため、「diff の diff」と考えることができます。
 
-Here's an example of `git range-diff` output (taken from [Git's
-docs][range-diff-example-docs]):
+以下は `git range-diff` 出力の例です（[Git のドキュメント][range-diff-example-docs]から引用）：
 
 ```console
 -:  ------- > 1:  0ddba11 Prepare for the inevitable!
@@ -444,139 +321,90 @@ docs][range-diff-example-docs]):
 3:  bedead < -:  ------- TO-UNDO
 ```
 
-(Note that `git range-diff` output in your terminal will probably be easier to
-read than in this example because it will have colors.)
+（ターミナルの `git range-diff` 出力は、色があるため、この例よりもおそらく読みやすいでしょう。）
 
-Another feature of `git range-diff` is that, unlike `git diff`, it will also
-diff commit messages. This feature can be useful when amending several commit
-messages so you can make sure you changed the right parts.
+`git range-diff` のもう1つの機能は、`git diff` とは異なり、コミットメッセージも diff することです。この機能は、複数のコミットメッセージを修正する際に、正しい部分を変更したことを確認できるため便利です。
 
-`git range-diff` is a very useful command, but note that it can take some time
-to get used to its output format. You may also find Git's documentation on the
-command useful, especially their ["Examples" section][range-diff-example-docs].
+`git range-diff` は非常に便利なコマンドですが、出力形式に慣れるまでに時間がかかることがあります。Git のコマンドに関するドキュメント、特に [「Examples」セクション][range-diff-example-docs]も役立つ場合があります。
 
 [range-diff-example-docs]: https://git-scm.com/docs/git-range-diff#_examples
 
-## No-Merge Policy
+## No-Merge ポリシー
 
-The rust-lang/rust repo uses what is known as a "rebase workflow." This means
-that merge commits in PRs are not accepted. As a result, if you are running
-`git merge` locally, chances are good that you should be rebasing instead. Of
-course, this is not always true; if your merge will just be a fast-forward,
-like the merges that `git pull` usually performs, then no merge commit is
-created and you have nothing to worry about. Running `git config merge.ff only`
-(this will apply the config to the local repo)
-once will ensure that all the merges you perform are of this type, so that you
-cannot make a mistake.
+rust-lang/rust リポジトリは、「リベースワークフロー」として知られているものを使用しています。これは、PR のマージコミットが受け入れられないことを意味します。その結果、ローカルで `git merge` を実行している場合は、代わりにリベースする必要がある可能性があります。もちろん、これは常に正しいわけではありません。マージがファストフォワードになる場合（`git pull` が通常実行するマージのように）、マージコミットは作成されず、心配する必要はありません。一度 `git config merge.ff only`（これはローカルリポジトリに設定を適用します）を実行すると、実行するすべてのマージがこのタイプであることが保証され、間違いを犯すことができません。
 
-There are a number of reasons for this decision and like all others, it is a
-tradeoff. The main advantage is the generally linear commit history. This
-greatly simplifies bisecting and makes the history and commit log much easier
-to follow and understand.
+この決定にはいくつかの理由があり、他のすべてと同様に、これはトレードオフです。主な利点は、一般的に線形のコミット履歴です。これにより、二分探索が大幅に簡素化され、履歴とコミットログがはるかに理解しやすくなります。
 
-## Tips for reviewing
+## レビューのためのヒント
 
-**NOTE**: This section is for *reviewing* PRs, not authoring them.
+**注意**：このセクションは PR を*レビューする*ためのものであり、作成するためのものではありません。
 
-### Hiding whitespace
+### 空白を非表示にする
 
-Github has a button for disabling whitespace changes that may be useful.
-You can also use `git diff -w origin/main` to view changes locally.
+GitHub には、空白の変更を無効にするボタンがあり、便利な場合があります。`git diff -w origin/main` を使用してローカルで変更を表示することもできます。
 
 ![hide whitespace](./img/github-whitespace-changes.png)
 
-### Fetching PRs
+### PR をフェッチする
 
-To checkout PRs locally, you can use `git fetch upstream pull/NNNNN/head && git checkout
-FETCH_HEAD`.
+PR をローカルでチェックアウトするには、`git fetch upstream pull/NNNNN/head && git checkout FETCH_HEAD` を使用できます。
 
-You can also use github's cli tool. Github shows a button on PRs where you can copy-paste the
-command to check it out locally. See <https://cli.github.com/> for more info.
+github の cli ツールも使用できます。Github は、ローカルでチェックアウトするためのコマンドをコピー＆ペーストできる PR のボタンを表示します。詳細については、<https://cli.github.com/> を参照してください。
 
 ![`gh` suggestion](./img/github-cli.png)
 
-### Moving large sections of code
+### 大きなコードセクションの移動
 
-Git and Github's default diff view for large moves *within* a file is quite poor; it will show each
-line as deleted and each line as added, forcing you to compare each line yourself. Git has an option
-to show moved lines in a different color:
+ファイル*内*での大きな移動に対する Git と Github のデフォルトの diff ビューはかなり貧弱です。各行が削除され、各行が追加されたものとして表示され、各行を自分で比較する必要があります。Git には、移動された行を別の色で表示するオプションがあります：
 
 ```console
 git log -p --color-moved=dimmed-zebra --color-moved-ws=allow-indentation-change
 ```
 
-See [the docs for `--color-moved`](https://git-scm.com/docs/git-diff#Documentation/git-diff.txt---color-movedltmodegt) for more info.
+詳細については、[`--color-moved` のドキュメント](https://git-scm.com/docs/git-diff#Documentation/git-diff.txt---color-movedltmodegt)を参照してください。
 
 ### range-diff
 
-See [the relevant section for PR authors](#git-range-diff). This can be useful for comparing code
-that was force-pushed to make sure there are no unexpected changes.
+[PR 作成者向けの関連セクション](#git-range-diff)を参照してください。これは、フォースプッシュされたコードを比較して、予期しない変更がないことを確認するのに役立ちます。
 
-### Ignoring changes to specific files
+### 特定のファイルへの変更を無視する
 
-Many large files in the repo are autogenerated. To view a diff that ignores changes to those files,
-you can use the following syntax (e.g. Cargo.lock):
+リポジトリ内の多くの大きなファイルは自動生成されます。それらのファイルへの変更を無視する diff を表示するには、次の構文を使用できます（例：Cargo.lock）：
 
 ```console
 git log -p ':!Cargo.lock'
 ```
 
-Arbitrary patterns are supported (e.g. `:!compiler/*`). Patterns use the same syntax as
-`.gitignore`, with `:` prepended to indicate a pattern.
+任意のパターンがサポートされています（例：`:!compiler/*`）。パターンは、`:` が先頭に付加されたパターンを示すために、`.gitignore` と同じ構文を使用します。
 
-## Git submodules
+## Git サブモジュール
 
-**NOTE**: submodules are a nice thing to know about, but it *isn't* an absolute
-prerequisite to contribute to `rustc`. If you are using Git for the first time,
-you might want to get used to the main concepts of Git before reading this section.
+**注意**：サブモジュールは知っておくと良いことですが、`rustc` に貢献するための絶対的な前提条件では*ありません*。Git を初めて使用する場合は、このセクションを読む前に Git の主要な概念に慣れたほうがよいかもしれません。
 
-The `rust-lang/rust` repository uses [Git submodules] as a way to use other
-Rust projects from within the `rust` repo. Examples include Rust's fork of
-`llvm-project`, `cargo`  and libraries like `stdarch` and `backtrace`.
+`rust-lang/rust` リポジトリは、`rust` リポジトリ内から他の Rust プロジェクトを使用する方法として [Git サブモジュール][Git submodules]を使用しています。例には、Rust の `llvm-project` のフォーク、`cargo`、および `stdarch` や `backtrace` などのライブラリが含まれます。
 
-Those projects are developed and maintained in an separate Git (and GitHub)
-repository, and they have their own Git history/commits, issue tracker and PRs.
-Submodules allow us to create some sort of embedded sub-repository inside the
-`rust` repository and use them like they were directories in the `rust` repository.
+これらのプロジェクトは、別個の Git（および GitHub）リポジトリで開発および保守され、独自の Git 履歴/コミット、issue トラッカー、PR を持っています。サブモジュールにより、`rust` リポジトリ内に埋め込まれたサブリポジトリのようなものを作成し、`rust` リポジトリ内のディレクトリのように使用できます。
 
-Take `llvm-project` for example. `llvm-project` is maintained in the [`rust-lang/llvm-project`]
-repository, but it is used in `rust-lang/rust` by the compiler for code generation and
-optimization. We bring it in `rust` as a submodule, in the `src/llvm-project` folder.
+例として `llvm-project` を取り上げます。`llvm-project` は [`rust-lang/llvm-project`] リポジトリで保守されていますが、コード生成と最適化のためにコンパイラによって `rust-lang/rust` で使用されます。これを `src/llvm-project` フォルダーのサブモジュールとして `rust` に取り込みます。
 
-The contents of submodules are ignored by Git: submodules are in some sense isolated
-from the rest of the repository. However, if you try to `cd src/llvm-project` and then
-run `git status`:
+サブモジュールの内容は Git によって無視されます：サブモジュールはある意味でリポジトリの残りの部分から分離されています。ただし、`cd src/llvm-project` を試してから `git status` を実行すると：
 
 ```console
 HEAD detached at 9567f08afc943
 nothing to commit, working tree clean
 ```
 
-As far as git is concerned, you are no longer in the `rust` repo, but in the `llvm-project` repo.
-You will notice that we are in "detached HEAD" state, i.e. not on a branch but on a
-particular commit.
+Git に関する限り、もはや `rust` リポジトリにいるのではなく、`llvm-project` リポジトリにいます。「detached HEAD」状態、つまりブランチではなく特定のコミットにいることに気付くでしょう。
 
-This is because, like any dependency, we want to be able to control which version to use.
-Submodules allow us to do just that: every submodule is "pinned" to a certain
-commit, which doesn't change unless modified manually. If you use `git checkout <commit>`
-in the `llvm-project` directory and go back to the `rust` directory, you can stage this
-change like any other, e.g. by running `git add src/llvm-project`. (Note that if
-you *don't* stage the change to commit, then you run the risk that running
-`x` will just undo your change by switching back to the previous commit when
-it automatically "updates" the submodules.)
+これは、他の依存関係と同様に、どのバージョンを使用するかを制御できるようにしたいためです。サブモジュールを使用すると、まさにそれができます：すべてのサブモジュールは特定のコミットに「固定」されており、手動で変更しない限り変更されません。`llvm-project` ディレクトリで `git checkout <commit>` を使用して `rust` ディレクトリに戻ると、`git add src/llvm-project` を実行するなどして、他の変更と同様にこの変更をステージできます。（変更をコミットにステージ*しない*場合、`x` を実行すると、サブモジュールを自動的に「更新」するときに前のコミットに戻ることで変更が元に戻されるリスクがあることに注意してください。）
 
-This version selection is usually done by the maintainers of the project, and
-looks like [this][llvm-update].
+このバージョン選択は通常、プロジェクトのメンテナーによって行われ、[このように][llvm-update]見えます。
 
-Git submodules take some time to get used to, so don't worry if it isn't perfectly
-clear yet. You will rarely have to use them directly and, again, you don't need
-to know everything about submodules to contribute to Rust. Just know that they
-exist and that they correspond to some sort of embedded subrepository dependency
-that Git can nicely and fairly conveniently handle for us.
+Git サブモジュールは慣れるまでに時間がかかるので、まだ完全に明確でなくても心配しないでください。サブモジュールを直接使用する必要があることはめったになく、繰り返しますが、Rust に貢献するためにサブモジュールについてすべてを知っている必要はありません。サブモジュールが存在し、Git が適切かつ公正に便利に処理できる、ある種の埋め込まれたサブリポジトリ依存関係に対応していることを知っておいてください。
 
-### Hard-resetting submodules
+### サブモジュールのハードリセット
 
-Sometimes you might run into (when you run `git status`)
+`git status` を実行すると、次のような状況に遭遇することがあります：
 
 ```console
 Changes not staged for commit:
@@ -586,7 +414,7 @@ Changes not staged for commit:
         modified:   src/llvm-project (new commits, modified content)
 ```
 
-and when you try to run `git submodule update` it breaks horribly with errors like
+`git submodule update` を実行しようとすると、次のようなエラーでひどく壊れます：
 
 ```console
 error: RPC failed; curl 92 HTTP/2 stream 7 was not closed cleanly: CANCEL (err 8)
@@ -597,55 +425,48 @@ fatal: fetch-pack: invalid index-pack output
 fatal: Fetched in submodule path 'src/llvm-project', but it did not contain 5a5152f653959d14d68613a3a8a033fb65eec021. Direct fetching of that commit failed.
 ```
 
-If you see `(new commits, modified content)` you can run
+`(new commits, modified content)` が表示される場合は、次を実行できます：
 
 ```console
 git submodule foreach git reset --hard
 ```
 
-and then try `git submodule update` again.
+その後、`git submodule update` を再度試してください。
 
-### Deinit git submodules
+### Git サブモジュールの deinit
 
-If that doesn't work, you can try to deinit all git submodules...
+それでもうまくいかない場合は、すべての Git サブモジュールを deinit してみることができます...
 
 ```console
 git submodule deinit -f --all
 ```
 
-Unfortunately sometimes your local git submodules configuration can become
-completely messed up for some reason.
+残念ながら、ローカルの Git サブモジュール構成が何らかの理由で完全に混乱することがあります。
 
-### Overcoming `fatal: not a git repository: <submodule>/../../.git/modules/<submodule>`
+### `fatal: not a git repository: <submodule>/../../.git/modules/<submodule>` の克服
 
-Sometimes, for some forsaken reason, you might run into
+何らかの理由で、次のような状況に遭遇することがあります：
 
 ```console
 fatal: not a git repository: src/gcc/../../.git/modules/src/gcc
 ```
 
-In this situation, for the given submodule path, i.e. `<submodule_path> =
-src/gcc` in this example, you need to:
+この状況では、指定されたサブモジュールパス、つまりこの例では `<submodule_path> = src/gcc` に対して、次のことを行う必要があります：
 
 1. `rm -rf <submodule_path>/.git`
 2. `rm -rf .git/modules/<submodule_path>/config`
-3. `rm -rf .gitconfig.lock` if somehow the `.gitconfig` lock is orphaned.
+3. 何らかの理由で `.gitconfig` ロックが孤立している場合は、`rm -rf .gitconfig.lock`
 
-Then do something like `./x fmt` to have bootstrap manage the submodule
-checkouts for you.
+その後、`./x fmt` のようなことを行って、bootstrap にサブモジュールのチェックアウトを管理させます。
 
-## Ignoring commits during `git blame`
+## `git blame` 中にコミットを無視する
 
-Some commits contain large reformatting changes that don't otherwise change functionality. They can
-be instructed to be ignored by `git blame` through
-[`.git-blame-ignore-revs`](https://github.com/rust-lang/rust/blob/HEAD/.git-blame-ignore-revs):
+機能を変更しない大規模な再フォーマット変更を含むコミットがいくつかあります。これらは、[`.git-blame-ignore-revs`](https://github.com/rust-lang/rust/blob/HEAD/.git-blame-ignore-revs)を介して `git blame` によって無視するように指示できます：
 
-1. Configure `git blame` to use `.git-blame-ignore-revs` as the list of commits to ignore: `git
-   config blame.ignorerevsfile .git-blame-ignore-revs`
-2. Add suitable commits that you wish to be ignored by `git blame`.
+1. 無視するコミットのリストとして `.git-blame-ignore-revs` を使用するように `git blame` を設定します：`git config blame.ignorerevsfile .git-blame-ignore-revs`
+2. `git blame` で無視したい適切なコミットを追加します。
 
-Please include a comment for the commit that you add to `.git-blame-ignore-revs` so people can
-easily figure out *why* a commit is ignored.
+`.git-blame-ignore-revs` に追加するコミットには、コミットが無視される*理由*を簡単に理解できるようにコメントを含めてください。
 
 [Git submodules]: https://git-scm.com/book/en/v2/Git-Tools-Submodules
 [`rust-lang/llvm-project`]: https://github.com/rust-lang/llvm-project

@@ -1,70 +1,69 @@
-# How Salsa works
+# Salsaの仕組み
 
-This chapter is based on the explanation given by Niko Matsakis in this
-[video](https://www.youtube.com/watch?v=_muY4HjSqVw) about
-[Salsa](https://github.com/salsa-rs/salsa). To find out more you may
-want to watch [Salsa In More
-Depth](https://www.youtube.com/watch?v=i_IhACacPRY), also by Niko
-Matsakis.
+この章は、Niko Matsakisによる
+[ビデオ](https://www.youtube.com/watch?v=_muY4HjSqVw)での
+[Salsa](https://github.com/salsa-rs/salsa)についての説明に基づいています。詳細については、
+Niko Matsakisによる[Salsa In More
+Depth](https://www.youtube.com/watch?v=i_IhACacPRY)も視聴してください。
 
-> As of <!-- date-check --> November 2022, although Salsa is inspired by (among
-> other things) rustc's query system, it is not used directly in rustc. It
-> _is_ used in [chalk], an implementation of  Rust's trait system, and
-> extensively in [`rust-analyzer`], the official implementation of the language
-> server protocol for Rust, but there are no  medium or long-term concrete
-> plans to integrate it into the compiler.
+> <!-- date-check --> 2022年11月時点では、Salsaは(他のものの中でも)rustcのクエリシステムに
+> 触発されていますが、rustcで直接使用されていません。
+> [chalk](Rustのトレイトシステムの実装)で*使用*され、
+> Rustの言語サーバープロトコルの公式実装である[`rust-analyzer`]で
+> 広範に使用されていますが、コンパイラに統合するための中期または長期の具体的な
+> 計画はありません。
 
 [`rust-analyzer`]: https://rust-analyzer.github.io/
 [chalk]: https://rust-lang.github.io/chalk/book/what_is_chalk.html
 
-## What is Salsa?
+## Salsaとは何ですか?
 
-Salsa is a library for incremental recomputation. This means it allows reusing
-computations that were already done in the past to increase the efficiency
-of future computations.
+Salsaは、インクリメンタル再計算のためのライブラリです。これは、
+将来の計算の効率を高めるために、過去に既に行われた計算を再利用できることを意味します。
 
-The objectives of Salsa are:
- * Provide that functionality in an automatic way, so reusing old computations
-   is done automatically by the library.
- * Doing so in a "sound", or "correct", way, therefore leading to the same
-   results as if it had been done from scratch.
+Salsaの目的は:
+ * その機能を自動的に提供すること。したがって、古い計算の再利用は
+   ライブラリによって自動的に行われます。
+ * これを「健全」または「正しい」方法で行うこと。したがって、
+   スクラッチから行われたかのように同じ結果につながります。
 
-Salsa's actual model is much richer, allowing many kinds of inputs and many different outputs.
-For example, integrating Salsa with an IDE could mean that
-the inputs could be manifests (`Cargo.toml`, `rust-toolchain.toml`), entire
-source files (`foo.rs`), snippets and so on. The outputs of such an integration
-could range from a binary executable, to lints, types (for example, if a user
-selects a certain variable and wishes to see its type), completions, etc.
+Salsaの実際のモデルははるかに豊かで、多くの種類の入力と多くの異なる出力を可能にします。
+たとえば、SalsaをIDEと統合すると、
+入力はマニフェスト(`Cargo.toml`、`rust-toolchain.toml`)、
+ソースファイル全体(`foo.rs`)、スニペットなどになる可能性があります。このような統合の
+出力は、バイナリ実行可能ファイルから、リント、型(たとえば、ユーザーが
+特定の変数を選択してその型を確認したい場合)、補完などにまで及ぶ可能性があります。
 
-## How does it work?
+## 仕組みは?
 
-The first thing that Salsa has to do is identify the "base inputs" that
-are not something computed but given as input.
+Salsaが最初に行う必要があるのは、計算されたものではなく、
+入力として与えられる「ベース入力」を識別することです。
 
-Then Salsa has to also identify intermediate, "derived" values, which are
-something that the library produces, but, for each derived value there's a
-"pure" function that computes the derived value.
+次に、Salsaは中間の「派生」値も識別する必要があります。これは
+ライブラリが生成するものですが、各派生値について、
+派生値を計算する「純粋な」関数があります。
 
-For example, there might be a function `ast(x: Path) -> AST`. The produced
-Abstract Syntax Tree (`AST`) isn't a final value, it's an intermediate value
-that the library would use for the computation.
+たとえば、`ast(x: Path) -> AST`という関数がある場合があります。生成された
+抽象構文木(`AST`)は最終的な値ではなく、ライブラリが
+計算に使用する中間値です。
 
-This means that when you try to compute with the library, Salsa is going to
-compute various derived values, and eventually read the input and produce the
-result for the asked computation.
+これは、ライブラリで計算しようとすると、Salsaが
+様々な派生値を計算し、最終的に入力を読み取って、要求された計算の
+結果を生成することを意味します。
 
-In the course of computing, Salsa tracks which inputs were accessed and which
-values are derived. This information is used to determine what's going to
-happen when the inputs change: are the derived values still valid?
+計算の過程で、Salsaは、どの入力がアクセスされたか、どの
+値が派生されたかを追跡します。この情報は、入力が変更されたときに何が
+起こるかを決定するために使用されます: 派生値はまだ有効ですか?
 
-This doesn't necessarily mean that each computation downstream from the input
-is going to be checked, which could be costly. Salsa only needs to check each
-downstream computation until it finds one that isn't changed. At that point, it
-won't check other derived computations since they wouldn't need to change.
+これは、入力からの各計算のダウンストリームが
+チェックされることを必ずしも意味しません。これはコストがかかる可能性があります。Salsaは、
+変更されていないものを見つけるまで、各ダウンストリーム計算をチェックするだけです。
+その時点で、それらは変更する必要がないため、他の派生計算を
+チェックしません。
 
-It's helpful to think about this as a graph with nodes. Each derived value
-has a dependency on other values, which could themselves be either base or
-derived. Base values don't have a dependency.
+これをノードを持つグラフとして考えると役立ちます。各派生値は
+他の値に依存しており、それら自体がベースまたは
+派生である可能性があります。ベース値には依存関係がありません。
 
 ```ignore
 I <- A <- C ...
@@ -72,71 +71,67 @@ I <- A <- C ...
 J <- B <--+
 ```
 
-When an input `I` changes, the derived value `A` could change. The derived
-value `B`, which does not depend on `I`, `A`, or any value derived from `A` or
-`I`, is not subject to change.  Therefore, Salsa can reuse the computation done
-for `B` in the past, without having to compute it again.
+入力`I`が変更されると、派生値`A`が変更される可能性があります。派生
+値`B`は、`I`、`A`、または`A`や
+`I`から派生した値に依存しないため、変更の対象にはなりません。したがって、Salsaは、
+再度計算することなく、過去に`B`に対して行った計算を再利用できます。
 
-The computation could also terminate early. Keeping the same graph as before,
-say that input `I` has changed in some way (and input `J` hasn't), but when
-computing `A` again, it's found that `A` hasn't changed from the previous
-computation. This leads to an "early termination", because there's no need to
-check if `C` needs to change, since both `C` direct inputs, `A` and `B`,
-haven't changed.
+計算は早期に終了することもできます。以前と同じグラフを維持し、
+入力`I`が何らかの方法で変更されたとします(入力`J`は変更されていません)が、
+`A`を再度計算すると、`A`が前回の計算から
+変更されていないことがわかります。これは「早期終了」につながります。`C`の両方の直接入力である`A`と`B`が
+変更されていないため、`C`が変更する必要があるかどうかをチェックする必要はないためです。
 
-## Key Salsa concepts
+## Salsaの主要な概念
 
-### Query
+### クエリ
 
-A query is some value that Salsa can access in the course of computation.  Each
-query can have a number of keys (from 0 to many), and all queries have a
-result, akin to functions.  `0-key` queries are called "input" queries.
+クエリは、Salsaが計算の過程でアクセスできる何らかの値です。各
+クエリには、いくつかのキー(0から多数まで)を持つことができ、すべてのクエリには
+結果があり、関数に似ています。`0-key`クエリは「入力」クエリと呼ばれます。
 
-### Database
+### データベース
 
-The database is basically the context for the entire computation, it's meant to
-store Salsa's internal state, all intermediate values for each query, and
-anything else that the computation might need. The database must know all the
-queries the library is going to do before it can be built, but they don't need
-to be specified in the same place.
+データベースは基本的に、計算全体のコンテキストです。Salsaの内部状態、
+各クエリのすべての中間値、計算が必要とするその他のものを保存することを目的としています。
+データベースは、ライブラリが実行するすべてのクエリを
+構築される前に知っている必要がありますが、同じ場所で指定する必要はありません。
 
-After the database is formed, it can be accessed with queries that are very
-similar to functions. Since each query's result is stored in the database, when
-a query is invoked `N`-times, it will return `N`-**cloned** results, without having
-to recompute the query (unless the input has changed in such a way that it
-warrants recomputation).
+データベースが形成されると、関数に非常に
+類似したクエリでアクセスできます。各クエリの結果はデータベースに保存されるため、
+クエリが`N`回呼び出されると、入力がそのような方法で変更されて
+再計算が必要にならない限り、再計算することなく、`N`個の**クローン**された結果を返します。
 
-For each input query (`0-key`), a "set" method is generated, allowing the user to
-change the output of such query, and trigger previous memoized values to be
-potentially invalidated.
+各入力クエリ(`0-key`)に対して、「set」メソッドが生成され、ユーザーが
+そのようなクエリの出力を変更し、以前にメモ化された値が
+無効化される可能性があることをトリガーできます。
 
-### Query Groups
+### クエリグループ
 
-A query group is a set of queries which have been defined together as a unit.
-The database is formed by combining query groups. Query groups are akin to
-"Salsa modules".
+クエリグループは、ユニットとして一緒に定義されたクエリのセットです。
+データベースは、クエリグループを組み合わせることによって形成されます。クエリグループは、
+「Salsaモジュール」に似ています。
 
-A set of queries in a query group are just a set of methods in a trait.
+クエリグループ内のクエリのセットは、トレート内のメソッドのセットです。
 
-To create a query group a trait annotated with a specific attribute
-(`#[salsa::query_group(...)]`) has to be created.
+クエリグループを作成するには、特定の属性
+(`#[salsa::query_group(...)]`)で注釈が付けられたトレートを作成する必要があります。
 
-An argument must also be provided to said attribute as it will be used by Salsa
-to create a `struct` to be used later when the database is created.
+また、引数を前記属性に提供する必要があります。これは、Salsaが
+データベースが作成されるときに後で使用される`struct`を作成するために使用されるためです。
 
-Example input query group:
+入力クエリグループの例:
 
 ```rust,ignore
-/// This attribute will process this tree, produce this tree as output, and produce
-/// a bunch of intermediate stuff that Salsa also uses. One of these things is a
-/// "StorageStruct", whose name we have specified in the attribute.
+/// この属性は、このツリーを処理し、このツリーを出力として生成し、Salsaも使用する
+/// 中間的なものの束を生成します。これらのうちの1つは
+/// 「StorageStruct」で、その名前を属性で指定しました。
 ///
-/// This query group is a bunch of **input** queries, that do not rely on any
-/// derived input.
+/// このクエリグループは、派生入力に依存しない**入力**クエリの束です。
 #[salsa::query_group(InputsStorage)]
 pub trait Inputs {
-    /// This attribute (`#[salsa::input]`) indicates that this query is a base
-    /// input, therefore `set_manifest` is going to be auto-generated
+    /// この属性(`#[salsa::input]`)は、このクエリがベース
+    /// 入力であることを示すため、`set_manifest`が自動生成されます
     #[salsa::input]
     fn manifest(&self) -> Manifest;
 
@@ -145,60 +140,60 @@ pub trait Inputs {
 }
 ```
 
-To create a **derived** query group, one must specify which other query groups
-this one depends on by specifying them as supertraits, as seen in the following
-example:
+**派生**クエリグループを作成するには、このグループが依存する他のクエリグループを
+スーパートレートとして指定することによって指定する必要があります。次の
+例を参照してください:
 
 ```rust,ignore
-/// This query group is going to contain queries that depend on derived values.
-/// A query group can access another query group's queries by specifying the
-/// dependency as a supertrait. Query groups can be stacked as much as needed using
-/// that pattern.
+/// このクエリグループには、派生値に依存するクエリが含まれます。
+/// クエリグループは、
+/// 依存関係をスーパートレートとして指定することによって、別のクエリグループのクエリにアクセスできます。
+/// クエリグループは、そのパターンを使用して必要なだけスタックできます。
 #[salsa::query_group(ParserStorage)]
 pub trait Parser: Inputs {
-    /// This query `ast` is not an input query, it's a derived query this means
-    /// that a definition is necessary.
+    /// このクエリ`ast`は入力クエリではなく、派生クエリです。これは
+    /// 定義が必要であることを意味します。
     fn ast(&self, name: String) -> String;
 }
 ```
 
-When creating a derived query the implementation of said query must be defined
-outside the trait.  The definition must take a database parameter as an `impl
-Trait` (or `dyn Trait`), where trait is the query group that the definition
-belongs to, in addition to the other keys.
+派生クエリを作成するときは、そのクエリの実装を
+トレートの外部で定義する必要があります。定義は、他のキーに加えて、
+`impl Trait`(または`dyn Trait`)としてデータベースパラメーターを取る必要があります。ここで、トレートは、
+定義が属するクエリグループです。
 
 ```rust,ignore
-/// This is going to be the definition of the `ast` query in the `Parser` trait.
-/// So, when the query `ast` is invoked, and it needs to be recomputed, Salsa is
-/// going to call this function and it's going to give it the database as `impl
-/// Parser`. The function doesn't need to be aware of all the queries of all the
-/// query groups
+/// これは、`Parser`トレートの`ast`クエリの定義になります。
+/// したがって、クエリ`ast`が呼び出され、再計算する必要がある場合、Salsaは
+/// この関数を呼び出し、データベースを`impl
+/// Parser`として与えます。この関数は、すべてのクエリグループのすべてのクエリを
+/// 認識している必要はありません
 fn ast(db: &impl Parser, name: String) -> String {
-    //! Note, `impl Parser` is used here but `dyn Parser` works just as well
+    //! 注意、`impl Parser`はここで使用されていますが、`dyn Parser`も同様に機能します
     /* code */
-    ///By passing an `impl Parser`, this is allowed
+    ///`impl Parser`を渡すことで、これが許可されます
     let source_text = db.input_file(name);
     /* do the actual parsing */
     return ast;
 }
 ```
 
-Eventually, after all the query groups have been defined, the database can be
-created by declaring a `struct`.
+最終的に、すべてのクエリグループが定義された後、
+`struct`を宣言することによってデータベースを作成できます。
 
-To specify which query groups are going to be part of the database an `attribute`
-(`#[salsa::database(...)]`) must be added. The argument of said `attribute` is a
-list of `identifiers`, specifying the query groups **storages**.
+データベースの一部になるクエリグループを指定するには、`attribute`
+(`#[salsa::database(...)]`)を追加する必要があります。前記`attribute`の引数は、
+クエリグループ**ストレージ**を指定する`identifier`のリストです。
 
 ```rust,ignore
-///This attribute specifies which query groups are going to be in the database
+///この属性は、データベースに含まれるクエリグループを指定します
 #[salsa::database(InputsStorage, ParserStorage)]
 #[derive(Default)] //optional!
 struct MyDatabase {
-    ///You also need this one field
+    ///このフィールドも必要です
     runtime : salsa::Runtime<MyDatabase>,
 }
-///And this trait has to be implemented
+///このトレートを実装する必要があります
 impl salsa::Database for MyDatabase {
     fn salsa_runtime(&self) -> &salsa::Runtime<MyDatabase> {
         &self.runtime
@@ -206,7 +201,7 @@ impl salsa::Database for MyDatabase {
 }
 ```
 
-Example usage:
+使用例:
 
 ```rust,ignore
 fn main() {

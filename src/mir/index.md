@@ -1,63 +1,39 @@
-# The MIR (Mid-level IR)
+# MIR（中レベルIR）
 
-MIR is Rust's _Mid-level Intermediate Representation_. It is
-constructed from [HIR](../hir.html). MIR was introduced in
-[RFC 1211]. It is a radically simplified form of Rust that is used for
-certain flow-sensitive safety checks – notably the borrow checker! –
-and also for optimization and code generation.
+MIRは、Rustの_中レベル中間表現_です。これは[HIR](../hir.html)から構築されます。MIRは[RFC 1211]で導入されました。これは、特定のフロー依存の安全性チェック（特に借用チェッカー！）、および最適化とコード生成に使用される、Rustの根本的に簡略化された形式です。
 
-If you'd like a very high-level introduction to MIR, as well as some
-of the compiler concepts that it relies on (such as control-flow
-graphs and desugaring), you may enjoy the
-[rust-lang blog post that introduced MIR][blog].
+MIRへの非常に高レベルの入門、および制御フローグラフや脱糖のようなそれが依存するコンパイラの概念に興味がある場合は、[MIRを紹介したrust-langブログ記事][blog]を楽しめるかもしれません。
 
 [blog]: https://blog.rust-lang.org/2016/04/19/MIR.html
 
-## Introduction to MIR
+## MIRの紹介
 
-MIR is defined in the [`compiler/rustc_middle/src/mir/`][mir] module, but much of the code
-that manipulates it is found in [`compiler/rustc_mir_build`][mirmanip_build],
-[`compiler/rustc_mir_transform`][mirmanip_transform], and
-[`compiler/rustc_mir_dataflow`][mirmanip_dataflow].
+MIRは[`compiler/rustc_middle/src/mir/`][mir]モジュールで定義されていますが、それを操作するコードの多くは[`compiler/rustc_mir_build`][mirmanip_build]、[`compiler/rustc_mir_transform`][mirmanip_transform]、および[`compiler/rustc_mir_dataflow`][mirmanip_dataflow]にあります。
 
 [RFC 1211]: https://rust-lang.github.io/rfcs/1211-mir.html
 
-Some of the key characteristics of MIR are:
+MIRの主要な特性のいくつかは次のとおりです：
 
-- It is based on a [control-flow graph][cfg].
-- It does not have nested expressions.
-- All types in MIR are fully explicit.
+- [制御フローグラフ][cfg]に基づいています。
+- ネストされた式はありません。
+- MIRのすべての型は完全に明示的です。
 
 [cfg]: ../appendix/background.html#cfg
 
-## Key MIR vocabulary
+## MIRの主要な用語
 
-This section introduces the key concepts of MIR, summarized here:
+このセクションでは、MIRの主要な概念を紹介します。ここにまとめます：
 
-- **Basic blocks**: units of the control-flow graph, consisting of:
-  - **statements:** actions with one successor
-  - **terminators:** actions with potentially multiple successors; always at
-    the end of a block
-  - (if you're not familiar with the term *basic block*, see the [background
-    chapter][cfg])
-- **Locals:** Memory locations allocated on the stack (conceptually, at
-  least), such as function arguments, local variables, and
-  temporaries. These are identified by an index, written with a
-  leading underscore, like `_1`. There is also a special "local"
-  (`_0`) allocated to store the return value.
-- **Places:** expressions that identify a location in memory, like `_1` or
-  `_1.f`.
-- **Rvalues:** expressions that produce a value. The "R" stands for
-  the fact that these are the "right-hand side" of an assignment.
-  - **Operands:** the arguments to an rvalue, which can either be a
-    constant (like `22`) or a place (like `_1`).
+- **基本ブロック**：制御フローグラフの単位で、次のもので構成されます：
+  - **ステートメント：** 1つの後続を持つアクション
+  - **ターミネータ：** 潜在的に複数の後続を持つアクション。常にブロックの最後にあります
+  - （*基本ブロック*という用語に慣れていない場合は、[背景の章][cfg]を参照してください）
+- **ローカル：** （少なくとも概念的には）スタックに割り当てられたメモリ位置、関数引数、ローカル変数、一時変数など。これらは、`_1`のように、先頭にアンダースコアが付いたインデックスで識別されます。戻り値を格納するために割り当てられた特別な「ローカル」（`_0`）もあります。
+- **場所：** `_1`や`_1.f`のような、メモリ内の場所を識別する式。
+- **Rvalue：** 値を生成する式。「R」は、これらが代入の「右辺」であることを表します。
+  - **オペランド：** rvalueの引数で、定数（`22`など）または場所（`_1`など）のいずれかです。
 
-You can get a feeling for how MIR is constructed by translating simple
-programs into MIR and reading the pretty printed output. In fact, the
-playground makes this easy, since it supplies a MIR button that will
-show you the MIR for your program. Try putting this program into play
-(or [clicking on this link][sample-play]), and then clicking the "MIR"
-button on the top:
+簡単なプログラムをMIRに変換し、きれいに印刷された出力を読むことで、MIRがどのように構築されるかを感じることができます。実際、プレイグラウンドはMIRボタンを提供しているため、これは簡単です。このプログラムをプレイに入れて（または[このリンクをクリック][sample-play]）、上部の「MIR」ボタンをクリックしてみてください：
 
 [sample-play]: https://play.rust-lang.org/?gist=30074856e62e74e91f06abd19bd72ece&version=stable&edition=2021
 
@@ -69,7 +45,7 @@ fn main() {
 }
 ```
 
-You should see something like:
+次のようなものが表示されるはずです：
 
 ```mir
 // WARNING: This output format is intended for human consumers only
@@ -79,16 +55,10 @@ fn main() -> () {
 }
 ```
 
-This is the MIR format for the `main` function.
-MIR shown by above link is optimized.
-Some statements like `StorageLive` are removed in optimization.
-This happens because the compiler notices the value is never accessed in the code.
-We can use `rustc [filename].rs -Z mir-opt-level=0 --emit mir` to view unoptimized MIR.
-This requires the nightly toolchain.
+これは`main`関数のMIR形式です。上記のリンクで示されるMIRは最適化されています。`StorageLive`のような一部のステートメントは、最適化で削除されます。これは、コンパイラが値がコード内でアクセスされないことに気付いたために発生します。最適化されていないMIRを表示するには、`rustc [filename].rs -Z mir-opt-level=0 --emit mir`を使用できます。これにはnightlyツールチェーンが必要です。
 
 
-**Variable declarations.** If we drill in a bit, we'll see it begins
-with a bunch of variable declarations. They look like this:
+**変数宣言。** 少し掘り下げると、変数宣言の束から始まっていることがわかります。それらは次のようになります：
 
 ```mir
 let mut _0: ();                      // return place
@@ -99,33 +69,19 @@ let mut _4: ();
 let mut _5: &mut std::vec::Vec<i32>;
 ```
 
-You can see that variables in MIR don't have names, they have indices,
-like `_0` or `_1`.  We also intermingle the user's variables (e.g.,
-`_1`) with temporary values (e.g., `_2` or `_3`). You can tell apart
-user-defined variables because they have debuginfo associated to them (see below).
+MIRの変数には名前がなく、`_0`や`_1`のようなインデックスがあることがわかります。また、ユーザーの変数（例：`_1`）と一時値（例：`_2`または`_3`）を混在させています。ユーザー定義変数は、それらに関連付けられたデバッグ情報があるため、区別できます（以下を参照）。
 
-**User variable debuginfo.** Below the variable declarations, we find the only
-hint that `_1` represents a user variable:
+**ユーザー変数のデバッグ情報。** 変数宣言の下に、`_1`がユーザー変数を表すことを示す唯一のヒントがあります：
 ```mir
 scope 1 {
     debug vec => _1;                 // in scope 1 at src/main.rs:2:9: 2:16
 }
 ```
-Each `debug <Name> => <Place>;` annotation describes a named user variable,
-and where (i.e. the place) a debugger can find the data of that variable.
-Here the mapping is trivial, but optimizations may complicate the place,
-or lead to multiple user variables sharing the same place.
-Additionally, closure captures are described using the same system, and so
-they're complicated even without optimizations, e.g.: `debug x => (*((*_1).0: &T));`.
+各`debug <Name> => <Place>;`アノテーションは、名前付きユーザー変数と、デバッガがその変数のデータを見つける場所（つまり、場所）を記述します。ここではマッピングは自明ですが、最適化により場所が複雑になったり、複数のユーザー変数が同じ場所を共有したりする可能性があります。さらに、クロージャキャプチャは同じシステムを使用して記述されるため、最適化がなくても複雑です。例：`debug x => (*((*_1).0: &T));`。
 
-The "scope" blocks (e.g., `scope 1 { .. }`) describe the lexical structure of
-the source program (which names were in scope when), so any part of the program
-annotated with `// in scope 0` would be missing `vec`, if you were stepping
-through the code in a debugger, for example.
+「スコープ」ブロック（例：`scope 1 { .. }`）は、ソースプログラムの字句構造（どの名前がいつスコープ内にあったか）を記述します。そのため、例えば、デバッガでコードをステップ実行している場合、`// in scope 0`でアノテーションされたプログラムの任意の部分には`vec`が欠けています。
 
-**Basic blocks.** Reading further, we see our first **basic block** (naturally
-it may look slightly different when you view it, and I am ignoring some of the
-comments):
+**基本ブロック。** さらに読むと、最初の**基本ブロック**が表示されます（当然、表示すると少し異なる場合があり、一部のコメントは無視しています）：
 
 ```mir
 bb0: {
@@ -134,33 +90,23 @@ bb0: {
 }
 ```
 
-A basic block is defined by a series of **statements** and a final
-**terminator**.  In this case, there is one statement:
+基本ブロックは、一連の**ステートメント**と最終的な**ターミネータ**によって定義されます。この場合、1つのステートメントがあります：
 
 ```mir
 StorageLive(_1);
 ```
 
-This statement indicates that the variable `_1` is "live", meaning
-that it may be used later – this will persist until we encounter a
-`StorageDead(_1)` statement, which indicates that the variable `_1` is
-done being used. These "storage statements" are used by LLVM to
-allocate stack space.
+このステートメントは、変数`_1`が「生きている」ことを示します。つまり、後で使用される可能性があることを意味します。これは、`StorageDead(_1)`ステートメントに遭遇するまで持続します。これは、変数`_1`の使用が終了したことを示します。これらの「ストレージステートメント」は、LLVMがスタック領域を割り当てるために使用されます。
 
-The **terminator** of the block `bb0` is the call to `Vec::new`:
+ブロック`bb0`の**ターミネータ**は、`Vec::new`への呼び出しです：
 
 ```mir
 _1 = const <std::vec::Vec<T>>::new() -> bb2;
 ```
 
-Terminators are different from statements because they can have more
-than one successor – that is, control may flow to different
-places. Function calls like the call to `Vec::new` are always
-terminators because of the possibility of unwinding, although in the
-case of `Vec::new` we are able to see that indeed unwinding is not
-possible, and hence we list only one successor block, `bb2`.
+ターミネータは、複数の後続を持つ可能性があるため、ステートメントとは異なります。つまり、制御が異なる場所に流れる可能性があります。`Vec::new`のような関数呼び出しは、アンワインドの可能性があるため、常にターミネータです。ただし、`Vec::new`の場合、アンワインドは実際には不可能であることがわかるため、後続ブロックは`bb2`の1つだけをリストします。
 
-If we look ahead to `bb2`, we will see it looks like this:
+`bb2`を先読みすると、次のようになります：
 
 ```mir
 bb2: {
@@ -170,24 +116,19 @@ bb2: {
 }
 ```
 
-Here there are two statements: another `StorageLive`, introducing the `_3`
-temporary, and then an assignment:
+ここには2つのステートメントがあります：もう1つの`StorageLive`で、`_3`一時変数を導入し、次に代入：
 
 ```mir
 _3 = &mut _1;
 ```
 
-Assignments in general have the form:
+代入は一般に次の形式です：
 
 ```text
 <Place> = <Rvalue>
 ```
 
-A place is an expression like `_3`, `_3.f` or `*_3` – it denotes a
-location in memory.  An **Rvalue** is an expression that creates a
-value: in this case, the rvalue is a mutable borrow expression, which
-looks like `&mut <Place>`. So we can kind of define a grammar for
-rvalues like so:
+場所は、`_3`、`_3.f`、または`*_3`のような式です。メモリ内の場所を示します。**Rvalue**は値を作成する式です：この場合、rvalueは可変借用式で、`&mut <Place>`のようになります。したがって、次のようなrvalueの文法を定義できます：
 
 ```text
 <Rvalue>  = & (mut)? <Place>
@@ -200,134 +141,68 @@ rvalues like so:
           | move Place
 ```
 
-As you can see from this grammar, rvalues cannot be nested – they can
-only reference places and constants. Moreover, when you use a place,
-we indicate whether we are **copying it** (which requires that the
-place have a type `T` where `T: Copy`) or **moving it** (which works
-for a place of any type). So, for example, if we had the expression `x
-= a + b + c` in Rust, that would get compiled to two statements and a
-temporary:
+この文法からわかるように、rvalueはネストできません。場所と定数のみを参照できます。さらに、場所を使用する場合、それを**コピー**しているか（場所が型`T`を持ち、`T: Copy`である必要があります）、**移動**しているか（任意の型の場所で機能します）を示します。したがって、例えば、Rustに`x = a + b + c`という式があった場合、それは2つのステートメントと1つの一時変数にコンパイルされます：
 
 ```mir
 TMP1 = a + b
 x = TMP1 + c
 ```
 
-([Try it and see][play-abc], though you may want to do release mode to skip
-over the overflow checks.)
+（[試してみてください][play-abc]が、オーバーフローチェックをスキップするにはリリースモードにしたいかもしれません。）
 
 [play-abc]: https://play.rust-lang.org/?gist=1751196d63b2a71f8208119e59d8a5b6&version=stable
 
-## MIR data types
+## MIRデータ型
 
-The MIR data types are defined in the [`compiler/rustc_middle/src/mir/`][mir]
-module. Each of the key concepts mentioned in the previous section
-maps in a fairly straightforward way to a Rust type.
+MIRデータ型は、[`compiler/rustc_middle/src/mir/`][mir]モジュールで定義されています。前のセクションで言及された各主要概念は、かなり直接的な方法でRustの型にマップされます。
 
-The main MIR data type is [`Body`]. It contains the data for a single
-function (along with sub-instances of Mir for "promoted constants",
-but [you can read about those below](#promoted)).
+主要なMIRデータ型は[`Body`]です。これには、単一の関数のデータが含まれています（「昇格された定数」のMirのサブインスタンスとともに、[それらについては以下で読むことができます](#promoted)）。
 
-- **Basic blocks**: The basic blocks are stored in the field
-  [`Body::basic_blocks`][basicblocks]; this is a vector
-  of [`BasicBlockData`] structures. Nobody ever references a
-  basic block directly: instead, we pass around [`BasicBlock`]
-  values, which are [newtype'd] indices into this vector.
-- **Statements** are represented by the type [`Statement`].
-- **Terminators** are represented by the [`Terminator`].
-- **Locals** are represented by a [newtype'd] index type [`Local`].
-  The data for a local variable is found in the
-  [`Body::local_decls`][localdecls] vector. There is also a special constant
-  [`RETURN_PLACE`] identifying the special "local" representing the return value.
-- **Places** are identified by the struct [`Place`]. There are a few
-  fields:
-  - Local variables like `_1`
-  - **Projections**, which are fields or other things that "project
-    out" from a base place. These are represented by the [newtype'd] type
-    [`ProjectionElem`]. So e.g. the place `_1.f` is a projection,
-    with `f` being the "projection element" and `_1` being the base
-    path. `*_1` is also a projection, with the `*` being represented
-    by the [`ProjectionElem::Deref`] element.
-- **Rvalues** are represented by the enum [`Rvalue`].
-- **Operands** are represented by the enum [`Operand`].
+- **基本ブロック**：基本ブロックは、フィールド[`Body::basic_blocks`][basicblocks]に格納されています。これは、[`BasicBlockData`]構造体のベクターです。誰も直接基本ブロックを参照しません：代わりに、このベクトルへの[newtype化][newtype'd]インデックスである[`BasicBlock`]値を渡します。
+- **ステートメント**は、型[`Statement`]によって表されます。
+- **ターミネータ**は、[`Terminator`]によって表されます。
+- **ローカル**は、[newtype化][newtype'd]インデックス型[`Local`]によって表されます。ローカル変数のデータは、[`Body::local_decls`][localdecls]ベクトルにあります。また、戻り値を表す特別な「ローカル」を識別する特別な定数[`RETURN_PLACE`]もあります。
+- **場所**は、構造体[`Place`]によって識別されます。いくつかのフィールドがあります：
+  - `_1`のようなローカル変数
+  - **プロジェクション**。これは、基本場所から「投影される」フィールドやその他のものです。これらは、[newtype化][newtype'd]型[`ProjectionElem`]によって表されます。したがって、例えば、場所`_1.f`はプロジェクションで、`f`が「プロジェクション要素」であり、`_1`が基本パスです。`*_1`もプロジェクションで、`*`は[`ProjectionElem::Deref`]要素で表されます。
+- **Rvalue**は、列挙型[`Rvalue`]によって表されます。
+- **オペランド**は、列挙型[`Operand`]によって表されます。
 
-## Representing constants
+## 定数の表現
 
-When code has reached the MIR stage, constants can generally come in two forms:
-*MIR constants* ([`mir::Constant`]) and *type system constants* ([`ty::Const`]).
-MIR constants are used as operands: in `x + CONST`, `CONST` is a MIR constant;
-similarly, in `x + 2`, `2` is a MIR constant. Type system constants are used in
-the type system, in particular for array lengths but also for const generics.
+コードがMIR段階に達すると、定数は一般に2つの形式で提供されます：*MIR定数*（[`mir::Constant`]）と*型システム定数*（[`ty::Const`]）。MIR定数はオペランドとして使用されます：`x + CONST`では、`CONST`はMIR定数です。同様に、`x + 2`では、`2`はMIR定数です。型システム定数は型システムで使用され、特に配列長に使用されますが、const genericsにも使用されます。
 
-Generally, both kinds of constants can be "unevaluated" or "already evaluated".
-An unevaluated constant simply stores the `DefId` of what needs to be evaluated
-to compute this result. An evaluated constant (a "value") has already been
-computed; their representation differs between type system constants and MIR
-constants: MIR constants evaluate to a `mir::ConstValue`; type system constants
-evaluate to a `ty::ValTree`.
+一般に、両方の種類の定数は「未評価」または「すでに評価済み」である可能性があります。未評価定数は、この結果を計算するために評価する必要があるものの`DefId`を単に格納します。評価済み定数（「値」）はすでに計算されています。それらの表現は、型システム定数とMIR定数で異なります：MIR定数は`mir::ConstValue`に評価されます。型システム定数は`ty::ValTree`に評価されます。
 
-Type system constants have some more variants to support const generics: they
-can refer to local const generic parameters, and they are subject to inference.
-Furthermore, the `mir::Constant::Ty` variant lets us use an arbitrary type
-system constant as a MIR constant; this happens whenever a const generic
-parameter is used as an operand.
+型システム定数には、const genericsをサポートするためのいくつかのバリアントがあります：ローカルconst genericsパラメータを参照でき、推論の対象となります。さらに、`mir::Constant::Ty`バリアントを使用すると、任意の型システム定数をMIR定数として使用できます。これは、const genericsパラメータがオペランドとして使用されるときはいつでも発生します。
 
-### MIR constant values
+### MIR定数値
 
-In general, a MIR constant value (`mir::ConstValue`) was computed by evaluating
-some constant the user wrote. This [const evaluation](../const-eval.md) produces
-a very low-level representation of the result in terms of individual bytes. We
-call this an "indirect" constant (`mir::ConstValue::Indirect`) since the value
-is stored in-memory.
+一般に、MIR定数値（`mir::ConstValue`）は、ユーザーが書いた定数を評価することによって計算されました。この[const評価](../const-eval.md)は、個々のバイトの観点から非常に低レベルの結果表現を生成します。これを「間接」定数（`mir::ConstValue::Indirect`）と呼びます。値はメモリ内に格納されているためです。
 
-However, storing everything in-memory would be awfully inefficient. Hence there
-are some other variants in `mir::ConstValue` that can represent certain simple
-and common values more efficiently. In particular, everything that can be
-directly written as a literal in Rust (integers, floats, chars, bools, but also
-`"string literals"` and `b"byte string literals"`) has an optimized variant that
-avoids the full overhead of the in-memory representation.
+ただし、すべてをメモリ内に格納すると、非常に非効率的です。したがって、`mir::ConstValue`には、特定の単純で一般的な値をより効率的に表すことができるいくつかの他のバリアントがあります。特に、Rustでリテラルとして直接記述できるすべてのもの（整数、浮動小数点数、文字、ブール値、だけでなく`"string literals"`および`b"byte string literals"`）には、メモリ内表現の完全なオーバーヘッドを回避する最適化されたバリアントがあります。
 
-### ValTrees
+### ValTree
 
-An evaluated type system constant is a "valtree". The `ty::ValTree` datastructure
-allows us to represent
+評価済み型システム定数は「valtree」です。`ty::ValTree`データ構造により、次のものを表現できます。
 
-* arrays,
-* many structs,
-* tuples,
-* enums and,
-* most primitives.
+* 配列、
+* 多くの構造体、
+* タプル、
+* 列挙型、および
+* ほとんどのプリミティブ。
 
-The most important rule for
-this representation is that every value must be uniquely represented. In other
-words: a specific value must only be representable in one specific way. For example: there is only
-one way to represent an array of two integers as a `ValTree`:
-`Branch([Leaf(first_int), Leaf(second_int)])`.
-Even though theoretically a `[u32; 2]` could be encoded in a `u64` and thus just be a
-`Leaf(bits_of_two_u32)`, that is not a legal construction of `ValTree`
-(and is very complex to do, so it is unlikely anyone is tempted to do so).
+この表現の最も重要なルールは、すべての値が一意に表現される必要があることです。言い換えれば：特定の値は、1つの特定の方法でのみ表現可能である必要があります。例えば：2つの整数の配列を`ValTree`として表現する方法は1つだけです：`Branch([Leaf(first_int), Leaf(second_int)])`。理論的には`[u32; 2]`は`u64`にエンコードできるため、単に`Leaf(bits_of_two_u32)`になる可能性がありますが、それは`ValTree`の合法的な構築ではありません（そして、そうすることは非常に複雑なので、誰もがそうしたくなる可能性は低いです）。
 
-These rules also mean that some values are not representable. There can be no `union`s in type
-level constants, as it is not clear how they should be represented, because their active variant
-is unknown. Similarly there is no way to represent raw pointers, as addresses are unknown at
-compile-time and thus we cannot make any assumptions about them. References on the other hand
-*can* be represented, as equality for references is defined as equality on their value, so we
-ignore their address and just look at the backing value. We must make sure that the pointer values
-of the references are not observable at compile time. We thus encode `&42` exactly like `42`.
-Any conversion from
-valtree back to a MIR constant value must reintroduce an actual indirection. At codegen time the
-addresses may be deduplicated between multiple uses or not, entirely depending on arbitrary
-optimization choices.
+これらのルールは、一部の値が表現可能でないことも意味します。型レベルの定数には`union`を含めることはできません。アクティブなバリアントが不明であるため、どのように表現すべきかが明確ではないからです。同様に、生のポインタを表現する方法はありません。アドレスはコンパイル時に不明であり、それらについて仮定を立てることはできないためです。一方、参照は表現*できます*。参照の等価性はその値の等価性として定義されるため、アドレスを無視して、バッキング値だけを見ます。参照のポインタ値がコンパイル時に観察可能でないことを確認する必要があります。したがって、`&42`は`42`とまったく同じようにエンコードします。valtreeからMIR定数値への変換は、実際の間接参照を再導入する必要があります。コード生成時、アドレスは複数の使用間で重複排除される場合とされない場合があり、完全に任意の最適化の選択に依存します。
 
-As a consequence, all decoding of `ValTree` must happen by matching on the type first and making
-decisions depending on that. The value itself gives no useful information without the type that
-belongs to it.
+結果として、`ValTree`のすべてのデコードは、最初に型をマッチングし、それに依存して決定を下すことによって行われる必要があります。値自体は、それに属する型なしでは有用な情報を提供しません。
 
 <a id="promoted"></a>
 
-### Promoted constants
+### 昇格された定数
 
-See the const-eval WG's [docs on promotion](https://github.com/rust-lang/const-eval/blob/master/promotion.md).
+const-eval WGの[昇格に関するドキュメント](https://github.com/rust-lang/const-eval/blob/master/promotion.md)を参照してください。
 
 
 [mir]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/mir/index.html

@@ -1,85 +1,87 @@
 # [`CoerceUnsized`](https://doc.rust-lang.org/std/ops/trait.CoerceUnsized.html)
 
-`CoerceUnsized` is primarily concerned with data containers. When a struct
-(typically, a smart pointer) implements `CoerceUnsized`, that means that the
-data it points to is being unsized.
+`CoerceUnsized` は主にデータコンテナに関係しています。構造体
+（通常はスマートポインタ）が `CoerceUnsized` を実装する場合、それは
+それが指すデータがアンサイズされていることを意味します。
 
-Some implementors of `CoerceUnsized` include:
+`CoerceUnsized` の実装者には次のものがあります：
 * `&T`
 * `Arc<T>`
 * `Box<T>`
 
-This trait is (eventually) intended to be implemented by user-written smart
-pointers, and there are rules about when a type is allowed to implement
-`CoerceUnsized` that are explained in the trait's documentation.
+このトレイトは（最終的に）ユーザーが書いたスマートポインタによって
+実装されることを意図しており、型が `CoerceUnsized` を実装することが
+許可される場合についての規則があります。これらはトレイトのドキュメントで
+説明されています。
 
 # [`Unsize`](https://doc.rust-lang.org/std/marker/trait.Unsize.html)
 
-To contrast, the `Unsize` trait is concerned the actual types that are allowed
-to be unsized.
+対照的に、`Unsize` トレイトは、アンサイズされることが許可される実際の型に
+関係しています。
 
-This is not intended to be implemented by users ever, since `Unsize` does not
-instruct the compiler (namely codegen) *how* to unsize a type, just whether it
-is allowed to be unsized. This is paired somewhat intimately with codegen
-which must understand how types are represented and unsized.
+これはユーザーによって実装されることを意図していません。なぜなら、
+`Unsize` は型をアンサイズする*方法*をコンパイラ（つまりコード生成）に
+指示するのではなく、アンサイズされることが許可されているかどうかのみを
+指示するからです。これはコード生成と多少密接にペアになっており、
+型がどのように表現され、アンサイズされるかを理解する必要があります。
 
-## Primitive unsizing implementations
+## プリミティブなアンサイズ実装
 
-Built-in implementations are provided for:
-* `T` -> `dyn Trait + 'a` when `T: Trait` (and `T: Sized + 'a`, and `Trait`
-  is dyn-compatible[^2]).
+組み込みの実装は次のために提供されています：
+* `T` -> `dyn Trait + 'a`（`T: Trait` かつ `T: Sized + 'a`、および `Trait` が
+  dyn 互換[^2]の場合）
 * `[T; N]` -> `[T]`
 
-## Structural implementations
+## 構造的実装
 
-There is one implementation of `Unsize` which can be thought of as
-structural:
-* `Struct<.., Pi, .., Pj, ..>: Unsize<Struct<.., Ui, .., Uj, ..>>` given 
-  `TailField<Pi, .., Pj>: Unsize<Ui, .. Uj>`, which allows the tail field of a
-  struct to be unsized if it is the only field that mentions generic parameters
-  `Pi`, .., `Pj` (which don't need to be contiguous).
+`Unsize` の実装の1つは構造的と考えることができます：
+* `Struct<.., Pi, .., Pj, ..>: Unsize<Struct<.., Ui, .., Uj, ..>>` は
+  `TailField<Pi, .., Pj>: Unsize<Ui, .. Uj>` が与えられた場合に成り立ちます。
+  これにより、構造体の末尾フィールドは、ジェネリックパラメータ `Pi`、..、`Pj`
+  （連続している必要はありません）に言及する唯一のフィールドである場合に
+  アンサイズできます。
 
-The rules for struct unsizing are slightly complicated, since they
-may allow more than one parameter to be changed (not necessarily unsized) and
-are best stated in terms of the tail field of the struct.
+構造体のアンサイズの規則は少し複雑です。なぜなら、複数のパラメータが
+変更される（必ずしもアンサイズされるわけではない）ことを許可する可能性があり、
+構造体の末尾フィールドの観点から最もよく述べられるからです。
 
-(Tuple unsizing was previously implemented behind the feature gate
-`unsized_tuple_coercion`, but the implementation was removed by [#137728].)
+（タプルのアンサイズは以前、機能ゲート `unsized_tuple_coercion` の背後で
+実装されていましたが、実装は [#137728] によって削除されました。）
 
 [#137728]: https://github.com/rust-lang/rust/pull/137728
 
-## Upcasting implementations
+## アップキャスト実装
 
-Two things are called "upcasting" internally:
-1. True upcasting `dyn SubTrait` -> `dyn SuperTrait` (this also allows
-   dropping auto traits and adjusting lifetimes, as below).
-2. Dropping auto traits and adjusting the lifetimes of dyn trait
-   *without changing the principal[^1]*:
-   `dyn Trait + AutoTraits... + 'a` -> `dyn Trait + NewAutoTraits... + 'b`
-   when `AutoTraits` ⊇ `NewAutoTraits`, and `'a: 'b`.
+内部で「アップキャスト」と呼ばれるものは2つあります：
+1. 真のアップキャスト `dyn SubTrait` -> `dyn SuperTrait`（これは以下のように
+   自動トレイトを削除し、ライフタイムを調整することも許可します）。
+2. *プリンシパルを変更せずに*dyn トレイトの自動トレイトを削除し、
+   ライフタイムを調整する：`dyn Trait + AutoTraits... + 'a` ->
+   `dyn Trait + NewAutoTraits... + 'b`（`AutoTraits` ⊇ `NewAutoTraits` かつ
+   `'a: 'b` の場合）。
 
-These may seem like different operations, since (1.) includes adjusting the
-vtable of a dyn trait, while (2.) is a no-op. However, to the type system,
-these are handled with much the same code.
+これらは異なる操作のように見えるかもしれません。なぜなら、(1.) は dyn トレイトの
+vtable の調整を含みますが、(2.) は no-op だからです。しかし、型システムにとっては、
+これらはほぼ同じコードで処理されます。
 
-This built-in implementation of `Unsize` is the most involved, particularly
-after [it was reworked](https://github.com/rust-lang/rust/pull/114036) to
-support the complexities of associated types.
+この `Unsize` の組み込み実装は最も複雑であり、特に関連型の複雑さを
+サポートするために[再構築された](https://github.com/rust-lang/rust/pull/114036)後です。
 
-Specifically, the upcasting algorithm involves: For each supertrait of the
-source dyn trait's principal (including itself)...
-1. Unify the super trait ref with the principal of the target (making sure
-   we only ever upcast to a true supertrait, and never [via an impl]).
-2. For every auto trait in the target, check that it's present in the source
-   (allowing us to drop auto traits, but never gain new ones).
-3. For every projection in the target, check that it unifies with a single
-   projection in the source (since there may be more than one given
-   `trait Sub: Sup<.., A = i32> + Sup<.., A = u32>`).
+具体的には、アップキャストアルゴリズムには次が含まれます：ソース dyn トレイトの
+プリンシパルの各スーパートレイト（それ自体を含む）に対して...
+1. スーパートレイト参照をターゲットのプリンシパルと単一化します（真のスーパートレイト
+   にのみアップキャストし、決して [impl 経由]でアップキャストしないことを確認します）。
+2. ターゲットのすべての自動トレイトに対して、それがソースに存在することを
+   チェックします（自動トレイトを削除できますが、新しいものを取得することは
+   決してありません）。
+3. ターゲットのすべてのプロジェクションに対して、ソースの単一のプロジェクションと
+   単一化することをチェックします（`trait Sub: Sup<.., A = i32> + Sup<.., A = u32>`
+   が与えられた場合、複数ある可能性があるため）。
 
 [via an impl]: https://github.com/rust-lang/rust/blob/f3457dbf84cd86d284454d12705861398ece76c3/tests/ui/traits/trait-upcasting/illegal-upcast-from-impl.rs#L19
 
-Specifically, (3.) prevents a choice of projection bound to guide inference
-unnecessarily, though it may guide inference when it is unambiguous.
+具体的には、(3.) はプロジェクション境界の選択が不必要に推論を導くことを
+防ぎますが、明確な場合は推論を導く可能性があります。
 
-[^1]: The principal is the one non-auto trait of a `dyn Trait`.
-[^2]: Formerly known as "object safe".
+[^1]: プリンシパルは `dyn Trait` の1つの非自動トレイトです。
+[^2]: 以前は「オブジェクト安全」として知られていました。
