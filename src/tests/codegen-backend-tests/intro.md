@@ -1,13 +1,13 @@
-# Codegen backend testing
+# コード生成バックエンドのテスト
 
-See also the [Code generation](../../backend/codegen.md) chapter.
+[コード生成](../../backend/codegen.md) の章も参照してください。
 
-In addition to the primary LLVM codegen backend, the rust-lang/rust CI also runs tests of the [cranelift][cg_clif] and [GCC][cg_gcc] codegen backends in certain test jobs.
+主要な LLVM コード生成バックエンドに加えて、rust-lang/rust CI は特定のテストジョブで [cranelift][cg_clif] および [GCC][cg_gcc] コード生成バックエンドのテストも実行します。
 
-For more details on the tests involved, see:
+関連するテストの詳細については、以下を参照してください：
 
-- [Cranelift codegen backend tests](./cg_clif.md)
-- [GCC codegen backend tests](./cg_gcc.md)
+- [Cranelift コード生成バックエンドのテスト](./cg_clif.md)
+- [GCC コード生成バックエンドのテスト](./cg_gcc.md)
 
 [cg_clif]: https://github.com/rust-lang/rustc_codegen_cranelift
 [cg_gcc]: https://github.com/rust-lang/rustc_codegen_gcc

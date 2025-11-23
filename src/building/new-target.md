@@ -1,23 +1,16 @@
-# Adding a new target
+# 新しいターゲットの追加
 
-These are a set of steps to add support for a new target. There are
-numerous end states and paths to get there, so not all sections may be
-relevant to your desired goal.
+新しいターゲットのサポートを追加するための一連の手順です。望ましいゴールに到達するための多数の最終状態とパスがあるため、すべてのセクションが関連するわけではありません。
 
-See also the associated documentation in the [target tier policy].
+関連するドキュメントについては、[target tier policy] もご覧ください。
 
 [target tier policy]: https://doc.rust-lang.org/rustc/target-tier-policy.html#adding-a-new-target
 
-## Specifying a new LLVM
+## 新しい LLVM の指定
 
-For very new targets, you may need to use a different fork of LLVM
-than what is currently shipped with Rust. In that case, navigate to
-the `src/llvm-project` git submodule (you might need to run `./x
-check` at least once so the submodule is updated), check out the
-appropriate commit for your fork, then commit that new submodule
-reference in the main Rust repository.
+非常に新しいターゲットの場合、Rust で現在出荷されているものとは異なる LLVM のフォークを使用する必要がある場合があります。その場合は、`src/llvm-project` git サブモジュール（サブモジュールが更新されるように少なくとも 1 回 `./x check` を実行する必要がある場合があります）に移動し、フォークの適切なコミットをチェックアウトし、メインの Rust リポジトリでその新しいサブモジュール参照をコミットします。
 
-An example would be:
+例：
 
 ```
 cd src/llvm-project
@@ -28,68 +21,45 @@ git add llvm-project
 git commit -m 'Use my custom LLVM'
 ```
 
-### Using pre-built LLVM
+### 事前ビルドされた LLVM の使用
 
-If you have a local LLVM checkout that is already built, you may be
-able to configure Rust to treat your build as the system LLVM to avoid
-redundant builds.
+すでにビルドされたローカルの LLVM チェックアウトがある場合、Rust がビルドをシステム LLVM として扱うように設定することで、冗長なビルドを避けることができる可能性があります。
 
-You can tell Rust to use a pre-built version of LLVM using the `target` section
-of `bootstrap.toml`:
+`bootstrap.toml` の `target` セクションを使用して、事前ビルドされたバージョンの LLVM を使用するように Rust に指示できます：
 
 ```toml
 [target.x86_64-unknown-linux-gnu]
 llvm-config = "/path/to/llvm/llvm-7.0.1/bin/llvm-config"
 ```
 
-If you are attempting to use a system LLVM, we have observed the following paths
-before, though they may be different from your system:
+システム LLVM を使用しようとしている場合、以前に次のパスを観察しましたが、システムによって異なる場合があります：
 
 - `/usr/bin/llvm-config-8`
 - `/usr/lib/llvm-8/bin/llvm-config`
 
-Note that you need to have the LLVM `FileCheck` tool installed, which is used
-for codegen tests. This tool is normally built with LLVM, but if you use your
-own preinstalled LLVM, you will need to provide `FileCheck` in some other way.
-On Debian-based systems, you can install the `llvm-N-tools` package (where `N`
-is the LLVM version number, e.g. `llvm-8-tools`). Alternately, you can specify
-the path to `FileCheck` with the `llvm-filecheck` config item in `bootstrap.toml`
-or you can disable codegen test with the `codegen-tests` item in `bootstrap.toml`.
+codegen テストに使用される LLVM `FileCheck` ツールがインストールされている必要があることに注意してください。このツールは通常 LLVM でビルドされますが、独自の事前インストールされた LLVM を使用する場合は、別の方法で `FileCheck` を提供する必要があります。Debian ベースのシステムでは、`llvm-N-tools` パッケージ（`N` は LLVM のバージョン番号、例：`llvm-8-tools`）をインストールできます。または、`bootstrap.toml` の `llvm-filecheck` 設定項目で `FileCheck` へのパスを指定するか、`bootstrap.toml` の `codegen-tests` 項目で codegen テストを無効にできます。
 
-## Creating a target specification
+## ターゲット仕様の作成
 
-You should start with a target JSON file. You can see the specification
-for an existing target using `--print target-spec-json`:
+ターゲット JSON ファイルから始める必要があります。`--print target-spec-json` を使用して、既存のターゲットの仕様を確認できます：
 
 ```
 rustc -Z unstable-options --target=wasm32-unknown-unknown --print target-spec-json
 ```
 
-Save that JSON to a file and modify it as appropriate for your target.
+その JSON をファイルに保存し、ターゲットに合わせて適切に変更します。
 
-### Adding a target specification
+### ターゲット仕様の追加
 
-Once you have filled out a JSON specification and been able to compile
-somewhat successfully, you can copy the specification into the
-compiler itself.
+JSON 仕様を記入し、ある程度成功裏にコンパイルできるようになったら、コンパイラ自体に仕様をコピーできます。
 
-You will need to add a line to the big table inside of the
-`supported_targets` macro in the `rustc_target::spec` module. You
-will then add a corresponding file for your new target containing a
-`target` function.
+`rustc_target::spec` モジュールの `supported_targets` マクロ内の大きなテーブルに行を追加する必要があります。次に、`target` 関数を含む新しいターゲット用の対応するファイルを追加します。
 
-Look for existing targets to use as examples.
+既存のターゲットを例として使用してください。
 
-After adding your target to the `rustc_target` crate you may want to add
-`core`, `std`, ... with support for your new target. In that case you will
-probably need access to some `target_*` cfg. Unfortunately when building with
-stage0 (a precompiled compiler), you'll get an error that the target cfg is
-unexpected because stage0 doesn't know about the new target specification and
-we pass `--check-cfg` in order to tell it to check.
+`rustc_target` クレートにターゲットを追加した後、新しいターゲットをサポートする `core`、`std` などを追加したい場合があります。その場合、おそらくいくつかの `target_*` cfg へのアクセスが必要になります。残念ながら、stage0（事前コンパイルされたコンパイラ）でビルドする場合、stage0 は新しいターゲット仕様を知らないため、ターゲット cfg が予期しないというエラーが発生し、チェックするために `--check-cfg` を渡します。
 
-To fix the errors you will need to manually add the unexpected value to the
-different `Cargo.toml` in `library/{std,alloc,core}/Cargo.toml`. Here is an
-example for adding `NEW_TARGET_ARCH` as `target_arch`:
+エラーを修正するには、`library/{std,alloc,core}/Cargo.toml` の異なる `Cargo.toml` に予期しない値を手動で追加する必要があります。以下は、`target_arch` として `NEW_TARGET_ARCH` を追加する例です：
 
 *`library/std/Cargo.toml`*:
 ```diff
@@ -102,10 +72,7 @@ example for adding `NEW_TARGET_ARCH` as `target_arch`:
 +      'cfg(target_arch, values("xtensa", "NEW_TARGET_ARCH"))',
 ```
 
-To use this target in bootstrap, we need to explicitly add the target triple to the `STAGE0_MISSING_TARGETS`
-list in `src/bootstrap/src/core/sanity.rs`. This is necessary because the default compiler bootstrap uses does
-not recognize the new target we just added. Therefore, it should be added to `STAGE0_MISSING_TARGETS` so that the
-bootstrap is aware that this target is not yet supported by the stage0 compiler.
+ブートストラップでこのターゲットを使用するには、`src/bootstrap/src/core/sanity.rs` の `STAGE0_MISSING_TARGETS` リストにターゲットトリプルを明示的に追加する必要があります。これは、ブートストラップが使用するデフォルトのコンパイラが、追加したばかりの新しいターゲットを認識しないために必要です。したがって、このターゲットが stage0 コンパイラによってまだサポートされていないことをブートストラップが認識できるように、`STAGE0_MISSING_TARGETS` に追加する必要があります。
 
 ```diff
 const STAGE0_MISSING_TARGETS: &[&str] = &[
@@ -113,13 +80,9 @@ const STAGE0_MISSING_TARGETS: &[&str] = &[
 ];
 ```
 
-## Patching crates
+## クレートへのパッチ適用
 
-You may need to make changes to crates that the compiler depends on,
-such as [`libc`][] or [`cc`][]. If so, you can use Cargo's
-[`[patch]`][patch] ability. For example, if you want to use an
-unreleased version of `libc`, you can add it to the top-level
-`Cargo.toml` file:
+コンパイラが依存するクレート（[`libc`][] や [`cc`][] など）に変更を加える必要がある場合があります。その場合、Cargo の [`[patch]`][patch] 機能を使用できます。たとえば、未リリースバージョンの `libc` を使用したい場合は、トップレベルの `Cargo.toml` ファイルに追加できます：
 
 ```diff
 diff --git a/Cargo.toml b/Cargo.toml
@@ -135,15 +98,11 @@ index 1e83f05e0ca..4d0172071c1 100644
  rustc-workspace-hack = { path = 'src/tools/rustc-workspace-hack' }
 ```
 
-After this, run `cargo update -p libc` to update the lockfiles.
+この後、`cargo update -p libc` を実行してロックファイルを更新します。
 
-Beware that if you patch to a local `path` dependency, this will enable
-warnings for that dependency. Some dependencies are not warning-free, and due
-to the `deny-warnings` setting in `bootstrap.toml`, the build may suddenly start
-to fail.
-To work around warnings, you may want to:
-- Modify the dependency to remove the warnings
-- Or for local development purposes, suppress the warnings by setting deny-warnings = false in bootstrap.toml.
+ローカルの `path` 依存関係にパッチを適用すると、その依存関係の警告が有効になることに注意してください。一部の依存関係は警告がなく、`bootstrap.toml` の `deny-warnings` 設定により、ビルドが突然失敗し始める可能性があります。警告を回避するには、次のようにします：
+- 依存関係を変更して警告を削除する
+- またはローカル開発のために、bootstrap.toml で deny-warnings = false を設定して警告を抑制します。
 
 ```toml
 # bootstrap.toml
@@ -155,10 +114,9 @@ deny-warnings = false
 [`cc`]: https://crates.io/crates/cc
 [patch]: https://doc.rust-lang.org/stable/cargo/reference/overriding-dependencies.html#the-patch-section
 
-## Cross-compiling
+## クロスコンパイル
 
-Once you have a target specification in JSON and in the code, you can
-cross-compile `rustc`:
+JSON でターゲット仕様を持ち、コードに含めたら、`rustc` をクロスコンパイルできます：
 
 ```
 DESTDIR=/path/to/install/in \
@@ -166,16 +124,14 @@ DESTDIR=/path/to/install/in \
 compiler/rustc library/std
 ```
 
-If your target specification is already available in the bootstrap
-compiler, you can use it instead of the JSON file for both arguments.
+ターゲット仕様がブートストラップコンパイラですでに利用可能な場合は、両方の引数に JSON ファイルの代わりにそれを使用できます。
 
-## Promoting a target from tier 2 (target) to tier 2 (host)
+## tier 2（ターゲット）から tier 2（ホスト）へのターゲットの昇格
 
-There are two levels of tier 2 targets:
-- Targets that are only cross-compiled (`rustup target add`)
-- Targets that [have a native toolchain][tier2-native] (`rustup toolchain install`)
+tier 2 ターゲットには 2 つのレベルがあります：
+- クロスコンパイルのみのターゲット（`rustup target add`）
+- [ネイティブツールチェーンを持つ][tier2-native] ターゲット（`rustup toolchain install`）
 
 [tier2-native]: https://doc.rust-lang.org/nightly/rustc/target-tier-policy.html#tier-2-with-host-tools
 
-For an example of promoting a target from cross-compiled to native,
-see [#75914](https://github.com/rust-lang/rust/pull/75914).
+ターゲットをクロスコンパイルからネイティブに昇格する例については、[#75914](https://github.com/rust-lang/rust/pull/75914) をご覧ください。

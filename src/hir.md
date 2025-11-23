@@ -1,46 +1,29 @@
-# The HIR
+# HIR
 
-The HIR – "High-Level Intermediate Representation" – is the primary IR used
-in most of rustc. It is a compiler-friendly representation of the abstract
-syntax tree (AST) that is generated after parsing, macro expansion, and name
-resolution (see [Lowering](./hir/lowering.md) for how the HIR is created).
-Many parts of HIR resemble Rust surface syntax quite closely, with
-the exception that some of Rust's expression forms have been desugared away.
-For example, `for` loops are converted into a `loop` and do not appear in
-the HIR. This makes HIR more amenable to analysis than a normal AST.
+HIR（「High-Level Intermediate Representation」：高レベル中間表現）は、rustc のほとんどで使用される主要な IR です。これは、パース、マクロ展開、名前解決の後に生成される抽象構文木（AST）のコンパイラフレンドリーな表現です（HIR がどのように作成されるかについては、[Lowering](./hir/lowering.md)を参照してください）。HIR の多くの部分は Rust の表面構文に非常に似ていますが、Rust の式の形式の一部がデシュガリングされている点が異なります。例えば、`for` ループは `loop` に変換され、HIR には現れません。これにより、HIR は通常の AST よりも分析に適しています。
 
-This chapter covers the main concepts of the HIR.
+この章では、HIR の主要な概念について説明します。
 
-You can view the HIR representation of your code by passing the
-`-Z unpretty=hir-tree` flag to rustc:
+`-Z unpretty=hir-tree` フラグを rustc に渡すことで、コードの HIR 表現を表示できます：
 
 ```bash
 cargo rustc -- -Z unpretty=hir-tree
 ```
 
 
-You can also use the `-Z unpretty=hir` option to generate a HIR
-that is closer to the original source code expression:
+また、`-Z unpretty=hir` オプションを使用して、元のソースコード式に近い HIR を生成することもできます：
 
 ```bash
 cargo rustc -- -Z unpretty=hir
 ```
 
-## Out-of-band storage and the `Crate` type
+## アウトオブバンドストレージと `Crate` 型
 
-The top-level data-structure in the HIR is the [`Crate`], which stores
-the contents of the crate currently being compiled (we only ever
-construct HIR for the current crate). Whereas in the AST the crate
-data structure basically just contains the root module, the HIR
-`Crate` structure contains a number of maps and other things that
-serve to organize the content of the crate for easier access.
+HIR のトップレベルのデータ構造は [`Crate`] で、現在コンパイルされているクレートの内容を格納します（現在のクレートに対してのみ HIR を構築します）。AST ではクレートのデータ構造が基本的にルートモジュールを含むだけであるのに対し、HIR の `Crate` 構造には、より簡単にアクセスできるようにクレートの内容を整理するための多数のマップやその他のものが含まれています。
 
 [`Crate`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/hir/struct.Crate.html
 
-For example, the contents of individual items (e.g. modules,
-functions, traits, impls, etc) in the HIR are not immediately
-accessible in the parents. So, for example, if there is a module item
-`foo` containing a function `bar()`:
+例えば、HIR 内の個々のアイテム（例：モジュール、関数、トレイト、impl など）の内容は、親ですぐにアクセスできるわけではありません。したがって、例えば、関数 `bar()` を含むモジュールアイテム `foo` がある場合：
 
 ```rust
 mod foo {
@@ -48,57 +31,31 @@ mod foo {
 }
 ```
 
-then in the HIR the representation of module `foo` (the [`Mod`]
-struct) would only have the **`ItemId`** `I` of `bar()`. To get the
-details of the function `bar()`, we would lookup `I` in the
-`items` map.
+HIR では、モジュール `foo` の表現（[`Mod`] 構造体）は、`bar()` の **`ItemId`** `I` のみを持ちます。関数 `bar()` の詳細を取得するには、`items` マップで `I` を検索します。
 
 [`Mod`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/hir/struct.Mod.html
 
-One nice result from this representation is that one can iterate
-over all items in the crate by iterating over the key-value pairs
-in these maps (without the need to trawl through the whole HIR).
-There are similar maps for things like trait items and impl items,
-as well as "bodies" (explained below).
+この表現の良い結果の1つは、これらのマップのキーと値のペアを反復処理することで、クレート内のすべてのアイテムを反復処理できることです（HIR 全体をトラバースする必要はありません）。トレイトアイテムや impl アイテム、および「ボディ」（後述）についても同様のマップがあります。
 
-The other reason to set up the representation this way is for better
-integration with incremental compilation. This way, if you gain access
-to an [`&rustc_hir::Item`] (e.g. for the mod `foo`), you do not immediately
-gain access to the contents of the function `bar()`. Instead, you only
-gain access to the **id** for `bar()`, and you must invoke some
-function to lookup the contents of `bar()` given its id; this gives
-the compiler a chance to observe that you accessed the data for
-`bar()`, and then record the dependency.
+この方法で表現をセットアップするもう1つの理由は、インクリメンタルコンパイルとのより良い統合のためです。この方法では、[`&rustc_hir::Item`] にアクセスした場合（例：mod `foo` の場合）、関数 `bar()` の内容に即座にアクセスできません。代わりに、`bar()` の **id** にのみアクセスでき、その id が与えられた場合に `bar()` の内容を検索する関数を呼び出す必要があります。これにより、コンパイラは `bar()` のデータにアクセスしたことを観察し、依存関係を記録する機会を得ます。
 
 [`&rustc_hir::Item`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/hir/struct.Item.html
 
 <a id="hir-id"></a>
 
-## Identifiers in the HIR
+## HIR の識別子
 
-The HIR uses a bunch of different identifiers that coexist and serve different purposes.
+HIR は、共存してさまざまな目的を果たすさまざまな識別子を使用します。
 
-- A [`DefId`], as the name suggests, identifies a particular definition, or top-level
-  item, in a given crate. It is composed of two parts: a [`CrateNum`] which identifies
-  the crate the definition comes from, and a [`DefIndex`] which identifies the definition
-  within the crate. Unlike [`HirId`]s, there isn't a [`DefId`] for every expression, which
-  makes them more stable across compilations.
+- [`DefId`] は、名前が示すように、特定の定義、つまりトップレベルのアイテムを特定のクレート内で識別します。これは2つの部分で構成されます：定義が来るクレートを識別する [`CrateNum`] と、クレート内の定義を識別する [`DefIndex`]。[`HirId`] とは異なり、すべての式に対して [`DefId`] があるわけではないため、コンパイル間でより安定しています。
 
-- A [`LocalDefId`] is basically a [`DefId`] that is known to come from the current crate.
-  This allows us to drop the [`CrateNum`] part, and use the type system to ensure that
-  only local definitions are passed to functions that expect a local definition.
+- [`LocalDefId`] は基本的に、現在のクレートから来ることが知られている [`DefId`] です。これにより、[`CrateNum`] 部分を削除し、型システムを使用してローカル定義のみが期待される関数に渡されることを保証できます。
 
-- A [`HirId`] uniquely identifies a node in the HIR of the current crate. It is composed
-  of two parts: an `owner` and a `local_id` that is unique within the `owner`. This
-  combination makes for more stable values which are helpful for incremental compilation.
-  Unlike [`DefId`]s, a [`HirId`] can refer to [fine-grained entities][Node] like expressions,
-  but stays local to the current crate.
+- [`HirId`] は、現在のクレートの HIR 内のノードを一意に識別します。`owner` と `owner` 内で一意な `local_id` の2つの部分で構成されます。この組み合わせにより、インクリメンタルコンパイルに役立つより安定した値が得られます。[`DefId`] とは異なり、[`HirId`] は式などの[きめ細かいエンティティ][Node]を参照できますが、現在のクレート内にとどまります。
 
-- A [`BodyId`] identifies a HIR [`Body`] in the current crate. It is currently only
-  a wrapper around a [`HirId`]. For more info about HIR bodies, please refer to the
-  [HIR chapter][hir-bodies].
+- [`BodyId`] は、現在のクレート内の HIR [`Body`] を識別します。現在、これは [`HirId`] のラッパーに過ぎません。HIR ボディの詳細については、[HIR 章][hir-bodies]を参照してください。
 
-These identifiers can be converted into one another through the `TyCtxt`.
+これらの識別子は、`TyCtxt` を介して相互に変換できます。
 
 [`DefId`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/def_id/struct.DefId.html
 [`LocalDefId`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/def_id/struct.LocalDefId.html
@@ -110,50 +67,31 @@ These identifiers can be converted into one another through the `TyCtxt`.
 [`Body`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/hir/struct.Body.html
 [hir-bodies]: ./hir.md#hir-bodies
 
-## HIR Operations
+## HIR 操作
 
-Most of the time when you are working with the HIR, you will do so via
-`TyCtxt`. It contains a number of methods, defined in the `hir::map` module and
-mostly prefixed with `hir_`, to convert between IDs of various kinds and to
-lookup data associated with a HIR node.
+ほとんどの場合、HIR を扱うときは、`TyCtxt` を介して行います。これには、`hir::map` モジュールで定義され、ほとんどが `hir_` プレフィックスを持つ多数のメソッドが含まれており、さまざまな種類の ID を変換したり、HIR ノードに関連付けられたデータを検索したりします。
 
 [`TyCtxt`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html
 
-For example, if you have a [`LocalDefId`], and you would like to convert it
-to a [`HirId`], you can use [`tcx.local_def_id_to_hir_id(def_id)`][local_def_id_to_hir_id].
-You need a `LocalDefId`, rather than a `DefId`, since only local items have HIR nodes.
+例えば、[`LocalDefId`] があり、それを [`HirId`] に変換したい場合は、[`tcx.local_def_id_to_hir_id(def_id)`][local_def_id_to_hir_id] を使用できます。ローカルアイテムのみが HIR ノードを持つため、`DefId` ではなく `LocalDefId` が必要です。
 
 [local_def_id_to_hir_id]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html#method.local_def_id_to_hir_id
 
-Similarly, you can use [`tcx.hir_node(n)`][hir_node] to lookup the node for a
-[`HirId`]. This returns a `Option<Node<'hir>>`, where [`Node`] is an enum
-defined in the map. By matching on this, you can find out what sort of
-node the `HirId` referred to and also get a pointer to the data
-itself. Often, you know what sort of node `n` is – e.g. if you know
-that `n` must be some HIR expression, you can do
-[`tcx.hir_expect_expr(n)`][expect_expr], which will extract and return the
-[`&hir::Expr`][Expr], panicking if `n` is not in fact an expression.
+同様に、[`tcx.hir_node(n)`][hir_node] を使用して [`HirId`] のノードを検索できます。これは `Option<Node<'hir>>` を返します。ここで [`Node`] はマップで定義された列挙型です。これに一致させることで、`HirId` がどのようなノードを指していたかを判断し、データ自体へのポインタを取得できます。多くの場合、`n` がどのような種類のノードであるかがわかっています。例えば、`n` が何らかの HIR 式でなければならないことがわかっている場合は、[`tcx.hir_expect_expr(n)`][expect_expr] を使用できます。これは [`&hir::Expr`][Expr] を抽出して返し、`n` が実際に式でない場合はパニックします。
 
 [hir_node]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html#method.hir_node
 [`Node`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/hir/enum.Node.html
 [expect_expr]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html#method.expect_expr
 [Expr]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/hir/struct.Expr.html
 
-Finally, you can find the parents of nodes, via
-calls like [`tcx.parent_hir_node(n)`][parent_hir_node].
+最後に、[`tcx.parent_hir_node(n)`][parent_hir_node] のような呼び出しを介してノードの親を見つけることができます。
 
 [parent_hir_node]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html#method.parent_hir_node
 
 
-## HIR Bodies
+## HIR ボディ
 
-A [`rustc_hir::Body`] represents some kind of executable code, such as the body
-of a function/closure or the definition of a constant. Bodies are
-associated with an **owner**, which is typically some kind of item
-(e.g. an `fn()` or `const`), but could also be a closure expression
-(e.g. `|x, y| x + y`). You can use the `TyCtxt` to find the body
-associated with a given def-id ([`hir_maybe_body_owned_by`]) or to find
-the owner of a body ([`hir_body_owner_def_id`]).
+[`rustc_hir::Body`] は、関数/クロージャの本体や定数の定義など、何らかの実行可能なコードを表します。ボディは **owner** に関連付けられており、これは通常何らかのアイテム（例：`fn()` または `const`）ですが、クロージャ式（例：`|x, y| x + y`）である場合もあります。`TyCtxt` を使用して、特定の def-id に関連付けられたボディを見つけたり（[`hir_maybe_body_owned_by`]）、ボディの所有者を見つけたりできます（[`hir_body_owner_def_id`]）。
 
 [`rustc_hir::Body`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/hir/struct.Body.html
 [`hir_maybe_body_owned_by`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html#method.hir_maybe_body_owned_by

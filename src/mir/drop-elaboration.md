@@ -1,20 +1,12 @@
-# Drop elaboration
+# ドロップ精緻化
 
-## Dynamic drops
+## 動的ドロップ
 
-According to the [reference][reference-drop]:
+[リファレンス][reference-drop]によると：
 
-> When an initialized variable or temporary goes out of scope, its destructor
-> is run, or it is dropped. Assignment also runs the destructor of its
-> left-hand operand, if it's initialized. If a variable has been partially
-> initialized, only its initialized fields are dropped.
+> 初期化された変数または一時変数がスコープ外になると、そのデストラクタが実行されるか、ドロップされます。代入も、初期化されている場合、その左オペランドのデストラクタを実行します。変数が部分的に初期化されている場合、その初期化されたフィールドのみがドロップされます。
 
-When building the MIR, the `Drop` and `DropAndReplace` terminators represent
-places where drops may occur. However, in this phase, the presence of these
-terminators does not guarantee that a destructor will run. That's because the
-target of a drop may be uninitialized (usually because it has been moved from)
-before the terminator is reached. In general, we cannot know at compile-time whether a
-variable is initialized.
+MIRを構築する際、`Drop`および`DropAndReplace`ターミネータは、ドロップが発生する可能性がある場所を表します。ただし、このフェーズでは、これらのターミネータの存在は、デストラクタが実行されることを保証するものではありません。それは、ターミネータに到達する前に、ドロップのターゲットが（通常は移動されたため）初期化されていない可能性があるためです。一般に、変数が初期化されているかどうかをコンパイル時に知ることはできません。
 
 ```rust
 let mut y = vec![];
@@ -22,50 +14,33 @@ let mut y = vec![];
 {
     let x = vec![1, 2, 3];
     if std::process::id() % 2 == 0 {
-        y = x; // conditionally move `x` into `y`
+        y = x; // 条件付きで`x`を`y`に移動
     }
-} // `x` goes out of scope here. Should it be dropped?
+} // `x`はここでスコープ外になります。ドロップされるべきですか？
 ```
 
-In these cases, we need to keep track of whether a variable is initialized
-*dynamically*. The rules are laid out in detail in [RFC 320: Non-zeroing
-dynamic drops][RFC 320].
+これらの場合、変数が初期化されているかどうかを*動的に*追跡する必要があります。ルールは[RFC 320: 非ゼロ化動的ドロップ][RFC 320]で詳細に説明されています。
 
-## Drop obligations
+## ドロップ義務
 
-From the RFC:
+RFCから：
 
-> When a local variable becomes initialized, it establishes a set of "drop
-> obligations": a set of structural paths (e.g. a local `a`, or a path to a
-> field `b.f.y`) that need to be dropped.
+> ローカル変数が初期化されると、「ドロップ義務」のセットを確立します：ドロップする必要がある構造パス（例：ローカル`a`、またはフィールドへのパス`b.f.y`）のセット。
 >
-> The drop obligations for a local variable x of struct-type `T` are computed
-> from analyzing the structure of `T`. If `T` itself implements `Drop`, then `x` is a
-> drop obligation. If `T` does not implement `Drop`, then the set of drop
-> obligations is the union of the drop obligations of the fields of `T`.
+> 構造体型`T`のローカル変数xのドロップ義務は、`T`の構造を分析することから計算されます。`T`自体が`Drop`を実装している場合、`x`はドロップ義務です。`T`が`Drop`を実装していない場合、ドロップ義務のセットは`T`のフィールドのドロップ義務の和集合です。
 
-When a structural path is moved from (and thus becomes uninitialized), any drop
-obligations for that path or its descendants (`path.f`, `path.f.g.h`, etc.) are
-released. Types with `Drop` implementations do not permit moves from individual
-fields, so there is no need to track initializedness through them.
+構造パスから移動される（そして初期化されていない状態になる）と、そのパスまたはその子孫（`path.f`、`path.f.g.h`など）のドロップ義務はすべて解放されます。`Drop`実装を持つ型は、個々のフィールドからの移動を許可しないため、それらを通じて初期化状態を追跡する必要はありません。
 
-When a local variable goes out of scope (`Drop`), or when a structural path is
-overwritten via assignment (`DropAndReplace`), we check for any drop
-obligations for that variable or path.  Unless that obligation has been
-released by this point, its associated `Drop` implementation will be called.
-For `enum` types, only fields corresponding to the "active" variant need to be
-dropped. When processing drop obligations for such types, we first check the
-discriminant to determine the active variant. All drop obligations for variants
-besides the active one are ignored.
+ローカル変数がスコープ外になる（`Drop`）とき、または構造パスが代入を介して上書きされる（`DropAndReplace`）とき、その変数またはパスのドロップ義務をチェックします。その時点でその義務が解放されていない限り、関連する`Drop`実装が呼び出されます。`enum`型の場合、「アクティブな」バリアントに対応するフィールドのみをドロップする必要があります。このような型のドロップ義務を処理する際、まず判別値をチェックしてアクティブなバリアントを決定します。アクティブなバリアント以外のバリアントのすべてのドロップ義務は無視されます。
 
-Here are a few interesting types to help illustrate these rules:
+これらのルールを説明するために、いくつかの興味深い型を示します：
 
 ```rust
-struct NoDrop(u8); // No `Drop` impl. No fields with `Drop` impls.
+struct NoDrop(u8); // `Drop`実装なし。`Drop`実装を持つフィールドもなし。
 
-struct NeedsDrop(Vec<u8>); // No `Drop` impl but has fields with `Drop` impls.
+struct NeedsDrop(Vec<u8>); // `Drop`実装はないが、`Drop`実装を持つフィールドがある。
 
-struct ThinVec(*const u8); // Custom `Drop` impl. Individual fields cannot be moved from.
+struct ThinVec(*const u8); // カスタム`Drop`実装。個々のフィールドからの移動は不可。
 
 impl Drop for ThinVec {
     fn drop(&mut self) { /* ... */ }
@@ -77,114 +52,56 @@ enum MaybeDrop {
 }
 ```
 
-## Drop elaboration
+## ドロップ精緻化
 
-One valid model for these rules is to keep a boolean flag (a "drop flag") for
-every structural path that is used at any point in the function. This flag is
-set when its path is initialized and is cleared when the path is moved from.
-When a `Drop` occurs, we check the flags for every obligation associated with
-the target of the `Drop` and call the associated `Drop` impl for those that are
-still applicable.
+これらのルールの1つの有効なモデルは、関数内の任意の時点で使用されるすべての構造パスに対してブールフラグ（「ドロップフラグ」）を保持することです。このフラグは、パスが初期化されたときに設定され、パスから移動されたときにクリアされます。`Drop`が発生すると、`Drop`のターゲットに関連するすべての義務のフラグをチェックし、まだ適用可能なものに対して関連する`Drop`実装を呼び出します。
 
-This process—transforming the newly built MIR with its imprecise `Drop` and
-`DropAndReplace` terminators into one with drop flags—is known as drop
-elaboration. When a MIR statement causes a variable to become initialized (or
-uninitialized), drop elaboration inserts code that sets (or clears) the drop
-flag for that variable. It wraps `Drop` terminators in conditionals that check
-the newly inserted drop flags.
+このプロセス—不正確な`Drop`および`DropAndReplace`ターミネータを持つ新しく構築されたMIRをドロップフラグを持つものに変換すること—は、ドロップ精緻化として知られています。MIRステートメントが変数を初期化（または初期化解除）する原因となる場合、ドロップ精緻化は、その変数のドロップフラグを設定（またはクリア）するコードを挿入します。新しく挿入されたドロップフラグをチェックする条件文で`Drop`ターミネータをラップします。
 
-Drop elaboration also splits `DropAndReplace` terminators into a `Drop` of the
-target and a write of the newly dropped place. This is somewhat unrelated to what
-we've discussed above.
+ドロップ精緻化は、`DropAndReplace`ターミネータを、ターゲットの`Drop`と新しくドロップされた場所への書き込みに分割します。これは、上で説明したこととはやや無関係です。
 
-Once this is complete, `Drop` terminators in the MIR correspond to a call to
-the "drop glue" or "drop shim" for the type of the dropped place. The drop
-glue for a type calls the `Drop` impl for that type (if one exists), and then
-recursively calls the drop glue for all fields of that type.
+これが完了すると、MIRの`Drop`ターミネータは、ドロップされた場所の型の「ドロップ糊」または「ドロップshim」への呼び出しに対応します。型のドロップ糊は、その型の`Drop`実装（存在する場合）を呼び出し、次にその型のすべてのフィールドのドロップ糊を再帰的に呼び出します。
 
-## Drop elaboration in `rustc`
+## `rustc`でのドロップ精緻化
 
-The approach described above is more expensive than necessary. One can imagine
-a few optimizations:
+上記で説明したアプローチは、必要以上に高価です。いくつかの最適化を想像できます：
 
-- Only paths that are the target of a `Drop` (or have the target as a prefix)
-  need drop flags.
-- Some variables are known to be initialized (or uninitialized) when they are
-  dropped. These do not need drop flags.
-- If a set of paths are only dropped or moved from via a shared prefix, those
-  paths can share a single drop flag.
+- `Drop`のターゲットである（またはターゲットをプレフィックスとして持つ）パスのみがドロップフラグを必要とします。
+- ドロップされるときに初期化されている（または初期化されていない）ことがわかっている一部の変数。これらはドロップフラグを必要としません。
+- 一連のパスが共有プレフィックスを介してのみドロップまたは移動される場合、それらのパスは単一のドロップフラグを共有できます。
 
-A subset of these are implemented in `rustc`.
+これらのサブセットは`rustc`に実装されています。
 
-In the compiler, drop elaboration is split across several modules. The pass
-itself is defined [here][drops-transform], but the [main logic][drops] is
-defined elsewhere since it is also used to build [drop shims][drops-shim].
+コンパイラでは、ドロップ精緻化は複数のモジュールに分割されています。パス自体は[ここ][drops-transform]で定義されていますが、[主要なロジック][drops]は、[ドロップshim][drops-shim]を構築するためにも使用されるため、別の場所で定義されています。
 
-Drop elaboration designates each `Drop` in the newly built MIR as one of four
-kinds:
+ドロップ精緻化は、新しく構築されたMIRの各`Drop`を、4つの種類のいずれかとして指定します：
 
-- `Static`, the target is always initialized.
-- `Dead`, the target is always **un**initialized.
-- `Conditional`, the target is either wholly initialized or wholly
-  uninitialized. It is not partly initialized.
-- `Open`, the target may be partly initialized.
+- `Static`、ターゲットは常に初期化されています。
+- `Dead`、ターゲットは常に**非**初期化されています。
+- `Conditional`、ターゲットは完全に初期化されているか、完全に初期化されていないかのいずれかです。部分的に初期化されていません。
+- `Open`、ターゲットは部分的に初期化されている可能性があります。
 
-For this, it uses a pair of dataflow analyses, `MaybeInitializedPlaces` and
-`MaybeUninitializedPlaces`. If a place is in one but not the other, then the
-initializedness of the target is known at compile-time (`Dead` or `Static`).
-In this case, drop elaboration does not add a flag for the target. It simply
-removes (`Dead`) or preserves (`Static`) the `Drop` terminator.
+このため、2つのデータフロー解析、`MaybeInitializedPlaces`と`MaybeUninitializedPlaces`を使用します。場所が一方に存在し、他方に存在しない場合、ターゲットの初期化状態はコンパイル時に既知です（`Dead`または`Static`）。この場合、ドロップ精緻化はターゲットのフラグを追加しません。単に`Drop`ターミネータを削除（`Dead`）または保持（`Static`）します。
 
-For `Conditional` drops, we know that the initializedness of the variable as a
-whole is the same as the initializedness of its fields. Therefore, once we
-generate a drop flag for the target of that drop, it's safe to call the drop
-glue for that target.
+`Conditional`ドロップの場合、変数全体の初期化状態がそのフィールドの初期化状態と同じであることがわかります。したがって、そのドロップのターゲットに対してドロップフラグを生成したら、そのターゲットのドロップ糊を呼び出すことは安全です。
 
-### `Open` drops
+### `Open`ドロップ
 
-`Open` drops are the most complex, since we need to break down a single `Drop`
-terminator into several different ones, one for each field of the target whose
-type has drop glue (`Ty::needs_drop`). We cannot call the drop glue for the
-target itself because that requires all fields of the target to be initialized.
-Remember, variables whose type has a custom `Drop` impl do not allow `Open`
-drops because their fields cannot be moved from.
+`Open`ドロップは最も複雑です。なぜなら、単一の`Drop`ターミネータを、ターゲットの各フィールドに対して、その型がドロップ糊を持つ（`Ty::needs_drop`）いくつかの異なるものに分解する必要があるからです。ターゲット自体のドロップ糊を呼び出すことはできません。なぜなら、それにはターゲットのすべてのフィールドが初期化されている必要があるからです。カスタム`Drop`実装を持つ型は、そのフィールドから移動できないため、`Open`ドロップを許可しないことを覚えておいてください。
 
-This is accomplished by recursively categorizing each field as `Dead`,
-`Static`, `Conditional` or `Open`. Fields whose type does not have drop glue
-are automatically `Dead` and need not be considered during the recursion. When
-we reach a field whose kind is not `Open`, we handle it as we did above. If the
-field is also `Open`, the recursion continues.
+これは、各フィールドを`Dead`、`Static`、`Conditional`、または`Open`として再帰的に分類することによって達成されます。ドロップ糊を持たない型のフィールドは自動的に`Dead`であり、再帰中に考慮する必要はありません。種類が`Open`でないフィールドに到達すると、上記のように処理します。フィールドも`Open`の場合、再帰は続きます。
 
-It's worth noting how we handle `Open` drops of enums. Inside drop elaboration,
-each variant of the enum is treated like a field, with the invariant that only
-one of those "variant fields" can be initialized at any given time. In the
-general case, we do not know which variant is the active one, so we will have
-to call the drop glue for the enum (which checks the discriminant) or check the
-discriminant ourselves as part of an elaborated `Open` drop. However, in
-certain cases (within a `match` arm, for example) we do know which variant of
-an enum is active. This information is encoded in the `MaybeInitializedPlaces`
-and `MaybeUninitializedPlaces` dataflow analyses by marking all places
-corresponding to inactive variants as uninitialized.
+列挙型の`Open`ドロップをどのように処理するかに注目する価値があります。ドロップ精緻化内では、列挙型の各バリアントはフィールドのように扱われ、それらの「バリアントフィールド」のうち1つだけが任意の時点で初期化できるという不変条件があります。一般的なケースでは、どのバリアントがアクティブであるかはわからないため、列挙型のドロップ糊を呼び出すか（判別値をチェックします）、精緻化された`Open`ドロップの一部として判別値を自分でチェックする必要があります。ただし、特定のケース（`match`アーム内など）では、列挙型のどのバリアントがアクティブであるかがわかります。この情報は、非アクティブなバリアントに対応するすべての場所を初期化されていないものとしてマークすることによって、`MaybeInitializedPlaces`および`MaybeUninitializedPlaces`データフロー解析にエンコードされます。
 
-### Cleanup paths
+### クリーンアップパス
 
-TODO: Discuss drop elaboration and unwinding.
+TODO: ドロップ精緻化とアンワインドについて議論する。
 
-## Aside: drop elaboration and const-eval
+## 余談：ドロップ精緻化とconst-eval
 
-In Rust, functions that are eligible for evaluation at compile-time must be
-marked explicitly using the `const` keyword. This includes implementations  of
-the `Drop` trait, which may or may not be `const`. Code that is eligible for
-compile-time evaluation may only call `const` functions, so any calls to
-non-const `Drop` implementations in such code must be forbidden.
+Rustでは、コンパイル時の評価の対象となる関数は、`const`キーワードを使用して明示的にマークする必要があります。これには、`Drop`トレイトの実装が含まれます。これは`const`である場合とそうでない場合があります。コンパイル時評価の対象となるコードは、`const`関数のみを呼び出すことができるため、このようなコード内の非const `Drop`実装への呼び出しはすべて禁止する必要があります。
 
-A call to a `Drop` impl is encoded as a `Drop` terminator in the MIR. However,
-as we discussed above, a `Drop` terminator in newly built MIR does not
-necessarily result in a call to `Drop::drop`. The drop target may be
-uninitialized at that point. This means that checking for non-const `Drop`s on
-the newly built MIR can result in spurious errors. Instead, we wait until after
-drop elaboration runs, which eliminates `Dead` drops (ones where the target is
-known to be uninitialized) to run these checks.
+`Drop`実装への呼び出しは、MIRでは`Drop`ターミネータとしてエンコードされます。ただし、上で説明したように、新しく構築されたMIRの`Drop`ターミネータは、必ずしも`Drop::drop`への呼び出しにつながるわけではありません。ドロップターゲットはその時点で初期化されていない可能性があります。これは、新しく構築されたMIRで非const `Drop`をチェックすると、偽のエラーが発生する可能性があることを意味します。代わりに、ドロップ精緻化が実行された後まで待ち、`Dead`ドロップ（ターゲットが初期化されていないことがわかっているもの）を排除してから、これらのチェックを実行します。
 
 [RFC 320]: https://rust-lang.github.io/rfcs/0320-nonzeroing-dynamic-drop.html
 [reference-drop]: https://doc.rust-lang.org/reference/destructors.html

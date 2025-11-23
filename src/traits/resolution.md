@@ -1,34 +1,34 @@
-# Trait resolution (old-style)
+# トレイト解決（旧スタイル）
 
-This chapter describes the general process of _trait resolution_ and points out
-some non-obvious things.
+この章では、_トレイト解決_の一般的なプロセスについて説明し、
+いくつかの自明ではないことを指摘します。
 
-**Note:** This chapter (and its subchapters) describe how the trait
-solver **currently** works. However, we are in the process of
-designing a new trait solver. If you'd prefer to read about *that*,
-see [*this* subchapter](./chalk.html).
+**注意：** この章（およびそのサブチャプター）は、トレイトソルバーが
+**現在**どのように機能しているかを説明しています。しかし、新しい
+トレイトソルバーを設計するプロセスの途中にあります。*それ*について
+読みたい場合は、[*この*サブチャプター](./chalk.html)を参照してください。
 
-## Major concepts
+## 主要な概念
 
-Trait resolution is the process of pairing up an impl with each
-reference to a trait. So, for example, if there is a generic function like:
+トレイト解決は、トレイトへの各参照と impl をペアにするプロセスです。
+したがって、例えば、次のようなジェネリック関数がある場合：
 
 ```rust,ignore
 fn clone_slice<T:Clone>(x: &[T]) -> Vec<T> { ... }
 ```
 
-and then a call to that function:
+そして、その関数への呼び出しがある場合：
 
 ```rust,ignore
 let v: Vec<isize> = clone_slice(&[1, 2, 3])
 ```
 
-it is the job of trait resolution to figure out whether there exists an impl of
-(in this case) `isize : Clone`.
+（この場合）`isize : Clone` の impl が存在するかどうかを理解するのが
+トレイト解決の仕事です。
 
-Note that in some cases, like generic functions, we may not be able to
-find a specific impl, but we can figure out that the caller must
-provide an impl. For example, consider the body of `clone_slice`:
+場合によっては、ジェネリック関数のように、特定の impl を見つけることが
+できない場合もありますが、呼び出し元が impl を提供する必要があることを
+理解できます。例えば、`clone_slice` の本体を考えてみましょう：
 
 ```rust,ignore
 fn clone_slice<T:Clone>(x: &[T]) -> Vec<T> {
@@ -39,109 +39,106 @@ fn clone_slice<T:Clone>(x: &[T]) -> Vec<T> {
 }
 ```
 
-The line marked `(*)` is only legal if `T` (the type of `*e`)
-implements the `Clone` trait. Naturally, since we don't know what `T`
-is, we can't find the specific impl; but based on the bound `T:Clone`,
-we can say that there exists an impl which the caller must provide.
+マークされた行 `(*)` は、`T`（`*e` の型）が `Clone` トレイトを
+実装している場合にのみ合法です。当然、`T` が何であるかわからないため、
+特定の impl を見つけることはできません。しかし、境界 `T:Clone` に
+基づいて、呼び出し元が提供する必要がある impl が存在すると言えます。
 
-We use the term *obligation* to refer to a trait reference in need of
-an impl. Basically, the trait resolution system resolves an obligation
-by proving that an appropriate impl does exist.
+impl を必要とするトレイト参照を指すために、*義務*という用語を使用します。
+基本的に、トレイト解決システムは、適切な impl が実際に存在することを
+証明することによって義務を解決します。
 
-During type checking, we do not store the results of trait selection.
-We simply wish to verify that trait selection will succeed. Then
-later, at codegen time, when we have all concrete types available, we
-can repeat the trait selection to choose an actual implementation, which
-will then be generated in the output binary.
+型チェック中、トレイト選択の結果を保存しません。トレイト選択が成功する
+ことを検証したいだけです。その後、コード生成時に、すべての具体的な型が
+利用可能になったら、トレイト選択を繰り返して実際の実装を選択し、
+出力バイナリに生成できます。
 
-## Overview
+## 概要
 
-Trait resolution consists of three major parts:
+トレイト解決は3つの主要な部分で構成されています：
 
-- **Selection**: Deciding how to resolve a specific obligation. For
-  example, selection might decide that a specific obligation can be
-  resolved by employing an impl which matches the `Self` type, or by using a
-  parameter bound (e.g. `T: Trait`). In the case of an impl, selecting one
-  obligation can create *nested obligations* because of where clauses
-  on the impl itself. It may also require evaluating those nested
-  obligations to resolve ambiguities.
+- **選択**：特定の義務をどのように解決するかを決定します。例えば、
+  選択は、特定の義務が `Self` 型に一致する impl を使用するか、
+  パラメータ境界（例：`T: Trait`）を使用することによって解決できると
+  決定するかもしれません。impl の場合、1つの義務を選択すると、
+  impl 自体の where 句のために*ネストされた義務*が作成される可能性が
+  あります。また、曖昧さを解決するために、それらのネストされた義務を
+  評価する必要がある場合もあります。
 
-- **Fulfillment**: The fulfillment code is what tracks that obligations
-  are completely fulfilled. Basically it is a worklist of obligations
-  to be selected: once selection is successful, the obligation is
-  removed from the worklist and any nested obligations are enqueued.
-  Fulfillment constrains inference variables.
+- **履行**：履行コードは、義務が完全に履行されることを追跡するものです。
+  基本的には、選択する義務のワークリストです：選択が成功すると、
+  義務はワークリストから削除され、ネストされた義務がエンキューされます。
+  履行は推論変数を制約します。
 
-- **Evaluation**: Checks whether obligations holds without constraining
-  any inference variables. Used by selection.
+- **評価**：推論変数を制約せずに義務が成り立つかどうかをチェックします。
+  選択によって使用されます。
 
-## Selection
+## 選択
 
-Selection is the process of deciding whether an obligation can be
-resolved and, if so, how it is to be resolved (via impl, where clause, etc).
-The main interface is the `select()` function, which takes an obligation
-and returns a `SelectionResult`. There are three possible outcomes:
+選択は、義務を解決できるかどうか、そしてもしそうなら、どのように解決するか
+（impl、where 句などを介して）を決定するプロセスです。主なインターフェースは
+`select()` 関数で、義務を受け取り、`SelectionResult` を返します。
+3つの可能な結果があります：
 
-- `Ok(Some(selection))` – yes, the obligation can be resolved, and
-  `selection` indicates how. If the impl was resolved via an impl,
-  then `selection` may also indicate nested obligations that are required
-  by the impl.
+- `Ok(Some(selection))` - はい、義務は解決でき、`selection` はその方法を
+  示します。impl を介して解決された場合、`selection` は impl によって
+  必要とされるネストされた義務も示す可能性があります。
 
-- `Ok(None)` – we are not yet sure whether the obligation can be
-  resolved or not. This happens most commonly when the obligation
-  contains unbound type variables.
+- `Ok(None)` - 義務が解決できるかどうかまだわかりません。これは、
+  義務に未束縛の型変数が含まれている場合に最もよく起こります。
 
-- `Err(err)` – the obligation definitely cannot be resolved due to a
-  type error or because there are no impls that could possibly apply.
+- `Err(err)` - 型エラーのため、または適用される可能性のある impl が
+  ないため、義務は確実に解決できません。
 
-The basic algorithm for selection is broken into two big phases:
-candidate assembly and confirmation.
+選択の基本的なアルゴリズムは、候補アセンブリと確認の2つの大きな
+フェーズに分かれています。
 
-Note that because of how lifetime inference works, it is not possible to
-give back immediate feedback as to whether a unification or subtype
-relationship between lifetimes holds or not. Therefore, lifetime
-matching is *not* considered during selection. This is reflected in
-the fact that subregion assignment is infallible. This may yield
-lifetime constraints that will later be found to be in error (in
-contrast, the non-lifetime-constraints have already been checked
-during selection and can never cause an error, though naturally they
-may lead to other errors downstream).
+ライフタイム推論がどのように機能するかのため、ライフタイム間の
+単一化またはサブタイプ関係が成り立つかどうかについて即座のフィードバックを
+返すことは不可能であることに注意してください。したがって、ライフタイム
+マッチングは選択中に*考慮されません*。これは、サブ領域割り当てが
+失敗しないという事実に反映されています。これにより、後でエラーが
+見つかるライフタイム制約が生成される可能性があります（対照的に、
+非ライフタイム制約は選択中にすでにチェックされており、エラーを
+引き起こすことはありませんが、当然、他のエラーを下流で引き起こす
+可能性があります）。
 
-### Candidate assembly
+### 候補アセンブリ
 
-**TODO**: Talk about _why_ we have different candidates, and why it needs to happen in a probe.
+**TODO**：なぜ異なる候補があるのか、そしてなぜそれがプローブで行われる必要が
+あるのかについて話します。
 
-Searches for impls/where-clauses/etc that might
-possibly be used to satisfy the obligation. Each of those is called
-a candidate. To avoid ambiguity, we want to find exactly one
-candidate that is definitively applicable. In some cases, we may not
-know whether an impl/where-clause applies or not – this occurs when
-the obligation contains unbound inference variables.
+義務を満たすために使用される可能性のある impl/where 句/などを検索します。
+これらのそれぞれは候補と呼ばれます。曖昧さを避けるために、確実に適用可能な
+正確に1つの候補を見つけたいと考えています。場合によっては、impl/where 句が
+適用されるかどうかわからないことがあります - これは、義務に未束縛の推論変数が
+含まれている場合に発生します。
 
-The subroutines that decide whether a particular impl/where-clause/etc applies
-to a particular obligation are collectively referred to as the process of
-_matching_. For `impl` candidates <!-- date-check: Oct 2022 -->,
-this amounts to unifying the impl header (the `Self` type and the trait arguments)
-while ignoring  nested obligations. If matching succeeds then we add it
-to a set of candidates. There are other rules when assembling candidates for
-built-in traits such as `Copy`, `Sized`, and `CoerceUnsized`.
+特定の impl/where 句/などが特定の義務に適用されるかどうかを決定する
+サブルーチンは、まとめて_マッチング_のプロセスと呼ばれます。`impl` 候補の場合
+<!-- date-check: Oct 2022 -->、これはネストされた義務を無視しながら
+impl ヘッダー（`Self` 型とトレイト引数）を単一化することになります。
+マッチングが成功した場合、候補のセットに追加します。`Copy`、`Sized`、
+`CoerceUnsized` などの組み込みトレイトの候補をアセンブルする際には、
+他の規則があります。
 
-Once this first pass is done, we can examine the set of candidates. If
-it is a singleton set, then we are done: this is the only impl in
-scope that could possibly apply. Otherwise, we can **winnow** down the set
-of candidates by using where clauses and other conditions. Winnowing uses
-`evaluate_candidate` to check whether the nested obligations may apply. 
-If this still leaves more than 1 candidate, we use ` fn candidate_should_be_dropped_in_favor_of` 
-to prefer some candidates over others. 
+この最初のパスが完了したら、候補のセットを調べることができます。
+シングルトンセットである場合、完了です：これが適用される可能性のある
+スコープ内の唯一の impl です。それ以外の場合は、where 句や他の条件を
+使用して候補のセットを**絞り込む**ことができます。絞り込みは
+`evaluate_candidate` を使用して、ネストされた義務が適用される可能性が
+あるかどうかをチェックします。それでも1つ以上の候補が残っている場合、
+` fn candidate_should_be_dropped_in_favor_of` を使用して、いくつかの
+候補を他の候補よりも優先します。
 
 
-If this reduced set yields a single, unambiguous entry, we're good to go,
-otherwise the result is considered ambiguous.
+この縮小されたセットが単一の明確なエントリを生成する場合、問題ありません。
+そうでなければ、結果は曖昧と見なされます。
 
-#### Winnowing: Resolving ambiguities
+#### 絞り込み：曖昧さの解決
 
-But what happens if there are multiple impls where all the types
-unify? Consider this example:
+しかし、すべての型が単一化する複数の impl がある場合はどうなるでしょうか？
+この例を考えてみましょう：
 
 ```rust,ignore
 trait Get {
@@ -161,29 +158,28 @@ impl<T: Get> Get for Box<T> {
 }
 ```
 
-What happens when we invoke `get(&Box::new(1_u16))`, for example? In this
-case, the `Self` type is `Box<u16>` – that unifies with both impls,
-because the first applies to all types `T`, and the second to all
-`Box<T>`. In order for this to be unambiguous, the compiler does a *winnowing*
-pass that considers `where` clauses
-and attempts to remove candidates. In this case, the first impl only
-applies if `Box<u16> : Copy`, which doesn't hold. After winnowing,
-then, we are left with just one candidate, so we can proceed.
+例えば、`get(&Box::new(1_u16))` を呼び出すとどうなりますか？この場合、
+`Self` 型は `Box<u16>` です - これは両方の impl と単一化します。
+なぜなら、最初はすべての型 `T` に適用され、2番目はすべての `Box<T>` に
+適用されるからです。これが曖昧でないためには、コンパイラは `where` 句を
+考慮し、候補を削除しようとする*絞り込み*パスを行います。この場合、
+最初の impl は `Box<u16> : Copy` が成り立つ場合にのみ適用されますが、
+これは成り立ちません。絞り込み後、1つの候補だけが残るため、
+続行できます。
 
-#### `where` clauses
+#### `where` 句
 
-Besides an impl, the other major way to resolve an obligation is via a
-where clause. The selection process is always given a [parameter
-environment] which contains a list of where clauses, which are
-basically obligations that we can assume are satisfiable. We will iterate
-over that list and check whether our current obligation can be found
-in that list. If so, it is considered satisfied. More precisely, we
-want to check whether there is a where-clause obligation that is for
-the same trait (or some subtrait) and which can match against the obligation.
+impl の他に、義務を解決する主な方法は where 句を介することです。
+選択プロセスには常に[パラメータ環境]が与えられ、これには where 句の
+リストが含まれています。これらは基本的に満たされると仮定できる義務です。
+そのリストを反復処理し、現在の義務がそのリストに見つかるかどうかを
+チェックします。見つかった場合、満たされていると見なされます。より
+正確には、同じトレイト（または何らかのサブトレイト）に対する where 句義務が
+あり、義務と一致できるかどうかをチェックしたいと考えています。
 
 [parameter environment]: ../typing_parameter_envs.html
 
-Consider this simple example:
+この簡単な例を考えてみましょう：
 
 ```rust,ignore
 trait A1 {
@@ -201,21 +197,20 @@ fn foo<X:A2+B>(x: X) {
 }
 ```
 
-In the body of `foo`, clearly we can use methods of `A1`, `A2`, or `B`
-on variable `x`. The line marked `(*)` will incur an obligation `X: A1`,
-while the line marked `(#)` will incur an obligation `X: B`. Meanwhile,
-the parameter environment will contain two where-clauses: `X : A2` and `X : B`.
-For each obligation, then, we search this list of where-clauses. The
-obligation `X: B` trivially matches against the where-clause `X: B`.
-To resolve an obligation `X:A1`, we would note that `X:A2` implies that `X:A1`.
+`foo` の本体では、明らかに変数 `x` で `A1`、`A2`、または `B` の
+メソッドを使用できます。マークされた行 `(*)` は義務 `X: A1` を
+発生させ、マークされた行 `(#)` は義務 `X: B` を発生させます。一方、
+パラメータ環境には2つの where 句が含まれます：`X : A2` と `X : B`。
+各義務について、この where 句のリストを検索します。義務 `X: B` は
+where 句 `X: B` と自明に一致します。義務 `X:A1` を解決するには、
+`X:A2` が `X:A1` を意味することに注意します。
 
-### Confirmation
+### 確認
 
-_Confirmation_ unifies the output type parameters of the trait with the
-values found in the obligation, possibly yielding a type error.
+_確認_は、トレイトの出力型パラメータを義務で見つかった値と単一化し、
+場合によっては型エラーを生成します。
 
-Suppose we have the following variation of the `Convert` example in the
-previous section:
+前のセクションの `Convert` 例の次のバリエーションがあるとします：
 
 ```rust,ignore
 trait Convert<Target> {
@@ -226,28 +221,27 @@ impl Convert<usize> for isize { ... } // isize -> usize
 impl Convert<isize> for usize { ... } // usize -> isize
 
 let x: isize = ...;
-let y: char = x.convert(); // NOTE: `y: char` now!
+let y: char = x.convert(); // 注意：今は `y: char` です！
 ```
 
-Confirmation is where an error would be reported because the impl specified
-that `Target` would be `usize`, but the obligation reported `char`. Hence the
-result of selection would be an error.
+確認は、impl が `Target` が `usize` になると指定したが、義務が `char` を
+報告したため、エラーが報告される場所です。したがって、選択の結果は
+エラーになります。
 
-Note that the candidate impl is chosen based on the `Self` type, but
-confirmation is done based on (in this case) the `Target` type parameter.
+候補 impl は `Self` 型に基づいて選択されますが、確認は（この場合）
+`Target` 型パラメータに基づいて行われることに注意してください。
 
-### Selection during codegen
+### コード生成時の選択
 
-As mentioned above, during type checking, we do not store the results of trait
-selection. At codegen time, we repeat the trait selection to choose a particular
-impl for each method call. This is done using `fn codegen_select_candidate`. 
-In this second selection, we do not consider any where-clauses to be in scope 
-because we know that each resolution will resolve to a particular impl.
+上述のように、型チェック中、トレイト選択の結果を保存しません。コード生成時に、
+各メソッド呼び出しに対して特定の impl を選択するためにトレイト選択を繰り返します。
+これは `fn codegen_select_candidate` を使用して行われます。この2番目の選択では、
+各解決が特定の impl に解決されることがわかっているため、スコープ内にある
+where 句は考慮しません。
 
-One interesting twist has to do with nested obligations. In general, in codegen,
-we only need to figure out which candidate applies, and we do not care about nested obligations,
-as these are already assumed to be true. Nonetheless, we *do* currently fulfill all of them.
-That is because it can sometimes inform the results of type inference.
-That is, we do not have the full substitutions in terms of the type variables
-of the impl available to us, so we must run trait selection to figure
-everything out.
+興味深いひねりの1つは、ネストされた義務に関係しています。一般的に、コード生成では、
+どの候補が適用されるかを理解する必要があるだけで、ネストされた義務については
+気にしません。これらはすでに真であると仮定されているためです。それにもかかわらず、
+現在、それらすべてを*実際に*履行しています。それは、時々型推論の結果を
+知らせることができるからです。つまり、impl の型変数に関する完全な置換が
+利用できないため、すべてを理解するためにトレイト選択を実行する必要があります。

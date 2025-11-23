@@ -1,103 +1,63 @@
-# The `ty` module: representing types
+# `ty` モジュール：型の表現
 
-The `ty` module defines how the Rust compiler represents types internally. It also defines the
-*typing context* (`tcx` or `TyCtxt`), which is the central data structure in the compiler.
+`ty` モジュールは、Rust コンパイラが型を内部的にどのように表現するかを定義します。また、コンパイラの中心的なデータ構造である *typing context*（`tcx` または `TyCtxt`）も定義します。
 
 ## `ty::Ty`
 
-When we talk about how rustc represents types,  we usually refer to a type called `Ty` . There are
-quite a few modules and types for `Ty` in the compiler ([Ty documentation][ty]).
+rustc が型をどのように表現するかについて話すとき、通常は `Ty` と呼ばれる型を指します。コンパイラには `Ty` に関するかなり多くのモジュールと型があります（[Ty ドキュメント][ty]）。
 
 [ty]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/index.html
 
-The specific `Ty` we are referring to is [`rustc_middle::ty::Ty`][ty_ty] (and not
-[`rustc_hir::Ty`][hir_ty]). The distinction is important, so we will discuss it first before going
-into the details of `ty::Ty`.
+ここで指している特定の `Ty` は [`rustc_middle::ty::Ty`][ty_ty] であり、[`rustc_hir::Ty`][hir_ty] ではありません。この区別は重要なので、`ty::Ty` の詳細に入る前にまずこれについて議論します。
 
 [ty_ty]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.Ty.html
 [hir_ty]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/hir/struct.Ty.html
 
-## `rustc_hir::Ty` vs `ty::Ty`
+## `rustc_hir::Ty` と `ty::Ty` の比較
 
-The HIR in rustc can be thought of as the high-level intermediate representation. It is more or less
-the AST (see [this chapter](hir.md)) as it represents the
-syntax that the user wrote, and is obtained after parsing and some *desugaring*. It has a
-representation of types, but in reality it reflects more of what the user wrote, that is, what they
-wrote so as to represent that type.
+rustc の HIR は高レベル中間表現と考えることができます。これは AST（[この章](hir.md)を参照）とほぼ同じで、ユーザーが書いた構文を表しており、パースといくつかの *脱糖* の後に得られます。型の表現を持っていますが、実際にはユーザーが書いたもの、つまり、その型を表現するために書いたものをより反映しています。
 
-In contrast, `ty::Ty` represents the semantics of a type, that is, the *meaning* of what the user
-wrote. For example, `rustc_hir::Ty` would record the fact that a user used the name `u32` twice
-in their program, but the `ty::Ty` would record the fact that both usages refer to the same type.
+対照的に、`ty::Ty` は型の意味論、つまりユーザーが書いたものの *意味* を表します。例えば、`rustc_hir::Ty` はユーザーがプログラムで `u32` という名前を 2 回使ったという事実を記録しますが、`ty::Ty` は両方の使用が同じ型を参照しているという事実を記録します。
 
-**Example: `fn foo(x: u32) → u32 { x }`**
+**例：`fn foo(x: u32) → u32 { x }`**
 
-In this function, we see that `u32` appears twice. We know
-that that is the same type,
-i.e. the function takes an argument and returns an argument of the same type,
-but from the point of view of the HIR,
-there would be two distinct type instances because these
-are occurring in two different places in the program.
-That is, they have two different [`Span`s][span] (locations).
+この関数では、`u32` が 2 回出現しているのがわかります。それが同じ型であることは知っています。つまり、関数は引数を受け取り、同じ型の引数を返します。しかし、HIR の観点からは、プログラムの異なる場所に出現しているため、2 つの異なる型インスタンスがあることになります。つまり、2 つの異なる [`Span`s][span]（位置）を持っています。
 
 [span]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/struct.Span.html
 
-**Example: `fn foo(x: &u32) -> &u32`**
+**例：`fn foo(x: &u32) -> &u32`**
 
-In addition, HIR might have information left out. This type
-`&u32` is incomplete, since in the full Rust type there is actually a lifetime, but we didn’t need
-to write those lifetimes. There are also some elision rules that insert information. The result may
-look like  `fn foo<'a>(x: &'a u32) -> &'a u32`.
+さらに、HIR には省略された情報があるかもしれません。この型 `&u32` は不完全です。なぜなら、完全な Rust 型には実際にはライフタイムがありますが、それらのライフタイムを書く必要がなかったからです。また、情報を挿入する省略規則もあります。結果は `fn foo<'a>(x: &'a u32) -> &'a u32` のようになるかもしれません。
 
-In the HIR level, these things are not spelled out and you can say the picture is rather incomplete.
-However, at the `ty::Ty` level, these details are added and it is complete. Moreover, we will have
-exactly one `ty::Ty` for a given type, like `u32`, and that `ty::Ty` is used for all `u32`s in the
-whole program, not a specific usage, unlike `rustc_hir::Ty`.
+HIR レベルでは、これらのことは綴られておらず、全体像はかなり不完全であると言えます。しかし、`ty::Ty` レベルでは、これらの詳細が追加され、完全になります。さらに、`u32` のような特定の型に対しては正確に 1 つの `ty::Ty` を持ち、その `ty::Ty` は `rustc_hir::Ty` のような特定の使用ではなく、プログラム全体のすべての `u32` に対して使用されます。
 
-Here is a summary:
+要約は次のとおりです：
 
 | [`rustc_hir::Ty`][hir_ty] | [`ty::Ty`][ty_ty] |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Describe the *syntax* of a type: what the user wrote (with some desugaring).  | Describe the *semantics* of a type: the meaning of what the user wrote. |
-| Each `rustc_hir::Ty` has its own spans corresponding to the appropriate place in the program. | Doesn’t correspond to a single place in the user’s program. |
-| `rustc_hir::Ty` has generics and lifetimes; however, some of those lifetimes are special markers like [`LifetimeKind::Implicit`][implicit]. | `ty::Ty` has the full type, including generics and lifetimes, even if the user left them out |
-| `fn foo(x: u32) -> u32 { }` - Two `rustc_hir::Ty` representing each usage of `u32`, each has its own `Span`s, and `rustc_hir::Ty` doesn’t tell us that both are the same type | `fn foo(x: u32) -> u32 { }` - One `ty::Ty` for all instances of `u32` throughout the program, and `ty::Ty` tells us that both usages of `u32` mean the same type. |
-| `fn foo(x: &u32) -> &u32 { }` - Two `rustc_hir::Ty` again. Lifetimes for the references show up in the `rustc_hir::Ty`s using a special marker, [`LifetimeKind::Implicit`][implicit]. | `fn foo(x: &u32) -> &u32 { }`- A single `ty::Ty`. The `ty::Ty` has the hidden lifetime param. |
+| 型の *構文* を記述：ユーザーが書いたもの（いくつかの脱糖を伴う）。  | 型の *意味論* を記述：ユーザーが書いたものの意味。 |
+| 各 `rustc_hir::Ty` は、プログラムの適切な場所に対応する独自のスパンを持ちます。 | ユーザーのプログラムの単一の場所に対応しません。 |
+| `rustc_hir::Ty` にはジェネリクスとライフタイムがありますが、それらのライフタイムの一部は [`LifetimeKind::Implicit`][implicit] のような特別なマーカーです。 | `ty::Ty` は、ユーザーが省略した場合でも、ジェネリクスとライフタイムを含む完全な型を持ちます |
+| `fn foo(x: u32) -> u32 { }` - `u32` の各使用を表す 2 つの `rustc_hir::Ty`、それぞれが独自の `Span` を持ち、`rustc_hir::Ty` は両方が同じ型であることを教えてくれません | `fn foo(x: u32) -> u32 { }` - プログラム全体の `u32` のすべてのインスタンスに対して 1 つの `ty::Ty`、そして `ty::Ty` は `u32` の両方の使用が同じ型を意味することを教えてくれます。 |
+| `fn foo(x: &u32) -> &u32 { }` - 再び 2 つの `rustc_hir::Ty`。参照のライフタイムは、[`LifetimeKind::Implicit`][implicit] という特別なマーカーを使用して `rustc_hir::Ty` に表示されます。 | `fn foo(x: &u32) -> &u32 { }`- 単一の `ty::Ty`。`ty::Ty` には隠されたライフタイムパラメータがあります。 |
 
 [implicit]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/hir/enum.LifetimeKind.html#variant.Implicit
 
-**Order**
+**順序**
 
-HIR is built directly from the AST, so it happens before any `ty::Ty` is produced. After
-HIR is built, some basic type inference and type checking is done. During the type inference, we
-figure out what the `ty::Ty` of everything is and we also check if the type of something is
-ambiguous. The `ty::Ty` is then used for type checking while making sure everything has the
-expected type. The [`hir_ty_lowering` module][hir_ty_lowering] is where the code responsible for
-lowering a `rustc_hir::Ty` to a `ty::Ty` is located. The main routine used is `lower_ty`.
-This occurs during the type-checking phase, but also in other parts of the compiler that want to ask
-questions like "what argument types does this function expect?"
+HIR は AST から直接構築されるため、`ty::Ty` が生成される前に発生します。HIR が構築された後、基本的な型推論と型チェックが行われます。型推論中に、すべてのものの `ty::Ty` が何であるかを把握し、何かの型があいまいかどうかもチェックします。`ty::Ty` は、すべてが期待される型を持っていることを確認しながら、型チェックに使用されます。[`hir_ty_lowering` モジュール][hir_ty_lowering]は、`rustc_hir::Ty` を `ty::Ty` に下げる責任があるコードが配置されている場所です。使用される主なルーチンは `lower_ty` です。これは型チェックフェーズ中に発生しますが、「この関数はどのような引数型を期待していますか？」のような質問をしたいコンパイラの他の部分でも発生します。
 
 [hir_ty_lowering]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir_analysis/hir_ty_lowering/index.html
 
-**How semantics drive the two instances of `Ty`**
+**意味論が 2 つの `Ty` インスタンスを駆動する方法**
 
-You can think of HIR as the perspective
-of the type information that assumes the least. We assume two things are distinct until they are
-proven to be the same thing. In other words, we know less about them, so we should assume less about
-them.
+HIR は、最小限のことを仮定する型情報の観点と考えることができます。2 つのものが同じものであることが証明されるまで、異なるものと仮定します。言い換えれば、それらについてより少ないことを知っているので、それらについてより少ないことを仮定すべきです。
 
-They are syntactically two strings: `"u32"` at line N column 20 and `"u32"` at line N column 35. We
-don’t know that they are the same yet. So, in the HIR we treat them as if they are different. Later,
-we determine that they semantically are the same type and that’s the `ty::Ty` we use.
+それらは構文的に 2 つの文字列です：行 N 列 20 の `"u32"` と行 N 列 35 の `"u32"`。それらがまだ同じであることは知りません。したがって、HIR ではそれらが異なるかのように扱います。後で、それらが意味的に同じ型であることを判断し、それが使用する `ty::Ty` です。
 
-Consider another example: `fn foo<T>(x: T) -> u32`. Suppose that someone invokes `foo::<u32>(0)`.
-This means that `T` and `u32` (in this invocation) actually turns out to be the same type, so we
-would eventually end up with the same `ty::Ty` in the end, but we have distinct `rustc_hir::Ty`.
-(This is a bit over-simplified, though, since during type checking, we would check the function
-generically and would still have a `T` distinct from `u32`. Later, when doing code generation,
-we would always be handling "monomorphized" (fully substituted) versions of each function,
-and hence we would know what `T` represents (and specifically that it is `u32`).)
+別の例を考えてみましょう：`fn foo<T>(x: T) -> u32`。誰かが `foo::<u32>(0)` を呼び出すとします。これは、`T` と `u32`（この呼び出しで）が実際には同じ型であることが判明することを意味するので、最終的には同じ `ty::Ty` になりますが、異なる `rustc_hir::Ty` があります。（ただし、これは少し単純化されています。型チェック中に、関数を一般的にチェックし、まだ `u32` とは異なる `T` を持ちます。後で、コード生成を行うときは、常に各関数の「単相化」（完全に置換された）バージョンを処理し、したがって `T` が何を表すか（具体的にはそれが `u32` であること）を知ります。）
 
-Here is one more example:
+もう 1 つの例を示します：
 
 ```rust
 mod a {
@@ -110,105 +70,57 @@ mod b {
 }
 ```
 
-Here the type `X` will vary depending on context, clearly. If you look at the `rustc_hir::Ty`,
-you will get back that `X` is an alias in both cases (though it will be mapped via name resolution
-to distinct aliases). But if you look at the `ty::Ty` signature, it will be either `fn(u32) -> u32`
-or `fn(i32) -> i32` (with type aliases fully expanded).
+ここで、型 `X` はコンテキストによって異なります。`rustc_hir::Ty` を見ると、両方の場合で `X` がエイリアスであることがわかります（ただし、名前解決を介して異なるエイリアスにマッピングされます）。しかし、`ty::Ty` シグネチャを見ると、`fn(u32) -> u32` または `fn(i32) -> i32`（型エイリアスが完全に展開された状態）になります。
 
-## `ty::Ty` implementation
+## `ty::Ty` の実装
 
-[`rustc_middle::ty::Ty`][ty_ty] is actually a wrapper around
-[`Interned<WithCachedTypeInfo<TyKind>>`][tykind].
-You can ignore `Interned` in general; you will basically never access it explicitly.
-We always hide them within `Ty` and skip over it via `Deref` impls or methods.
-`TyKind` is a big enum
-with variants to represent many different Rust types
-(e.g. primitives, references, algebraic data types, generics, lifetimes, etc).
-`WithCachedTypeInfo` has a few cached values like `flags` and `outer_exclusive_binder`. They
-are convenient hacks for efficiency and summarize information about the type that we may want to
-know, but they don’t come into the picture as much here. Finally, [`Interned`](./memory.md) allows
-the `ty::Ty` to be a thin pointer-like
-type. This allows us to do cheap comparisons for equality, along with the other
-benefits of interning.
+[`rustc_middle::ty::Ty`][ty_ty] は実際には [`Interned<WithCachedTypeInfo<TyKind>>`][tykind] のラッパーです。一般的に `Interned` は無視できます。基本的に明示的にアクセスすることはありません。常に `Ty` 内に隠され、`Deref` 実装やメソッドを介してスキップします。`TyKind` は、多くの異なる Rust 型（例：プリミティブ、参照、代数的データ型、ジェネリクス、ライフタイムなど）を表すバリアントを持つ大きな enum です。`WithCachedTypeInfo` には、`flags` や `outer_exclusive_binder` のようないくつかのキャッシュされた値があります。これらは効率のための便利なハックであり、知りたいかもしれない型に関する情報を要約しますが、ここではそれほど重要ではありません。最後に、[`Interned`](./memory.md) により、`ty::Ty` を薄いポインターのような型にすることができます。これにより、等価性の安価な比較を行うことができ、インターンの他の利点もあります。
 
 [tykind]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_type_ir/ty_kind/enum.TyKind.html
 
-## Allocating and working with types
+## 型の割り当てと操作
 
-To allocate a new type, you can use the various `new_*` methods defined on
-[`Ty`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.Ty.html).
-These have names
-that correspond mostly to the various kinds of types. For example:
+新しい型を割り当てるには、[`Ty`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.Ty.html) で定義されたさまざまな `new_*` メソッドを使用できます。これらの名前は、主にさまざまな種類の型に対応しています。例：
 
 ```rust,ignore
 let array_ty = Ty::new_array_with_const_len(tcx, ty, count);
 ```
 
-These methods all return a `Ty<'tcx>` – note that the lifetime you get back is the lifetime of the
-arena that this `tcx` has access to. Types are always canonicalized and interned (so we never
-allocate exactly the same type twice).
+これらのメソッドはすべて `Ty<'tcx>` を返します – 返されるライフタイムは、この `tcx` がアクセスできるアリーナのライフタイムであることに注意してください。型は常に正規化されインターンされます（したがって、まったく同じ型を 2 回割り当てることはありません）。
 
-You can also find various common types in the `tcx` itself by accessing its fields:
-`tcx.types.bool`, `tcx.types.char`, etc. (See [`CommonTypes`] for more.)
+また、`tcx` 自体のフィールドにアクセスすることで、さまざまな一般的な型を見つけることもできます：`tcx.types.bool`、`tcx.types.char` など。（詳細については [`CommonTypes`] を参照してください。）
 
 [`CommonTypes`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/context/struct.CommonTypes.html
 
 <!-- N.B: This section is linked from the type comparison internal lint. -->
-## Comparing types
+## 型の比較
 
-Because types are interned, it is possible to compare them for equality efficiently using `==`
-– however, this is almost never what you want to do unless you happen to be hashing and looking
-for duplicates. This is because often in Rust there are multiple ways to represent the same type,
-particularly once inference is involved.
+型はインターンされているため、`==` を使用して効率的に等価性を比較することができます – ただし、これはハッシュして重複を探している場合を除いて、やりたいことではほとんどありません。これは、Rust では特に推論が関与すると、同じ型を表現する複数の方法があるためです。
 
-For example, the type `{integer}` (`ty::Infer(ty::IntVar(..))` an integer inference variable,
-the type of an integer literal like `0`) and `u8` (`ty::UInt(..)`) should often be treated as
-equal when testing whether they can be assigned to each other (which is a common operation in
-diagnostics code). `==` on them will return `false` though, since they are different types.
+例えば、型 `{integer}`（`ty::Infer(ty::IntVar(..))`、整数リテラル `0` のような整数推論変数）と `u8`（`ty::UInt(..)`）は、互いに割り当て可能かどうかをテストするときに等しいものとして扱われることがよくあります（これは診断コードでは一般的な操作です）。しかし、それらに対する `==` は `false` を返します。なぜなら、それらは異なる型だからです。
 
-The simplest way to compare two types correctly requires an inference context (`infcx`).
-If you have one, you can use `infcx.can_eq(param_env, ty1, ty2)`
-to check whether the types can be made equal.
-This is typically what you want to check during diagnostics, which is concerned with questions such
-as whether two types can be assigned to each other, not whether they're represented identically in
-the compiler's type-checking layer.
+2 つの型を正しく比較する最も簡単な方法には、推論コンテキスト（`infcx`）が必要です。それがある場合は、`infcx.can_eq(param_env, ty1, ty2)` を使用して、型を等しくできるかどうかを確認できます。これは通常、診断中にチェックしたいことであり、2 つの型が互いに割り当て可能かどうかなどの質問に関係しており、コンパイラの型チェックレイヤーで同一に表現されているかどうかではありません。
 
-When working with an inference context, you have to be careful to ensure that potential inference
-variables inside the types actually belong to that inference context. If you are in a function
-that has access to an inference context already, this should be the case. Specifically, this is the
-case during HIR type checking or MIR borrow checking.
+推論コンテキストで作業するときは、型内の潜在的な推論変数が実際にその推論コンテキストに属していることを確認するように注意する必要があります。すでに推論コンテキストにアクセスできる関数内にいる場合は、そうあるべきです。具体的には、HIR 型チェックまたは MIR 借用チェック中です。
 
-Another consideration is normalization. Two types may actually be the same, but one is behind an
-associated type. To compare them correctly, you have to normalize the types first. This is
-primarily a concern during HIR type checking and with all types from a `TyCtxt` query
-(for example from `tcx.type_of()`).
+もう 1 つの考慮事項は正規化です。2 つの型は実際には同じかもしれませんが、1 つは関連型の背後にあります。それらを正しく比較するには、最初に型を正規化する必要があります。これは主に HIR 型チェック中および `TyCtxt` クエリからのすべての型（例えば `tcx.type_of()` から）に関する懸念です。
 
-When a `FnCtxt` or an `ObligationCtxt` is available during type checking, `.normalize(ty)`
-should be used on them to normalize the type. After type checking, diagnostics code can use
-`tcx.normalize_erasing_regions(ty)`.
+型チェック中に `FnCtxt` または `ObligationCtxt` が利用可能な場合は、型を正規化するためにそれらで `.normalize(ty)` を使用する必要があります。型チェック後、診断コードは `tcx.normalize_erasing_regions(ty)` を使用できます。
 
-There are also cases where using `==` on `Ty` is fine. This is for example the case in late lints
-or after monomorphization, since type checking has been completed, meaning all inference variables
-are resolved and all regions have been erased. In these cases, if you know that inference variables
-or normalization won't be a concern, `#[allow]` or `#[expect]`ing the lint is recommended.
+`Ty` で `==` を使用しても問題ない場合もあります。これは例えば、遅延リントまたは単相化後の場合です。型チェックが完了しているため、すべての推論変数が解決され、すべてのリージョンが消去されています。これらの場合、推論変数や正規化が問題にならないことがわかっている場合は、リントを `#[allow]` または `#[expect]` することをお勧めします。
 
-When diagnostics code does not have access to an inference context, it should be threaded through
-the function calls if one is available in some place (like during type checking).
+診断コードが推論コンテキストにアクセスできない場合は、どこかで利用可能な場合（型チェック中など）、関数呼び出しを介してスレッド化する必要があります。
 
-If no inference context is available at all, then one can be created as described in
-[type-inference]. But this is only useful when the involved types (for example, if
-they came from a query like `tcx.type_of()`) are actually substituted with fresh
-inference variables using [`fresh_args_for_item`]. This can be used to answer questions
-like "can `Vec<T>` for any `T` be unified with `Vec<u32>`?".
+推論コンテキストがまったく利用できない場合は、[type-inference] で説明されているように作成できます。しかし、これは関係する型（例えば、`tcx.type_of()` のようなクエリから来た場合）が [`fresh_args_for_item`] を使用して新しい推論変数で実際に置換されている場合にのみ有用です。これは、「任意の `T` に対する `Vec<T>` を `Vec<u32>` と統一できますか？」のような質問に答えるために使用できます。
 
 [type-inference]: ./type-inference.md#creating-an-inference-context
 [`fresh_args_for_item`]: https://doc.rust-lang.org/beta/nightly-rustc/rustc_infer/infer/struct.InferCtxt.html#method.fresh_substs_for_item
 
-## `ty::TyKind` Variants
+## `ty::TyKind` バリアント
 
-Note: `TyKind` is **NOT** the functional programming concept of *Kind*.
+注：`TyKind` は関数型プログラミングの概念である *Kind* ではありません。
 
-Whenever working with a `Ty` in the compiler, it is common to match on the kind of type:
+コンパイラで `Ty` を操作するときは、型の種類に対してマッチすることが一般的です：
 
 ```rust,ignore
 fn foo(x: Ty<'tcx>) {
@@ -218,37 +130,22 @@ fn foo(x: Ty<'tcx>) {
 }
 ```
 
-The `kind` field is of type `TyKind<'tcx>`, which is an enum defining all of the different kinds of
-types in the compiler.
+`kind` フィールドは `TyKind<'tcx>` 型で、これはコンパイラ内のすべての異なる種類の型を定義する enum です。
 
-> N.B. inspecting the `kind` field on types during type inference can be risky, as there may be
-> inference variables and other things to consider, or sometimes types are not yet known and will
-> become known later.
+> 注：型推論中に型の `kind` フィールドを検査することは危険です。推論変数やその他の考慮事項があるか、または型がまだ知られておらず、後で知られるようになる場合があります。
 
-There are a lot of related types, and we’ll cover them in time (e.g regions/lifetimes,
-“substitutions”, etc).
+`TyKind` enum には多くのバリアントがあり、その[ドキュメント][tykind]を見ることで確認できます。いくつかのサンプルを示します：
 
-There are many variants on the `TyKind` enum, which you can see by looking at its
-[documentation][tykind]. Here is a sampling:
-
-- [**Algebraic Data Types (ADTs)**][kindadt] An [*algebraic data type*][wikiadt] is a  `struct`,
-  `enum` or `union`.  Under the hood, `struct`, `enum` and `union` are actually implemented
-  the same way: they are all [`ty::TyKind::Adt`][kindadt].  It’s basically a user defined type.
-  We will talk more about these later.
-- [**Foreign**][kindforeign] Corresponds to `extern type T`.
-- [**Str**][kindstr] Is the type str. When the user writes `&str`, `Str` is the how we represent the
-  `str` part of that type.
-- [**Slice**][kindslice] Corresponds to `[T]`.
-- [**Array**][kindarray] Corresponds to `[T; n]`.
-- [**RawPtr**][kindrawptr] Corresponds to `*mut T` or `*const T`.
-- [**Ref**][kindref] `Ref` stands for safe references, `&'a mut T` or `&'a T`. `Ref` has some
-  associated parts, like `Ty<'tcx>` which is the type that the reference references.
-  `Region<'tcx>` is the lifetime or region of the reference and `Mutability` if the reference
-  is mutable or not.
-- [**Param**][kindparam] Represents a type parameter (e.g. the `T` in `Vec<T>`).
-- [**Error**][kinderr] Represents a type error somewhere so that we can print better diagnostics. We
-  will discuss this more later.
-- [**And many more**...][kindvars]
+- [**代数的データ型（ADT）**][kindadt] [*代数的データ型*][wikiadt]は `struct`、`enum`、または `union` です。内部的には、`struct`、`enum`、`union` は実際には同じ方法で実装されています：それらはすべて [`ty::TyKind::Adt`][kindadt] です。基本的にはユーザー定義型です。これらについては後で詳しく説明します。
+- [**Foreign**][kindforeign] `extern type T` に対応します。
+- [**Str**][kindstr] 型 str です。ユーザーが `&str` と書いたとき、`Str` はその型の `str` 部分を表現する方法です。
+- [**Slice**][kindslice] `[T]` に対応します。
+- [**Array**][kindarray] `[T; n]` に対応します。
+- [**RawPtr**][kindrawptr] `*mut T` または `*const T` に対応します。
+- [**Ref**][kindref] `Ref` は安全な参照を表します、`&'a mut T` または `&'a T`。`Ref` には、参照が参照する型である `Ty<'tcx>` のようないくつかの関連部分があります。`Region<'tcx>` は参照のライフタイムまたはリージョンであり、`Mutability` は参照が可変かどうかです。
+- [**Param**][kindparam] 型パラメータ（例：`Vec<T>` の `T`）を表します。
+- [**Error**][kinderr] より良い診断を印刷できるように、どこかで型エラーを表します。これについては後で詳しく説明します。
+- [**その他多数**...][kindvars]
 
 [wikiadt]: https://en.wikipedia.org/wiki/Algebraic_data_type
 [kindadt]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_type_ir/ty_kind/enum.TyKind.html#variant.Adt
@@ -262,63 +159,40 @@ There are many variants on the `TyKind` enum, which you can see by looking at it
 [kinderr]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_type_ir/ty_kind/enum.TyKind.html#variant.Error
 [kindvars]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_type_ir/ty_kind/enum.TyKind.html#variants
 
-## Import conventions
+## インポート規則
 
-Although there is no hard and fast rule, the `ty` module tends to be used like so:
+厳密なルールはありませんが、`ty` モジュールは次のように使用される傾向があります：
 
 ```rust,ignore
 use ty::{self, Ty, TyCtxt};
 ```
 
-In particular, since they are so common, the `Ty` and `TyCtxt` types are imported directly. Other
-types are often referenced with an explicit `ty::` prefix (e.g. `ty::TraitRef<'tcx>`). But some
-modules choose to import a larger or smaller set of names explicitly.
+特に、非常に一般的であるため、`Ty` および `TyCtxt` 型は直接インポートされます。他の型は、明示的な `ty::` プレフィックスで参照されることがよくあります（例：`ty::TraitRef<'tcx>`）。ただし、一部のモジュールは、より大きなまたはより小さな名前のセットを明示的にインポートすることを選択します。
 
-## Type errors
+## 型エラー
 
-There is a `TyKind::Error` that is produced when the user makes a type error. The idea is that
-we would propagate this type and suppress other errors that come up due to it so as not to overwhelm
-the user with cascading compiler error messages.
+ユーザーが型エラーを起こしたときに生成される `TyKind::Error` があります。この型を伝播し、それに起因する他のエラーを抑制して、カスケードするコンパイラエラーメッセージでユーザーを圧倒しないようにするというアイデアです。
 
-There is an **important invariant** for `TyKind::Error`. The compiler should
-**never** produce `Error` unless we **know** that an error has already been
-reported to the user. This is usually
-because (a) you just reported it right there or (b) you are propagating an existing Error type (in
-which case the error should've been reported when that error type was produced).
+`TyKind::Error` には **重要な不変条件** があります。コンパイラは、エラーがユーザーに **既に報告されている** ことを **知っている** 場合を除き、`Error` を生成すべきではありません。これは通常、(a) そこで報告したばかりか、(b) 既存の Error 型を伝播している（その場合、その Error 型が生成されたときにエラーが報告されているはずです）ためです。
 
-It's important to maintain this invariant because the whole point of the `Error` type is to suppress
-other errors -- i.e., we don't report them. If we were to produce an `Error` type without actually
-emitting an error to the user, then this could cause later errors to be suppressed, and the
-compilation might inadvertently succeed!
+この不変条件を維持することが重要です。なぜなら、`Error` 型の全体的なポイントは、他のエラーを抑制することだからです – つまり、それらを報告しません。実際にユーザーにエラーを発行せずに `Error` 型を生成すると、後のエラーが抑制される可能性があり、コンパイルが誤って成功する可能性があります！
 
-Sometimes there is a third case. You believe that an error has been reported, but you believe it
-would've been reported earlier in the compilation, not locally. In that case, you can create a
-"delayed bug" with [`delayed_bug`] or [`span_delayed_bug`]. This will make a note that you expect
-compilation to yield an error -- if however compilation should succeed, then it will trigger a
-compiler bug report.
+時には 3 番目のケースがあります。エラーが報告されたと信じていますが、コンパイルの早い段階で報告されたと信じており、ローカルではありません。その場合、[`delayed_bug`] または [`span_delayed_bug`] で「遅延バグ」を作成できます。これにより、コンパイルがエラーを生成することを期待しているというメモが作成されます – ただし、コンパイルが成功する場合は、コンパイラバグレポートがトリガーされます。
 
 [`delayed_bug`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_errors/struct.DiagCtxt.html#method.delayed_bug
 [`span_delayed_bug`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_errors/struct.DiagCtxt.html#method.span_delayed_bug
 
-For added safety, it's not actually possible to produce a `TyKind::Error` value
-outside of [`rustc_middle::ty`][ty]; there is a private member of
-`TyKind::Error` that prevents it from being constructable elsewhere. Instead,
-one should use the [`Ty::new_error`][terr] or
-[`Ty::new_error_with_message`][terrmsg] methods. These methods either take an `ErrorGuaranteed`
-or call `span_delayed_bug` before returning an interned `Ty` of kind `Error`. If you
-were already planning to use [`span_delayed_bug`], then you can just pass the
-span and message to [`ty_error_with_message`][terrmsg] instead to avoid
-a redundant delayed bug.
+安全性を高めるため、[`rustc_middle::ty`][ty] の外部で `TyKind::Error` 値を生成することは実際には不可能です。`TyKind::Error` には、他の場所で構築可能にするのを防ぐプライベートメンバーがあります。代わりに、[`Ty::new_error`][terr] または [`Ty::new_error_with_message`][terrmsg] メソッドを使用する必要があります。これらのメソッドは、`ErrorGuaranteed` を受け取るか、`Error` 種類のインターンされた `Ty` を返す前に `span_delayed_bug` を呼び出します。すでに [`span_delayed_bug`] を使用する予定だった場合は、代わりにスパンとメッセージを [`ty_error_with_message`][terrmsg] に渡して、冗長な遅延バグを回避できます。
 
 [terr]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.Ty.html#method.new_error
 [terrmsg]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.Ty.html#method.new_error_with_message
 
 
-## `TyKind` variant shorthand syntax
+## `TyKind` バリアントの簡略構文
 
-When looking at the debug output of `Ty` or simply talking about different types in the compiler, you may encounter syntax that is not valid rust but is used to concisely represent internal information about types. Below is a quick reference cheat sheet to tell what the various syntax actually means, these should be covered in more depth in later chapters.
+`Ty` のデバッグ出力を見ているとき、または単にコンパイラ内の異なる型について話しているときに、有効な Rust ではないが、型に関する内部情報を簡潔に表現するために使用される構文に遭遇することがあります。以下は、さまざまな構文が実際に何を意味するかを示すクイックリファレンスチートシートです。これらはより詳しく後の章でカバーされるべきです。
 
-- Generic parameters: `{name}/#{index}` e.g. `T/#0`, where `index` corresponds to its position in the list of generic parameters
-- Inference variables: `?{id}` e.g. `?x`/`?0`, where `id` identifies the inference variable
-- Variables from binders: `^{binder}_{index}` e.g. `^0_x`/`^0_2`, where `binder` and `index` identify which variable from which binder is being referred to
-- Placeholders: `!{id}` or `!{id}_{universe}` e.g. `!x`/`!0`/`!x_2`/`!0_2`, representing some unique type in the specified universe. The universe is often elided when it is `0`
+- ジェネリックパラメータ：`{name}/#{index}` 例：`T/#0`、ここで `index` はジェネリックパラメータのリストでの位置に対応します
+- 推論変数：`?{id}` 例：`?x`/`?0`、ここで `id` は推論変数を識別します
+- バインダーからの変数：`^{binder}_{index}` 例：`^0_x`/`^0_2`、ここで `binder` と `index` はどのバインダーからどの変数が参照されているかを識別します
+- プレースホルダー：`!{id}` または `!{id}_{universe}` 例：`!x`/`!0`/`!x_2`/`!0_2`、指定された宇宙内の一意の型を表します。宇宙が `0` の場合、しばしば省略されます

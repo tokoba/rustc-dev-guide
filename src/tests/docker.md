@@ -1,57 +1,38 @@
-# Testing with Docker
+# Dockerでのテスト
 
-The [`src/ci/docker`] directory includes [Docker] image definitions for Linux-based jobs executed on GitHub Actions (non-Linux jobs run outside Docker). You can run these jobs on your local development machine, which can be
-helpful to test environments different from your local system. You will
-need to install Docker on a Linux, Windows, or macOS system (typically Linux
-will be much faster than Windows or macOS because the latter use virtual
-machines to emulate a Linux environment).
+[`src/ci/docker`]ディレクトリには、GitHub Actions上で実行されるLinuxベースのジョブのための[Docker]イメージ定義が含まれています（非Linuxジョブはdocker外で実行されます）。ローカル開発マシンでこれらのジョブを実行できます。これは、ローカルシステムとは異なる環境をテストするのに役立ちます。Linux、Windows、またはmacOSシステムにDockerをインストールする必要があります（通常、LinuxはWindowsまたはmacOSよりもはるかに高速です。後者はLinux環境をエミュレートするために仮想マシンを使用するためです）。
 
-Jobs running in CI are configured through a set of bash scripts, and it is not always trivial to reproduce their behavior locally. If you want to run a CI job locally in the simplest way possible, you can use a provided helper `citool` that tries to replicate what happens on CI as closely as possible:
+CIで実行されるジョブは、一連のbashスクリプトを介して設定されており、その動作をローカルで再現することは必ずしも簡単ではありません。可能な限り簡単な方法でCIジョブをローカルで実行したい場合は、CIで発生することをできるだけ忠実に再現しようとする提供されたヘルパー`citool`を使用できます：
 
 ```bash
 cargo run --manifest-path src/ci/citool/Cargo.toml run-local <job-name>
-# For example:
+# 例：
 cargo run --manifest-path src/ci/citool/Cargo.toml run-local dist-x86_64-linux-alt
 ```
 
-If the above script does not work for you, you would like to have more control of the Docker image execution, or you want to understand what exactly happens during Docker job execution, then continue reading below.
+上記のスクリプトがうまくいかない場合、Dockerイメージの実行をより詳細に制御したい場合、またはDockerジョブの実行中に正確に何が起こるかを理解したい場合は、以下を読み続けてください。
 
-## The `run.sh` script
-The [`src/ci/docker/run.sh`] script is used to build a specific Docker image, run it,
-build Rust within the image, and either run tests or prepare a set of archives designed for distribution. The script will mount your local Rust source tree in read-only mode, and an `obj` directory in read-write mode. All the compiler artifacts will be stored in the `obj` directory. The shell will start out in the `obj`directory. From there, it will execute `../src/ci/run.sh` which starts the build as defined by the Docker image.
+## `run.sh`スクリプト
+[`src/ci/docker/run.sh`]スクリプトは、特定のDockerイメージをビルドし、実行し、イメージ内でRustをビルドし、テストを実行するか、配布用に設計された一連のアーカイブを準備するために使用されます。スクリプトは、ローカルのRustソースツリーを読み取り専用モードでマウントし、`obj`ディレクトリを読み書きモードでマウントします。すべてのコンパイラアーティファクトは`obj`ディレクトリに保存されます。シェルは`obj`ディレクトリから開始されます。そこから、Dockerイメージによって定義されたビルドを開始する`../src/ci/run.sh`を実行します。
 
-You can run `src/ci/docker/run.sh <image-name>` directly. A few important notes regarding the `run.sh` script:
-- When executed on CI, the script expects that all submodules are checked out. If some submodule that is accessed by the job is not available, the build will result in an error. You should thus make sure that you have all required submodules checked out locally. You can either do that manually through git, or set `submodules = true` in your `bootstrap.toml` and run a command such as `x build` to let bootstrap download the most important submodules (this might not be enough for the given CI job that you are trying to execute though).
-- `<image-name>` corresponds to a single directory located in one of the `src/ci/docker/host-*` directories. Note that image name does not necessarily correspond to a job name, as some jobs execute the same image, but with different environment variables or Docker build arguments (this is a part of the complexity that makes it difficult to run CI jobs locally).
-- If you are executing a "dist" job (job beginning with `dist-`), you should set the `DEPLOY=1` environment variable.
-- If you are executing an "alternative dist" job (job beginning with `dist-` and ending with `-alt`), you should set the `DEPLOY_ALT=1` environment variable.
-- Some of the std tests require IPv6 support. Docker on Linux seems to have it
-  disabled by default. Run the commands in [`enable-docker-ipv6.sh`] to enable
-  IPv6 before creating the container. This only needs to be done once.
+`src/ci/docker/run.sh <image-name>`を直接実行できます。`run.sh`スクリプトに関するいくつかの重要な注意事項：
+- CIで実行されるとき、スクリプトはすべてのサブモジュールがチェックアウトされていることを期待します。ジョブによってアクセスされる一部のサブモジュールが利用できない場合、ビルドはエラーになります。したがって、必要なすべてのサブモジュールがローカルにチェックアウトされていることを確認する必要があります。git経由で手動で行うか、`bootstrap.toml`に`submodules = true`を設定し、`x build`のようなコマンドを実行してbootstrapに最も重要なサブモジュールをダウンロードさせることができます（ただし、実行しようとしている特定のCIジョブには十分でない可能性があります）。
+- `<image-name>`は、`src/ci/docker/host-*`ディレクトリのいずれかに配置された単一のディレクトリに対応します。イメージ名は必ずしもジョブ名に対応しないことに注意してください。一部のジョブは同じイメージを実行しますが、異なる環境変数またはDockerビルド引数を使用します（これは、CIジョブをローカルで実行することを困難にする複雑さの一部です）。
+- 「dist」ジョブ（`dist-`で始まるジョブ）を実行している場合は、`DEPLOY=1`環境変数を設定する必要があります。
+- 「代替dist」ジョブ（`dist-`で始まり`-alt`で終わるジョブ）を実行している場合は、`DEPLOY_ALT=1`環境変数を設定する必要があります。
+- stdテストの一部にはIPv6サポートが必要です。LinuxのDockerはデフォルトで無効になっているようです。コンテナを作成する前に、[`enable-docker-ipv6.sh`]のコマンドを実行してIPv6を有効にしてください。これは一度だけ実行する必要があります。
 
-### Interactive mode
+### インタラクティブモード
 
-Sometimes, it can be useful to build a specific Docker image, and then run custom commands inside it, so that you can experiment with how the given system behaves. You can do that using an interactive mode, which will
-start a bash shell in the container, using `src/ci/docker/run.sh --dev <image-name>`.
+場合によっては、特定のDockerイメージをビルドしてから、その中でカスタムコマンドを実行して、特定のシステムがどのように動作するかを実験できると便利です。インタラクティブモードを使用してこれを行うことができます。これにより、`src/ci/docker/run.sh --dev <image-name>`を使用してコンテナ内でbashシェルが起動されます。
 
-When inside the Docker container, you can run individual commands to do specific tasks. For
-example, you can run `../x test tests/ui` to just run UI tests.
+Dockerコンテナ内では、個々のコマンドを実行して特定のタスクを実行できます。たとえば、`../x test tests/ui`を実行してUIテストのみを実行できます。
 
-Some additional notes about using the interactive mode:
+インタラクティブモードの使用に関する追加の注意事項：
 
-- The container will be deleted automatically when you exit the shell, however
-  the build artifacts persist in the `obj` directory. If you are switching
-  between different Docker images, the artifacts from previous environments
-  stored in the `obj` directory may confuse the build system. Sometimes you
-  will need to delete parts or all of the `obj` directory before building
-  inside the container.
-- The container is bare-bones, with only a minimal set of packages. You may
-  want to install some things like `apt install less vim`.
-- You can open multiple shells in the container. First you need the container
-  name (a short hash), which is displayed in the shell prompt, or you can run
-  `docker container ls` outside of the container to list the available
-  containers. With the container name, run `docker exec -it <CONTAINER>
-  /bin/bash` where `<CONTAINER>` is the container name like `4ba195e95cef`.
+- シェルを終了すると、コンテナは自動的に削除されますが、ビルドアーティファクトは`obj`ディレクトリに保持されます。異なるDockerイメージを切り替える場合、`obj`ディレクトリに保存されている以前の環境からのアーティファクトがビルドシステムを混乱させる可能性があります。コンテナ内でビルドする前に、`obj`ディレクトリの一部またはすべてを削除する必要がある場合があります。
+- コンテナは最小限のパッケージのみを備えたベアボーンです。`apt install less vim`のようなものをインストールしたい場合があります。
+- コンテナ内で複数のシェルを開くことができます。まず、コンテナ名（短いハッシュ）が必要です。これはシェルプロンプトに表示されるか、コンテナの外で`docker container ls`を実行して利用可能なコンテナをリストできます。コンテナ名を使用して、`docker exec -it <CONTAINER> /bin/bash`を実行します。`<CONTAINER>`は`4ba195e95cef`のようなコンテナ名です。
 
 [Docker]: https://www.docker.com/
 [`src/ci/docker`]: https://github.com/rust-lang/rust/tree/HEAD/src/ci/docker

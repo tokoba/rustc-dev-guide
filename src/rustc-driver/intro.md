@@ -1,33 +1,33 @@
-# `rustc_driver` and `rustc_interface`
+# `rustc_driver`と`rustc_interface`
 
 ## `rustc_driver`
 
-The [`rustc_driver`] is essentially `rustc`'s `main` function.
-It acts as the glue for running the various phases of the compiler in the correct order,
-using the interface defined in the [`rustc_interface`] crate. Where possible, using [`rustc_driver`] rather than [`rustc_interface`] is recommended.
+[`rustc_driver`]は本質的に`rustc`の`main`関数です。
+これは、[`rustc_interface`]クレートで定義されたインターフェースを使用して、
+コンパイラのさまざまなフェーズを正しい順序で実行するための接着剤として機能します。可能な限り、[`rustc_interface`]ではなく[`rustc_driver`]を使用することが推奨されます。
 
-The main entry point of [`rustc_driver`] is [`rustc_driver::run_compiler`][rd_rc].
-This builder accepts the same command-line args as rustc as well as an implementation of [`Callbacks`] and a couple of other optional options.
-[`Callbacks`] is a `trait` that allows for custom compiler configuration,
-as well as allowing custom code to run after different phases of the compilation.
+[`rustc_driver`]のメインエントリーポイントは[`rustc_driver::run_compiler`][rd_rc]です。
+このビルダーは、rustcと同じコマンドライン引数、[`Callbacks`]の実装、およびいくつかの他のオプションのオプションを受け入れます。
+[`Callbacks`]は、カスタムコンパイラ設定を可能にする`trait`であり、
+コンパイルのさまざまなフェーズの後にカスタムコードを実行することもできます。
 
 ## `rustc_interface`
 
-The [`rustc_interface`] crate provides a low level API to external users for manually driving the compilation process,
-allowing third parties to effectively use `rustc`'s internals as a library for analyzing a crate or for ad hoc emulating of the compiler for cases where [`rustc_driver`] is not flexible enough (i.e. `rustdoc` compiling code and serving output).
+[`rustc_interface`]クレートは、コンパイルプロセスを手動で駆動するための低レベルAPIを外部ユーザーに提供し、
+サードパーティがクレートを分析したり、[`rustc_driver`]が十分に柔軟でない場合（例：`rustdoc`がコードをコンパイルして出力を提供する場合）のコンパイラのアドホックなエミュレーションのために、`rustc`の内部をライブラリとして効果的に使用できるようにします。
 
-The main entry point of [`rustc_interface`] ([`rustc_interface::run_compiler`][i_rc]) takes a configuration variable for the compiler
-and a `closure` taking a yet unresolved [`Compiler`].
-[`run_compiler`][i_rc] creates a `Compiler` from the configuration and passes it to the `closure`.
-Inside the `closure` you can use the `Compiler` to call various functions to compile a crate and get the results.
-You can see a minimal example of how to use [`rustc_interface`] [here][example].
+[`rustc_interface`]のメインエントリーポイント（[`rustc_interface::run_compiler`][i_rc]）は、コンパイラの設定変数と、
+まだ解決されていない[`Compiler`]を受け取る`closure`を受け取ります。
+[`run_compiler`][i_rc]は、設定から`Compiler`を作成し、それを`closure`に渡します。
+`closure`内では、`Compiler`を使用してさまざまな関数を呼び出し、クレートをコンパイルして結果を取得できます。
+[`rustc_interface`]の使用方法の最小限の例は[ここ][example]で確認できます。
 
-You can see an example of how to use the various functions using [`rustc_interface`] needs by looking at the `rustc_driver` implementation,
-specifically [`rustc_driver_impl::run_compiler`][rdi_rc]
-(not to be confused with [`rustc_interface::run_compiler`][i_rc]).
+[`rustc_interface`]を使用するさまざまな関数の使用例は、`rustc_driver`の実装、
+特に[`rustc_driver_impl::run_compiler`][rdi_rc]
+（[`rustc_interface::run_compiler`][i_rc]と混同しないでください）を見ることで確認できます。
 
-> **Warning:** By its very nature, the internal compiler APIs are always going
-> to be unstable. That said, we do try not to break things unnecessarily.
+> **警告：** その性質上、内部コンパイラAPIは常に
+> 不安定です。とはいえ、不必要に壊さないように努めています。
 
 
 [`Compiler`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_interface/interface/struct.Compiler.html

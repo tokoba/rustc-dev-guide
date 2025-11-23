@@ -1,67 +1,66 @@
-# Profiling the compiler
+# コンパイラのプロファイリング
 
-This section talks about how to profile the compiler and find out where it spends its time.
+このセクションでは、コンパイラのプロファイリング方法と、どこで時間を費やしているかを見つける方法について説明します。
 
-Depending on what you're trying to measure, there are several different approaches:
+測定したい内容に応じて、いくつかの異なるアプローチがあります:
 
-- If you want to see if a PR improves or regresses compiler performance,
-  see the [rustc-perf chapter](tests/perf.md) for requesting a benchmarking run.
+- PRがコンパイラのパフォーマンスを改善または低下させるかどうかを確認したい場合は、
+  ベンチマーク実行をリクエストするための[rustc-perfの章](tests/perf.md)を参照してください。
 
-- If you want a medium-to-high level overview of where `rustc` is spending its time:
-  - The `-Z self-profile` flag and [measureme](https://github.com/rust-lang/measureme) tools offer a query-based approach to profiling.
-    See [their docs](https://github.com/rust-lang/measureme/blob/master/summarize/README.md) for more information.
+- `rustc`が時間を費やしている場所の中〜高レベルの概要が必要な場合:
+  - `-Z self-profile`フラグと[measureme](https://github.com/rust-lang/measureme)ツールは、クエリベースのプロファイリング手法を提供します。
+    詳細については[ドキュメント](https://github.com/rust-lang/measureme/blob/master/summarize/README.md)を参照してください。
 
-- If you want function level performance data or even just more details than the above approaches:
-  - Consider using a native code profiler such as [perf](profiling/with_perf.md)
-  - or [tracy](https://github.com/nagisa/rust_tracy_client) for a nanosecond-precision,
-    full-featured graphical interface.
+- 関数レベルのパフォーマンスデータ、または上記のアプローチよりも詳細な情報が必要な場合:
+  - [perf](profiling/with_perf.md)などのネイティブコードプロファイラの使用を検討してください
+  - または、ナノ秒精度の完全機能を備えたグラフィカルインターフェースを持つ[tracy](https://github.com/nagisa/rust_tracy_client)を使用してください。
 
-- If you want a nice visual representation of the compile times of your crate graph,
-  you can use [cargo's `--timings` flag](https://doc.rust-lang.org/nightly/cargo/reference/timings.html),
-  e.g. `cargo build --timings`.
-  You can use this flag on the compiler itself with `CARGOFLAGS="--timings" ./x build`
+- クレートグラフのコンパイル時間の視覚的な表現が必要な場合は、
+  [cargoの`--timings`フラグ](https://doc.rust-lang.org/nightly/cargo/reference/timings.html)を使用できます。
+  例: `cargo build --timings`
+  コンパイラ自体でこのフラグを使用するには、`CARGOFLAGS="--timings" ./x build`を使用してください。
 
-- If you want to profile memory usage, you can use various tools depending on what operating system
-  you are using.
-  - For Windows, read our [WPA guide](profiling/wpa_profiling.md).
+- メモリ使用量をプロファイリングしたい場合は、使用しているオペレーティングシステムに応じて
+  様々なツールを使用できます。
+  - Windowsの場合は、[WPAガイド](profiling/wpa_profiling.md)をお読みください。
 
-## Optimizing rustc's bootstrap times with `cargo-llvm-lines`
+## `cargo-llvm-lines`を使ったrustcのブートストラップ時間の最適化
 
-Using [cargo-llvm-lines](https://github.com/dtolnay/cargo-llvm-lines) you can count the
-number of lines of LLVM IR across all instantiations of a generic function.
-Since most of the time compiling rustc is spent in LLVM, the idea is that by
-reducing the amount of code passed to LLVM, compiling rustc gets faster.
+[cargo-llvm-lines](https://github.com/dtolnay/cargo-llvm-lines)を使用すると、
+ジェネリック関数のすべてのインスタンス化にわたるLLVM IRの行数をカウントできます。
+rustcのコンパイルにおける時間の大半はLLVMで費やされるため、
+LLVMに渡されるコードの量を減らすことで、rustcのコンパイルが速くなるという考えです。
 
-To use `cargo-llvm-lines` together with somewhat custom rustc build process, you can use
-`-C save-temps` to obtain required LLVM IR. The option preserves temporary work products
-created during compilation. Among those is LLVM IR that represents an input to the
-optimization pipeline; ideal for our purposes. It is stored in files with `*.no-opt.bc`
-extension in LLVM bitcode format.
+やや特殊なrustcのビルドプロセスで`cargo-llvm-lines`を使用するには、
+必要なLLVM IRを取得するために`-C save-temps`を使用できます。このオプションは、
+コンパイル中に作成される一時的な作業生成物を保持します。その中には、
+最適化パイプラインへの入力を表すLLVM IRが含まれており、これは私たちの目的に理想的です。
+これは、LLVMビットコード形式で`*.no-opt.bc`拡張子を持つファイルに保存されます。
 
-Example usage:
+使用例:
 ```
 cargo install cargo-llvm-lines
-# On a normal crate you could now run `cargo llvm-lines`, but `x` isn't normal :P
+# 通常のクレートでは`cargo llvm-lines`を実行できますが、`x`は通常ではありません :P
 
-# Do a clean before every run, to not mix in the results from previous runs.
+# 毎回実行前にクリーンを行い、以前の実行結果が混ざらないようにします。
 ./x clean
 env RUSTFLAGS=-Csave-temps ./x build --stage 0 compiler/rustc
 
-# Single crate, e.g., rustc_middle. (Relies on the glob support of your shell.)
-# Convert unoptimized LLVM bitcode into a human readable LLVM assembly accepted by cargo-llvm-lines.
+# 単一のクレート、例えばrustc_middle。(シェルのグロブサポートに依存します。)
+# 最適化されていないLLVMビットコードを、cargo-llvm-linesが受け入れる人間が読めるLLVMアセンブリに変換します。
 for f in build/x86_64-unknown-linux-gnu/stage0-rustc/x86_64-unknown-linux-gnu/release/deps/rustc_middle-*.no-opt.bc; do
   ./build/x86_64-unknown-linux-gnu/llvm/bin/llvm-dis "$f"
 done
 cargo llvm-lines --files ./build/x86_64-unknown-linux-gnu/stage0-rustc/x86_64-unknown-linux-gnu/release/deps/rustc_middle-*.ll > llvm-lines-middle.txt
 
-# Specify all crates of the compiler.
+# コンパイラのすべてのクレートを指定します。
 for f in build/x86_64-unknown-linux-gnu/stage0-rustc/x86_64-unknown-linux-gnu/release/deps/*.no-opt.bc; do
   ./build/x86_64-unknown-linux-gnu/llvm/bin/llvm-dis "$f"
 done
 cargo llvm-lines --files ./build/x86_64-unknown-linux-gnu/stage0-rustc/x86_64-unknown-linux-gnu/release/deps/*.ll > llvm-lines.txt
 ```
 
-Example output for the compiler:
+コンパイラの出力例:
 ```
   Lines            Copies          Function name
   -----            ------          -------------
@@ -85,29 +84,29 @@ Example output for the compiler:
     326903 (0.7%)      642 (0.0%)  rustc_query_system::query::plumbing::try_execute_query
 ```
 
-Since this doesn't seem to work with incremental compilation or `./x check`,
-you will be compiling rustc _a lot_.
-I recommend changing a few settings in `bootstrap.toml` to make it bearable:
+これはインクリメンタルコンパイルや`./x check`では機能しないようなので、
+rustcを何度もコンパイルすることになります。
+耐えられるように、`bootstrap.toml`でいくつかの設定を変更することをお勧めします:
 ```
 [rust]
-# A debug build takes _a third_ as long on my machine,
-# but compiling more than stage0 rustc becomes unbearably slow.
+# デバッグビルドは私のマシンでは3分の1の時間で済みますが、
+# stage0以上のrustcのコンパイルは耐え難いほど遅くなります。
 optimize = false
 
-# We can't use incremental anyway, so we disable it for a little speed boost.
+# いずれにしてもインクリメンタルは使用できないので、少し速度を上げるために無効にします。
 incremental = false
-# We won't be running it, so no point in compiling debug checks.
+# 実行しないので、デバッグチェックをコンパイルする意味はありません。
 debug = false
 
-# Using a single codegen unit gives less output, but is slower to compile.
+# 単一のコード生成ユニットを使用すると出力は少なくなりますが、コンパイルは遅くなります。
 codegen-units = 0  # num_cpus
 ```
 
-The llvm-lines output is affected by several options.
-`optimize = false` increases it from 2.1GB to 3.5GB and `codegen-units = 0` to 4.1GB.
+llvm-linesの出力はいくつかのオプションの影響を受けます。
+`optimize = false`で2.1GBから3.5GBに増加し、`codegen-units = 0`で4.1GBになります。
 
-MIR optimizations have little impact. Compared to the default `RUSTFLAGS="-Z
-mir-opt-level=1"`, level 0 adds 0.3GB and level 2 removes 0.2GB.
-As of <!-- date-check --> July 2022,
-inlining happens in LLVM and GCC codegen backends,
-missing only in the Cranelift one.
+MIR最適化の影響はほとんどありません。デフォルトの`RUSTFLAGS="-Z
+mir-opt-level=1"`と比較して、レベル0では0.3GB追加され、レベル2では0.2GB削減されます。
+<!-- date-check --> 2022年7月時点では、
+インライン化はLLVMおよびGCCコード生成バックエンドで行われ、
+Craneliftのみで欠落しています。

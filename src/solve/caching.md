@@ -1,48 +1,38 @@
-# Caching in the new trait solver
+# 新しいトレイトソルバーにおけるキャッシング
 
-Caching results of the trait solver is necessary for performance.
-We have to make sure that it is sound. Caching is handled by the
-[`SearchGraph`]
+トレイトソルバーの結果をキャッシュすることは、パフォーマンスのために必要です。
+キャッシュが健全であることを確認する必要があります。キャッシングは
+[`SearchGraph`]によって処理されます。
 
 [`SearchGraph`]: https://github.com/rust-lang/rust/blob/7606c13961ddc1174b70638e934df0439b7dc515/compiler/rustc_trait_selection/src/solve/search_graph.rs#L102-L117
 
-## The global cache
+## グローバルキャッシュ
 
-At its core, the cache is fairly straightforward. When evaluating a goal, we
-check whether it's in the global cache. If so, we reuse that entry. If not, we
-compute the goal and then store its result in the cache.
+その中核において、キャッシュは非常にシンプルです。ゴールを評価する際に、
+それがグローバルキャッシュに存在するかをチェックします。存在する場合は、そのエントリを再利用します。存在しない場合は、
+ゴールを計算し、その結果をキャッシュに保存します。
 
-To handle incremental compilation the computation of a goal happens inside of
-[`DepGraph::with_anon_task`][`with_anon_task`] which creates a new `DepNode` which depends on all queries
-used inside of this computation. When accessing the global cache we then read this
-`DepNode`, manually adding a dependency edge to all the queries used: [source][wdn].
+インクリメンタルコンパイルに対処するため、ゴールの計算は
+[`DepGraph::with_anon_task`][`with_anon_task`]内で行われ、この計算内で使用されるすべてのクエリに依存する新しい`DepNode`が作成されます。グローバルキャッシュにアクセスする際には、この
+`DepNode`を読み取り、手動で使用されたすべてのクエリへの依存エッジを追加します: [ソース][wdn]。
 
-### Dealing with overflow
+### オーバーフローへの対処
 
-Hitting the recursion limit is not fatal in the new trait solver but instead simply
-causes it to return ambiguity: [source][overflow]. Whether we hit the recursion limit
-can therefore change the result without resulting in a compilation failure. This
-means we must consider the remaining available depth when accessing a cache result.
+再帰制限に達することは、新しいトレイトソルバーでは致命的ではなく、単に
+曖昧性を返すだけです: [ソース][overflow]。したがって、再帰制限に達するかどうかは、
+コンパイル失敗を引き起こすことなく結果を変更できます。これは、
+キャッシュ結果にアクセスする際に、残りの利用可能な深さを考慮する必要があることを意味します。
 
-We do this by storing more information in the cache entry. For goals whose evaluation
-did not reach the recursion limit, we simply store its reached depth: [source][req-depth].
-These results can freely be used as long as the current `available_depth` is higher than
-its `reached_depth`: [source][req-depth-ck]. We then update the reached depth of the
-current goal to make sure that whether we've used the global cache entry is not
-observable: [source][update-depth].
+これを行うために、キャッシュエントリにより多くの情報を保存します。評価が
+再帰制限に達しなかったゴールについては、単にその到達深さを保存します: [ソース][req-depth]。
+これらの結果は、現在の`available_depth`がその`reached_depth`よりも高い限り自由に使用できます: [ソース][req-depth-ck]。その後、グローバルキャッシュエントリを使用したかどうかが観察できないように、現在のゴールの到達深さを更新します: [ソース][update-depth]。
 
-For goals which reach the recursion limit we currently only use the cached result if the
-available depth *exactly matches* the depth of the entry. The cache entry for each goal
-therefore contains a separate result for each remaining depth: [source][rem-depth].[^1]
+再帰制限に達するゴールについては、現在、利用可能な深さがエントリの深さと*完全に一致する*場合にのみキャッシュされた結果を使用します。したがって、各ゴールのキャッシュエントリには、残りの深さごとに個別の結果が含まれます: [ソース][rem-depth]。[^1]
 
-## Handling cycles
+## サイクルの処理
 
-The trait solver has to support cycles. These cycles are either inductive or coinductive,
-depending on the participating goals. See the [chapter on coinduction] for more details.
-We distinguish between the cycle heads and the cycle root: a stack entry is a
-cycle head if it recursively accessed. The *root* is the deepest goal on the stack which
-is involved in any cycle. Given the following dependency tree, `A` and `B` are both cycle
-heads, while only `A` is a root.
+トレイトソルバーはサイクルをサポートする必要があります。これらのサイクルは、参加するゴールに応じて、帰納的または余帰納的です。詳細については、[余帰納に関する章]を参照してください。
+サイクルヘッドとサイクルルートを区別します：スタックエントリは、再帰的にアクセスされる場合、サイクルヘッドです。*ルート*は、任意のサイクルに関与するスタック上の最も深いゴールです。次の依存関係ツリーを考えると、`A`と`B`は両方ともサイクルヘッドですが、`A`だけがルートです。
 
 ```mermaid
 graph TB
@@ -52,43 +42,35 @@ graph TB
     C --> A
 ```
 
-The result of cycle participants depends on the result of goals still on the stack.
-However, we are currently computing that result, so its result is still unknown. This is
-handled by evaluating cycle heads until we reach a fixpoint. In the first iteration, we
-return either success or overflow with no constraints, depending on whether the cycle is
-coinductive: [source][initial-prov-result]. After evaluating the head of a cycle, we
-check whether its [`provisional_result`] is equal to the result of this iteration. If so,
-we've finished evaluating this cycle and return its result. If not, we update the provisional
-result and reevaluate the goal: [source][fixpoint]. After the first iteration it does not
-matter whether cycles are coinductive or inductive. We always use the provisional result.
+サイクル参加者の結果は、スタック上にまだあるゴールの結果に依存します。
+しかし、現在その結果を計算中であるため、その結果はまだ不明です。これは、
+不動点に達するまでサイクルヘッドを評価することで処理されます。最初のイテレーションでは、
+サイクルが余帰納的かどうかに応じて、制約のない成功またはオーバーフローのいずれかを返します: [ソース][initial-prov-result]。サイクルのヘッドを評価した後、
+その[`provisional_result`]がこのイテレーションの結果と等しいかをチェックします。等しい場合は、
+このサイクルの評価を終了し、その結果を返します。等しくない場合は、暫定的な
+結果を更新し、ゴールを再評価します: [ソース][fixpoint]。最初のイテレーションの後は、
+サイクルが余帰納的か帰納的かは関係ありません。常に暫定的な結果を使用します。
 
-### Only caching cycle roots
+### サイクルルートのみをキャッシュ
 
-We cannot move the result of any cycle participant to the global cache until we've
-finished evaluating the cycle root. However, even after we've completely evaluated the
-cycle, we are still forced to discard the result of all participants apart from the root
-itself.
+サイクルルートの評価を完了するまで、サイクル参加者の結果をグローバルキャッシュに移動することはできません。しかし、サイクルを完全に評価した後でも、
+ルート自体以外のすべての参加者の結果を破棄することを余儀なくされます。
 
-We track the query dependencies of all global cache entries. This causes the caching of
-cycle participants to be non-trivial. We cannot simply reuse the `DepNode` of the cycle
-root.[^2] If we have a cycle `A -> B -> A`, then the `DepNode` for `A` contains a dependency
-from `A -> B`. Reusing this entry for `B` may break if the source is changed. The `B -> A`
-edge may not exist anymore and `A` may have been completely removed. This can easily result
-in an ICE.
+すべてのグローバルキャッシュエントリのクエリ依存関係を追跡します。これにより、サイクル参加者のキャッシングが
+自明ではなくなります。サイクルルートの`DepNode`を単純に再利用することはできません。[^2]サイクル`A -> B -> A`がある場合、`A`の`DepNode`には`A -> B`からの依存関係が含まれます。このエントリを`B`に再利用すると、ソースが変更された場合に壊れる可能性があります。`B -> A`
+エッジが存在しなくなり、`A`が完全に削除された可能性があります。これは簡単にICEを引き起こす可能性があります。
 
-However, it's even worse as the result of a cycle can change depending on which goal is
-the root: [example][unstable-result-ex]. This forces us to weaken caching even further.
-We must not use a cache entry of a cycle root, if there exists a stack entry, which was
-a participant of its cycle involving that root. We do this by storing all cycle participants
-of a given root in its global cache entry and checking that it contains no element of the
-stack: [source][cycle-participants].
+しかし、さらに悪いことに、サイクルの結果は、どのゴールが
+ルートであるかによって変わる可能性があります: [例][unstable-result-ex]。これにより、キャッシングをさらに弱める必要があります。
+そのサイクルに関与するルートの参加者であったスタックエントリが存在する場合、サイクルルートのキャッシュエントリを使用してはなりません。これを行うには、特定のルートのすべてのサイクル参加者を
+そのグローバルキャッシュエントリに保存し、スタックの要素が含まれていないことをチェックします: [ソース][cycle-participants]。
 
-### The provisional cache
+### 暫定的キャッシュ
 
-TODO: write this :3
+TODO: これを書く :3
 
-- stack dependence of provisional results
-- edge case: provisional cache impacts behavior
+- 暫定的な結果のスタック依存性
+- エッジケース: 暫定的キャッシュが動作に影響を与える
 
 
 [`with_anon_task`]: https://github.com/rust-lang/rust/blob/7606c13961ddc1174b70638e934df0439b7dc515/compiler/rustc_trait_selection/src/solve/search_graph.rs#L391
@@ -98,15 +80,14 @@ TODO: write this :3
 [req-depth-ck]: https://github.com/rust-lang/rust/blob/7606c13961ddc1174b70638e934df0439b7dc515/compiler/rustc_middle/src/traits/solve/cache.rs#L76-L86
 [update-depth]: https://github.com/rust-lang/rust/blob/7606c13961ddc1174b70638e934df0439b7dc515/compiler/rustc_trait_selection/src/solve/search_graph.rs#L308
 [rem-depth]: https://github.com/rust-lang/rust/blob/7606c13961ddc1174b70638e934df0439b7dc515/compiler/rustc_middle/src/traits/solve/cache.rs#L124
-[^1]: This is overly restrictive: if all nested goals return the overflow response with some
-available depth `n`, then their result should be the same for any depths smaller than `n`.
-We can implement this optimization in the future.
+[^1]: これは過度に制限的です：すべてのネストされたゴールが、ある利用可能な深さ`n`でオーバーフロー応答を返す場合、それらの結果は`n`より小さい任意の深さで同じであるべきです。
+この最適化は将来実装できます。
 
-[chapter on coinduction]: ./coinduction.md
+[余帰納に関する章]: ./coinduction.md
 [`provisional_result`]: https://github.com/rust-lang/rust/blob/7606c13961ddc1174b70638e934df0439b7dc515/compiler/rustc_trait_selection/src/solve/search_graph.rs#L57
 [initial-prov-result]: https://github.com/rust-lang/rust/blob/7606c13961ddc1174b70638e934df0439b7dc515/compiler/rustc_trait_selection/src/solve/search_graph.rs#L366-L370
 [fixpoint]: https://github.com/rust-lang/rust/blob/7606c13961ddc1174b70638e934df0439b7dc515/compiler/rustc_trait_selection/src/solve/search_graph.rs#L425-L446
-[^2]: summarizing the relevant [Zulip thread]
+[^2]: 関連する[Zulipスレッド]を要約しています
 
 [zulip thread]: https://rust-lang.zulipchat.com/#narrow/stream/364551-t-types.2Ftrait-system-refactor/topic/global.20cache
 [unstable-result-ex]: https://github.com/rust-lang/rust/blob/7606c13961ddc1174b70638e934df0439b7dc515/tests/ui/traits/next-solver/cycles/coinduction/incompleteness-unstable-result.rs#L4-L16

@@ -1,50 +1,43 @@
-# Attributes
+# 属性
 
-Attributes come in two types: *inert* (or *built-in*) and *active* (*non-builtin*).
+属性には 2 つのタイプがあります：*inert*（または *built-in*）と *active*（*non-builtin*）。
 
-## Builtin/inert attributes
+## ビルトイン/inert 属性
 
-These attributes are defined in the compiler itself, in
-[`compiler/rustc_feature/src/builtin_attrs.rs`][builtin_attrs].
+これらの属性はコンパイラ自体で定義されており、
+[`compiler/rustc_feature/src/builtin_attrs.rs`][builtin_attrs] にあります。
 
-Examples include `#[allow]` and `#[macro_use]`.
+例としては `#[allow]` と `#[macro_use]` があります。
 
 [builtin_attrs]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_feature/builtin_attrs/index.html
 
-These attributes have several important characteristics:
-* They are always in scope, and do not participate in typical path-based resolution.
-* They cannot be renamed. For example, `use allow as foo` will compile, but writing `#[foo]` will
-  produce an error.
-* They are 'inert', meaning they are left as-is by the macro expansion code.
-  As a result, any behavior comes as a result of the compiler explicitly checking for their presence.
-  For example, lint-related code explicitly checks for `#[allow]`, `#[warn]`, `#[deny]`, and
-  `#[forbid]`, rather than the behavior coming from the expansion of the attributes themselves.
+これらの属性にはいくつかの重要な特徴があります：
+* 常にスコープ内にあり、典型的なパスベースの解決には参加しません。
+* 名前を変更できません。たとえば、`use allow as foo` はコンパイルされますが、`#[foo]` を書くと
+  エラーが発生します。
+* 'inert' であり、マクロ展開コードによってそのまま残されます。
+  その結果、動作はコンパイラがそれらの存在を明示的にチェックすることによって生じます。
+  たとえば、lint 関連のコードは `#[allow]`、`#[warn]`、`#[deny]`、
+  `#[forbid]` を明示的にチェックします。属性自体の展開から動作が生じるのではありません。
 
-## 'Non-builtin'/'active' attributes
+## '非ビルトイン'/'アクティブ' 属性
 
-These attributes are defined by a crate - either the standard library, or a proc-macro crate.
+これらの属性はクレート（標準ライブラリまたは proc-macro クレート）によって定義されます。
 
-**Important**: Many non-builtin attributes, such as `#[derive]`, are still considered part of the
-core Rust language. However, they are **not** called 'builtin attributes', since they have a
-corresponding definition in the standard library.
+**重要**：`#[derive]` などの多くの非ビルトイン属性は、依然としてコア Rust 言語の一部と見なされます。ただし、標準ライブラリに対応する定義があるため、'ビルトイン属性' とは**呼ばれません**。
 
-Definitions of non-builtin attributes take two forms:
+非ビルトイン属性の定義には 2 つの形式があります：
 
-1. Proc-macro attributes, defined via a function annotated with `#[proc_macro_attribute]` in a
-   proc-macro crate.
-2. AST-based attributes, defined in the standard library. These attributes have special 'stub'
-   macros defined in places like [`library/core/src/macros/mod.rs`][core_macros].
+1. Proc-macro 属性。proc-macro クレート内の `#[proc_macro_attribute]` で注釈された関数によって定義されます。
+2. AST ベースの属性。標準ライブラリで定義されます。これらの属性には、[`library/core/src/macros/mod.rs`][core_macros] のような場所で定義された特別な 'スタブ' マクロがあります。
 
 [core_macros]:  https://github.com/rust-lang/rust/blob/HEAD/library/core/src/macros/mod.rs
 
-These definitions exist to allow the macros to participate in typical path-based resolution - they
-can be imported, re-exported, and renamed just like any other item definition. However, the body of
-the definition is empty. Instead, the macro is annotated with the `#[rustc_builtin_macro]`
-attribute, which tells the compiler to run a corresponding function in `rustc_builtin_macros`.
+これらの定義は、マクロが典型的なパスベースの解決に参加できるようにするために存在します。他のアイテム定義と同様にインポート、再エクスポート、名前変更できます。ただし、定義の本体は空です。代わりに、マクロは `#[rustc_builtin_macro]` 属性で注釈されており、これはコンパイラに `rustc_builtin_macros` 内の対応する関数を実行するよう指示します。
 
-All non-builtin attributes have the following characteristics:
-* Like all other definitions (e.g. structs), they must be brought into scope via an import.
-  Many standard library attributes are included in the prelude - this is why writing `#[derive]`
-  works without an import.
-* They participate in macro expansion. The implementation of the macro may leave the attribute
-  target unchanged, modify the target, produce new AST nodes, or remove the target entirely.
+すべての非ビルトイン属性には以下の特徴があります：
+* 他のすべての定義（例：構造体）と同様に、インポートを介してスコープに入れる必要があります。
+  多くの標準ライブラリ属性がプリュードに含まれています。これが `#[derive]` を
+  インポートなしで書ける理由です。
+* マクロ展開に参加します。マクロの実装は、属性ターゲットを変更せずに残したり、ターゲットを変更したり、
+  新しい AST ノードを生成したり、ターゲットを完全に削除したりできます。

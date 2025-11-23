@@ -1,3 +1,3 @@
-# The Rust Code of Conduct
+# Rust行動規範
 
-This repository follows the [Code of Conduct](https://www.rust-lang.org/policies/code-of-conduct) of the Rust organization.
+このリポジトリはRust組織の[Code of Conduct](https://www.rust-lang.org/policies/code-of-conduct)に従います。

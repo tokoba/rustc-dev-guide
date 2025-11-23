@@ -1,30 +1,30 @@
-# The `rustdoc` test suite
+# `rustdoc`テストスイート
 
-This page is about the test suite named `rustdoc` used to test the HTML output of `rustdoc`.
-For other rustdoc-specific test suites, see [Rustdoc test suites].
+このページは、`rustdoc`のHTML出力をテストするために使用される`rustdoc`という名前のテストスイートについて説明します。
+他のrustdoc固有のテストスイートについては、[Rustdocテストスイート]を参照してください。
 
-Each test file in this test suite is simply a Rust source file `file.rs` sprinkled with
-so-called *directives* located inside normal Rust code comments.
-These come in two flavors: *Compiletest* and *HtmlDocCk*.
+このテストスイートの各テストファイルは、通常のRustコードコメント内に配置された
+いわゆる*ディレクティブ*が散りばめられた単純なRustソースファイル`file.rs`です。
+これらには2つの種類があります：*Compiletest*と*HtmlDocCk*です。
 
-To learn more about the former, read [Compiletest directives].
-For the latter, continue reading.
+前者について詳しく学ぶには、[Compiletestディレクティブ]をお読みください。
+後者については、読み続けてください。
 
-Internally, [`compiletest`] invokes the supplementary checker script [`htmldocck.py`].
+内部的には、[`compiletest`]は補助チェッカースクリプト[`htmldocck.py`]を呼び出します。
 
-[Rustdoc test suites]: ../tests/compiletest.md#rustdoc-test-suites
+[Rustdocテストスイート]: ../tests/compiletest.md#rustdoc-test-suites
 [`compiletest`]: ../tests/compiletest.md
 [`htmldocck.py`]: https://github.com/rust-lang/rust/blob/HEAD/src/etc/htmldocck.py
 
-## HtmlDocCk Directives
+## HtmlDocCkディレクティブ
 
-Directives to HtmlDocCk are assertions that place constraints on the generated HTML.
-They look similar to those given to `compiletest` in that they take the form of `//@` comments
-but ultimately, they are completely distinct and processed by different programs.
+HtmlDocCkへのディレクティブは、生成されたHTMLに制約を課すアサーションです。
+これらは、`//@`コメントの形式を取るという点で`compiletest`に与えられるものと似ていますが、
+最終的には完全に異なり、異なるプログラムによって処理されます。
 
-[XPath] is used to query parts of the HTML document tree.
+[XPath]は、HTMLドキュメントツリーの一部をクエリするために使用されます。
 
-**Introductory example**:
+**入門例**：
 
 ```rust,ignore (illustrative)
 //@ has file/type.Alias.html
@@ -32,163 +32,163 @@ but ultimately, they are completely distinct and processed by different programs
 pub type Alias = Option<i32>;
 ```
 
-Here, we check that documentation generated for crate `file` contains a page for the
-public type alias `Alias` where the code block that is found at the top contains the
-expected rendering of the item. The `//*[@class="rust item-decl"]//code` is an XPath
-expression.
+ここでは、クレート`file`用に生成されたドキュメントに、
+パブリック型エイリアス`Alias`のページが含まれており、
+上部にあるコードブロックにアイテムの期待されるレンダリングが含まれていることをチェックします。
+`//*[@class="rust item-decl"]//code`はXPath式です。
 
-Conventionally, you place these directives directly above the thing they are meant to test.
-Technically speaking however, they don't need to be as HtmlDocCk only looks for the directives.
+慣例的には、これらのディレクティブをテストする対象の直前に配置します。
+しかし、技術的には、HtmlDocCkはディレクティブのみを探すため、その必要はありません。
 
-All directives take a `PATH` argument.
-To avoid repetition, `-` can be passed to it to re-use the previous `PATH` argument.
-Since the path contains the name of the crate, it is conventional to add a
-`#![crate_name = "foo"]` attribute to the crate root to shorten the resulting path.
+すべてのディレクティブは`PATH`引数を取ります。
+繰り返しを避けるために、`-`を渡して前の`PATH`引数を再利用できます。
+パスにはクレートの名前が含まれるため、慣例的にクレートルートに
+`#![crate_name = "foo"]`属性を追加して、結果のパスを短縮します。
 
-All arguments take the form of shell-style (single or double) quoted strings,
-with the exception of `COUNT` and the special `-` form of `PATH`.
+すべての引数は、シェルスタイルの（単一または二重の）引用符で囲まれた文字列の形式を取ります。
+ただし、`COUNT`と特別な`-`形式の`PATH`は除きます。
 
-All directives (except `files`) can be *negated* by putting a `!` in front of their name.
-Before you add negated directives, please read about [their caveats](#caveats).
+すべてのディレクティブ（`files`を除く）は、名前の前に`!`を置くことで*否定*できます。
+否定されたディレクティブを追加する前に、[その注意点](#caveats)をお読みください。
 
-Similar to shell commands,
-directives can extend across multiple lines if their last char is `\`.
-In this case, the start of the next line should be `//`, with no `@`.
+シェルコマンドと同様に、
+最後の文字が`\`の場合、ディレクティブは複数行にわたることができます。
+この場合、次の行の開始は`//`である必要があり、`@`は不要です。
 
-Similar to compiletest directives, besides a space you can also use a colon `:` to separate
-the directive name and the arguments, however a space is preferred for HtmlDocCk directives.
+compiletestディレクティブと同様に、スペースの他にコロン`:`を使用して
+ディレクティブ名と引数を区切ることもできますが、HtmlDocCkディレクティブにはスペースが推奨されます。
 
-Use the special string `{{channel}}` in XPaths, `PATTERN` arguments and [snapshot files](#snapshot)
-if you'd like to refer to the URL `https://doc.rust-lang.org/CHANNEL` where `CHANNEL` refers to the
-current release channel (e.g, `stable` or `nightly`).
+現在のリリースチャネル（例：`stable`または`nightly`）を参照する`https://doc.rust-lang.org/CHANNEL`というURLを参照したい場合は、
+XPath、`PATTERN`引数、[スナップショットファイル](#snapshot)で特別な文字列`{{channel}}`を使用してください。
 
-Listed below are all possible directives:
+以下にリストされているのは、可能なすべてのディレクティブです：
 
 [XPath]: https://en.wikipedia.org/wiki/XPath
 
 ### `has`
 
-> Usage 1: `//@ has PATH`
+> 使用法1: `//@ has PATH`
 
-Check that the file given by `PATH` exists.
+`PATH`で指定されたファイルが存在することをチェックします。
 
-> Usage 2: `//@ has PATH XPATH PATTERN`
+> 使用法2: `//@ has PATH XPATH PATTERN`
 
-Checks that the text of each element / attribute / text selected by `XPATH` in the
-whitespace-normalized[^1] file given by `PATH` matches the
-(also whitespace-normalized) string `PATTERN`.
+`PATH`で指定された空白正規化された[^1]ファイル内の`XPATH`によって選択された
+各要素/属性/テキストのテキストが、
+（同様に空白正規化された）文字列`PATTERN`と一致することをチェックします。
 
-**Tip**: If you'd like to avoid whitespace normalization and/or if you'd like to match with a regex,
-use `matches` instead.
+**ヒント**: 空白の正規化を避けたい場合や、正規表現で一致させたい場合は、
+代わりに`matches`を使用してください。
 
 ### `hasraw`
 
-> Usage: `//@ hasraw PATH PATTERN`
+> 使用法: `//@ hasraw PATH PATTERN`
 
-Checks that the contents of the whitespace-normalized[^1] file given by `PATH`
-matches the (also whitespace-normalized) string `PATTERN`.
+`PATH`で指定された空白正規化された[^1]ファイルの内容が、
+（同様に空白正規化された）文字列`PATTERN`と一致することをチェックします。
 
-**Tip**: If you'd like to avoid whitespace normalization and / or if you'd like to match with a
-regex, use `matchesraw` instead.
+**ヒント**: 空白の正規化を避けたい場合や、正規表現で一致させたい場合は、
+代わりに`matchesraw`を使用してください。
 
 ### `matches`
 
-> Usage: `//@ matches PATH XPATH PATTERN`
+> 使用法: `//@ matches PATH XPATH PATTERN`
 
-Checks that the text of each element / attribute / text selected by `XPATH` in the
-file given by `PATH` matches the Python-flavored[^2] regex `PATTERN`.
+`PATH`で指定されたファイル内の`XPATH`によって選択された
+各要素/属性/テキストのテキストが、
+Python風の[^2]正規表現`PATTERN`と一致することをチェックします。
 
 ### `matchesraw`
 
-> Usage: `//@ matchesraw PATH PATTERN`
+> 使用法: `//@ matchesraw PATH PATTERN`
 
-Checks that the contents of the file given by `PATH` matches the
-Python-flavored[^2] regex `PATTERN`.
+`PATH`で指定されたファイルの内容が、
+Python風の[^2]正規表現`PATTERN`と一致することをチェックします。
 
 ### `count`
 
-> Usage: `//@ count PATH XPATH COUNT`
+> 使用法: `//@ count PATH XPATH COUNT`
 
-Checks that there are exactly `COUNT` matches for `XPATH` within the file given by `PATH`.
+`PATH`で指定されたファイル内の`XPATH`の一致が正確に`COUNT`個であることをチェックします。
 
 ### `snapshot`
 
-> Usage: `//@ snapshot NAME PATH XPATH`
+> 使用法: `//@ snapshot NAME PATH XPATH`
 
-Checks that the element / text selected by `XPATH` in the file given by `PATH` matches the
-pre-recorded subtree or text (the "snapshot") in file `FILE_STEM.NAME.html` where `FILE_STEM`
-is the file stem of the test file.
+`PATH`で指定されたファイル内の`XPATH`によって選択された要素/テキストが、
+ファイル`FILE_STEM.NAME.html`内の事前記録されたサブツリーまたはテキスト（「スナップショット」）と一致することをチェックします。
+ここで、`FILE_STEM`はテストファイルのファイルステムです。
 
-Pass the `--bless` option to `compiletest` to accept the current subtree/text as expected.
-This will overwrite the aforementioned file (or create it if it doesn't exist). It will
-automatically normalize the channel-dependent URL `https://doc.rust-lang.org/CHANNEL` to
-the special string `{{channel}}`.
+現在のサブツリー/テキストを期待されるものとして受け入れるには、`compiletest`に`--bless`オプションを渡します。
+これにより、前述のファイルが上書きされます（存在しない場合は作成されます）。チャネル依存のURL `https://doc.rust-lang.org/CHANNEL`を
+特別な文字列`{{channel}}`に自動的に正規化します。
 
 ### `has-dir`
 
-> Usage: `//@ has-dir PATH`
+> 使用法: `//@ has-dir PATH`
 
-Checks for the existence of the directory given by `PATH`.
+`PATH`で指定されたディレクトリの存在をチェックします。
 
 ### `files`
 
-> Usage: `//@ files PATH ENTRIES`
+> 使用法: `//@ files PATH ENTRIES`
 
-Checks that the directory given by `PATH` contains exactly `ENTRIES`.
-`ENTRIES` is a Python-like list of strings inside a quoted string.
+`PATH`で指定されたディレクトリに正確に`ENTRIES`が含まれていることをチェックします。
+`ENTRIES`は、引用符で囲まれた文字列内のPython風の文字列のリストです。
 
-**Example**: `//@ files "foo/bar" '["index.html", "sidebar-items.js"]'`
+**例**: `//@ files "foo/bar" '["index.html", "sidebar-items.js"]'`
 
-[^1]: Whitespace normalization means that all spans of consecutive whitespace are replaced with a single space.
-[^2]: They are Unicode aware (flag `UNICODE` is set), match case-sensitively and in single-line mode.
+[^1]: 空白の正規化とは、連続する空白のすべてのスパンが単一のスペースに置き換えられることを意味します。
+[^2]: Unicode対応（`UNICODE`フラグが設定）、大文字小文字を区別し、単一行モードで一致します。
 
-## Compiletest Directives (Brief)
+## Compiletestディレクティブ（簡単に）
 
-As mentioned in the introduction, you also have access to [compiletest directives].
-Most importantly, they allow you to register auxiliary crates and
-to pass flags to the `rustdoc` binary under test.
-It's *strongly recommended* to read that chapter if you don't know anything about them yet.
+冒頭で述べたように、[compiletestディレクティブ]にもアクセスできます。
+最も重要なのは、補助クレートを登録したり、
+テスト対象の`rustdoc`バイナリにフラグを渡したりできることです。
+まだ何も知らない場合は、その章を読むことを*強くお勧め*します。
 
-Here are some details that are relevant to this test suite specifically:
+このテストスイートに特に関連する詳細は次のとおりです：
 
-* While you can use both `//@ compile-flags` and `//@ doc-flags` to pass flags to `rustdoc`,
-  prefer to user the latter to show intent. The former is meant for `rustc`.
-* Add `//@ build-aux-docs` to the test file that has auxiliary crates to not only compile the
-  auxiliaries with `rustc` but to also document them with `rustdoc`.
+* `//@ compile-flags`と`//@ doc-flags`の両方を使用して`rustdoc`にフラグを渡すことができますが、
+  意図を示すために後者を使用することをお勧めします。前者は`rustc`向けです。
+* 補助クレートを持つテストファイルに`//@ build-aux-docs`を追加して、
+  補助クレートを`rustc`でコンパイルするだけでなく、`rustdoc`でドキュメント化することもできます。
 
-## Caveats
+## 注意点
 
-Testing for the absence of an element or a piece of text is quite fragile and not very future proof.
+要素やテキストの不在をテストすることは、非常に脆弱で、将来の証拠にはなりません。
 
-It's not unusual that the *shape* of the generated HTML document tree changes from time to time.
-This includes for example renamings of CSS classes.
+生成されたHTMLドキュメントツリーの*形状*は、時々変わることは珍しくありません。
+これには、たとえばCSSクラスの名前変更が含まれます。
 
-Whenever that happens, *positive* checks will either continue to match the intended element /
-attribute / text (if their XPath expression is general / loose enough) and
-thus continue to test the correct thing or they won't in which case they would fail thereby
-forcing the author of the change to look at them.
+そのようなことが起こるたびに、*肯定的な*チェックは、
+意図された要素/属性/テキストに一致し続けるか（XPath式が十分に一般的/緩い場合）、
+したがって正しいことをテストし続けるか、一致しない場合は失敗し、
+変更の作成者にそれらを見るように強制します。
 
-Compare that to *negative* checks (e.g., `//@ !has PATH XPATH PATTERN`) which won't fail if their
-XPath expression "no longer" matches. The author who changed "the shape" thus won't get notified and
-as a result someone else can unintentionally reintroduce `PATTERN` into the generated docs without
-the original negative check failing.
+それを*否定的な*チェック（例：`//@ !has PATH XPATH PATTERN`）と比較すると、
+XPath式が「もはや」一致しない場合、失敗しません。したがって、「形状」を変更した作成者は通知されず、
+その結果、元の否定的なチェックが失敗することなく、
+誰かが誤って`PATTERN`を生成されたドキュメントに再導入する可能性があります。
 
-**Note**: Please avoid the use of *negated* checks!
+**注意**: *否定された*チェックの使用を避けてください！
 
-**Tip**: If you can't avoid it, please **always** pair it with an analogous positive check in the
-immediate vicinity, so people changing "the shape" have a chance to notice and to update the
-negated check!
+**ヒント**: それを避けられない場合は、**常に**同様の肯定的なチェックと
+すぐ近くでペアにしてください。そうすれば、「形状」を変更する人が気づいて
+否定されたチェックを更新する機会があります！
 
-## Limitations
+## 制限事項
 
-HtmlDocCk uses the XPath implementation from the Python standard library.
-This leads to several limitations:
+HtmlDocCkは、Python標準ライブラリのXPath実装を使用します。
+これにより、いくつかの制限があります：
 
-* All `XPATH` arguments must start with `//` due to a flaw in the implementation.
-* Many XPath features (functions, axies, etc.) are not supported.
-* Only well-formed HTML can be parsed (hopefully rustdoc doesn't output mismatched tags).
+* 実装の欠陥により、すべての`XPATH`引数は`//`で始まる必要があります。
+* 多くのXPath機能（関数、軸など）はサポートされていません。
+* 整形式のHTMLのみが解析できます（うまくいけば、rustdocは不一致のタグを出力しません）。
 
-Furthmore, compiletest [revisions] are not supported.
+さらに、compiletest[リビジョン]はサポートされていません。
 
-[revisions]: ../tests/compiletest.md#revisions
-[compiletest directives]: ../tests/directives.md
+[リビジョン]: ../tests/compiletest.md#revisions
+[compiletestディレクティブ]: ../tests/directives.md
+[Compiletestディレクティブ]: ../tests/directives.md

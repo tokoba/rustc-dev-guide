@@ -1,25 +1,24 @@
-# Lowering to logic
+# 論理への降下
 
-The key observation here is that the Rust trait system is basically a
-kind of logic, and it can be mapped onto standard logical inference
-rules. We can then look for solutions to those inference rules in a
-very similar fashion to how e.g. a [Prolog] solver works. It turns out
-that we can't *quite* use Prolog rules (also called Horn clauses) but
-rather need a somewhat more expressive variant.
+ここでの重要な観察は、Rust のトレイトシステムは基本的に一種の論理であり、
+標準的な論理推論規則にマッピングできるということです。次に、例えば
+[Prolog] ソルバーがどのように動作するかと非常に似た方法で、
+これらの推論規則の解決策を探すことができます。*完全に* Prolog 規則
+（ホーン節とも呼ばれる）を使用することはできませんが、やや表現力の高い
+バリアントが必要であることがわかります。
 
 [Prolog]: https://en.wikipedia.org/wiki/Prolog
 
-## Rust traits and logic
+## Rust トレイトと論理
 
-One of the first observations is that the Rust trait system is
-basically a kind of logic. As such, we can map our struct, trait, and
-impl declarations into logical inference rules. For the most part,
-these are basically Horn clauses, though we'll see that to capture the
-full richness of Rust – and in particular to support generic
-programming – we have to go a bit further than standard Horn clauses.
+最初の観察の1つは、Rust のトレイトシステムは基本的に一種の論理である
+ということです。そのため、構造体、トレイト、impl 宣言を論理推論規則に
+マッピングできます。ほとんどの場合、これらは基本的にホーン節ですが、
+Rust の完全な豊かさを捉えるため、特にジェネリックプログラミングをサポート
+するためには、標準的なホーン節よりも少し先に進む必要があることがわかります。
 
-To see how this mapping works, let's start with an example. Imagine
-we declare a trait and a few impls, like so:
+このマッピングがどのように機能するかを見るために、例から始めましょう。
+次のようにトレイトといくつかの impl を宣言すると想像してください：
 
 ```rust
 trait Clone { }
@@ -27,40 +26,39 @@ impl Clone for usize { }
 impl<T> Clone for Vec<T> where T: Clone { }
 ```
 
-We could map these declarations to some Horn clauses, written in a
-Prolog-like notation, as follows:
+これらの宣言を、Prolog のような表記法で書かれたホーン節にマッピングできます：
 
 ```text
 Clone(usize).
 Clone(Vec<?T>) :- Clone(?T).
 
-// The notation `A :- B` means "A is true if B is true".
-// Or, put another way, B implies A.
+// 表記法 `A :- B` は「B が真ならば A が真」を意味します。
+// または、別の言い方をすれば、B は A を意味します。
 ```
 
-In Prolog terms, we might say that `Clone(Foo)` – where `Foo` is some
-Rust type – is a *predicate* that represents the idea that the type
-`Foo` implements `Clone`. These rules are **program clauses**; they
-state the conditions under which that predicate can be proven (i.e.,
-considered true). So the first rule just says "Clone is implemented
-for `usize`". The next rule says "for any type `?T`, Clone is
-implemented for `Vec<?T>` if clone is implemented for `?T`". So
-e.g. if we wanted to prove that `Clone(Vec<Vec<usize>>)`, we would do
-so by applying the rules recursively:
+Prolog の用語では、`Clone(Foo)` - ここで `Foo` は何らかの Rust 型 - は
+型 `Foo` が `Clone` を実装するというアイデアを表す*述語*であると言えます。
+これらの規則は**プログラム節**です。これらは、その述語が証明できる
+（つまり、真と見なされる）条件を述べています。したがって、最初の規則は
+単に「Clone は `usize` に対して実装されている」と言っています。次の規則は
+「任意の型 `?T` に対して、Clone が `?T` に対して実装されている場合、
+Clone は `Vec<?T>` に対して実装されている」と言っています。したがって、
+例えば `Clone(Vec<Vec<usize>>)` を証明したい場合、規則を再帰的に適用することで
+行います：
 
-- `Clone(Vec<Vec<usize>>)` is provable if:
-  - `Clone(Vec<usize>)` is provable if:
-    - `Clone(usize)` is provable. (Which it is, so we're all good.)
+- `Clone(Vec<Vec<usize>>)` は次の場合に証明可能：
+  - `Clone(Vec<usize>)` は次の場合に証明可能：
+    - `Clone(usize)` は証明可能。（そして、それは証明可能なので、すべて問題ありません。）
 
-But now suppose we tried to prove that `Clone(Vec<Bar>)`. This would
-fail (after all, I didn't give an impl of `Clone` for `Bar`):
+しかし、今度は `Clone(Vec<Bar>)` を証明しようとすると、これは失敗します
+（結局、`Bar` に対する `Clone` の impl を与えていません）：
 
-- `Clone(Vec<Bar>)` is provable if:
-  - `Clone(Bar)` is provable. (But it is not, as there are no applicable rules.)
+- `Clone(Vec<Bar>)` は次の場合に証明可能：
+  - `Clone(Bar)` は証明可能。（しかし、適用可能な規則がないため、証明できません。）
 
-We can easily extend the example above to cover generic traits with
-more than one input type. So imagine the `Eq<T>` trait, which declares
-that `Self` is equatable with a value of type `T`:
+複数の入力型を持つジェネリックトレイトをカバーするように上記の例を簡単に
+拡張できます。したがって、`Self` が型 `T` の値と等しいと宣言する `Eq<T>`
+トレイトを想像してください：
 
 ```rust,ignore
 trait Eq<T> { ... }
@@ -68,118 +66,110 @@ impl Eq<usize> for usize { }
 impl<T: Eq<U>> Eq<Vec<U>> for Vec<T> { }
 ```
 
-That could be mapped as follows:
+これは次のようにマッピングできます：
 
 ```text
 Eq(usize, usize).
 Eq(Vec<?T>, Vec<?U>) :- Eq(?T, ?U).
 ```
 
-So far so good.
+これまでのところ順調です。
 
-## Type-checking normal functions
+## 通常の関数の型チェック
 
-OK, now that we have defined some logical rules that are able to
-express when traits are implemented and to handle associated types,
-let's turn our focus a bit towards **type-checking**. Type-checking is
-interesting because it is what gives us the goals that we need to
-prove. That is, everything we've seen so far has been about how we
-derive the rules by which we can prove goals from the traits and impls
-in the program; but we are also interested in how to derive the goals
-that we need to prove, and those come from type-checking.
+さて、トレイトが実装されているときを表現でき、関連型を処理できる論理規則を
+定義したので、**型チェック**に少し焦点を移しましょう。型チェックが
+興味深いのは、証明する必要があるゴールを提供してくれるからです。つまり、
+これまで見てきたことはすべて、プログラム内のトレイトと impl からゴールを
+証明できる規則を導出する方法についてでした。しかし、証明する必要がある
+ゴールを導出する方法にも興味があり、それらは型チェックから来ます。
 
-Consider type-checking the function `foo()` here:
+ここで関数 `foo()` の型チェックを考えてみましょう：
 
 ```rust,ignore
 fn foo() { bar::<usize>() }
 fn bar<U: Eq<U>>() { }
 ```
 
-This function is very simple, of course: all it does is to call
-`bar::<usize>()`. Now, looking at the definition of `bar()`, we can see
-that it has one where-clause `U: Eq<U>`. So, that means that `foo()` will
-have to prove that `usize: Eq<usize>` in order to show that it can call `bar()`
-with `usize` as the type argument.
+この関数は非常にシンプルです：やっていることは `bar::<usize>()` を
+呼び出すことだけです。さて、`bar()` の定義を見ると、where 句 `U: Eq<U>` が
+1つあることがわかります。したがって、`foo()` は `bar()` を型引数 `usize` で
+呼び出せることを示すために、`usize: Eq<usize>` を証明する必要があることを
+意味します。
 
-If we wanted, we could write a Prolog predicate that defines the
-conditions under which `bar()` can be called. We'll say that those
-conditions are called being "well-formed":
+必要に応じて、`bar()` を呼び出せる条件を定義する Prolog 述語を書くことが
+できます。それらの条件を「整形式」と呼びます：
 
 ```text
 barWellFormed(?U) :- Eq(?U, ?U).
 ```
 
-Then we can say that `foo()` type-checks if the reference to
-`bar::<usize>` (that is, `bar()` applied to the type `usize`) is
-well-formed:
+次に、`bar::<usize>` への参照（つまり、型 `usize` に適用された `bar()`）が
+整形式である場合、`foo()` は型チェックに成功すると言えます：
 
 ```text
 fooTypeChecks :- barWellFormed(usize).
 ```
 
-If we try to prove the goal `fooTypeChecks`, it will succeed:
+ゴール `fooTypeChecks` を証明しようとすると、成功します：
 
-- `fooTypeChecks` is provable if:
-  - `barWellFormed(usize)`, which is provable if:
-    - `Eq(usize, usize)`, which is provable because of an impl.
+- `fooTypeChecks` は次の場合に証明可能：
+  - `barWellFormed(usize)` は次の場合に証明可能：
+    - `Eq(usize, usize)` は impl があるため証明可能。
 
-Ok, so far so good. Let's move on to type-checking a more complex function.
+さて、これまでのところ順調です。より複雑な関数の型チェックに移りましょう。
 
-## Type-checking generic functions: beyond Horn clauses
+## ジェネリック関数の型チェック：ホーン節を超えて
 
-In the last section, we used standard Prolog horn-clauses (augmented with Rust's
-notion of type equality) to type-check some simple Rust functions. But that only
-works when we are type-checking non-generic functions. If we want to type-check
-a generic function, it turns out we need a stronger notion of goal than what Prolog
-can provide. To see what I'm talking about, let's revamp our previous
-example to make `foo` generic:
+前のセクションでは、標準的な Prolog ホーン節（Rust の型等価性の概念で
+補強された）を使用して、いくつかのシンプルな Rust 関数を型チェックしました。
+しかし、それは非ジェネリック関数を型チェックするときにのみ機能します。
+ジェネリック関数を型チェックしたい場合、Prolog が提供できるものよりも
+強力なゴールの概念が必要であることがわかります。何を言っているのかを見るために、
+前の例を変更して `foo` をジェネリックにしましょう：
 
 ```rust,ignore
 fn foo<T: Eq<T>>() { bar::<T>() }
 fn bar<U: Eq<U>>() { }
 ```
 
-To type-check the body of `foo`, we need to be able to hold the type
-`T` "abstract".  That is, we need to check that the body of `foo` is
-type-safe *for all types `T`*, not just for some specific type. We might express
-this like so:
+`foo` の本体を型チェックするには、型 `T` を「抽象的」に保持できる必要が
+あります。つまり、`foo` の本体が*すべての型 `T`*に対して型安全であることを
+チェックする必要があります。特定の型だけではありません。次のように表現できます：
 
 ```text
 fooTypeChecks :-
-  // for all types T...
+  // すべての型 T に対して...
   forall<T> {
-    // ...if we assume that Eq(T, T) is provable...
+    // ...Eq(T, T) が証明可能であると仮定すれば...
     if (Eq(T, T)) {
-      // ...then we can prove that `barWellFormed(T)` holds.
+      // ...次に `barWellFormed(T)` が成り立つことを証明できる。
       barWellFormed(T)
     }
   }.
 ```
 
-This notation I'm using here is the notation I've been using in my
-prototype implementation; it's similar to standard mathematical
-notation but a bit Rustified. Anyway, the problem is that standard
-Horn clauses don't allow universal quantification (`forall`) or
-implication (`if`) in goals (though many Prolog engines do support
-them, as an extension). For this reason, we need to accept something
-called "first-order hereditary harrop" (FOHH) clauses – this long
-name basically means "standard Horn clauses with `forall` and `if` in
-the body". But it's nice to know the proper name, because there is a
-lot of work describing how to efficiently handle FOHH clauses; see for
-example Gopalan Nadathur's excellent
+ここで使用している表記法は、プロトタイプ実装で使用してきた表記法です。
+標準的な数学表記に似ていますが、少し Rust 化されています。とにかく、
+問題は、標準的なホーン節がゴールでの全称量化（`forall`）や含意（`if`）を
+許可しないことです（ただし、多くの Prolog エンジンは拡張としてそれらを
+サポートしています）。このため、「一階遺伝的ハロップ」(FOHH) 節と呼ばれる
+ものを受け入れる必要があります - この長い名前は基本的に「本体に `forall` と
+`if` を持つ標準的なホーン節」を意味します。しかし、適切な名前を知っておくと
+良いです。なぜなら、FOHH 節を効率的に処理する方法を説明する多くの研究が
+あるからです。例えば、Gopalan Nadathur の優れた
 ["A Proof Procedure for the Logic of Hereditary Harrop Formulas"][pphhf]
-in [the bibliography of Chalk Book][bibliography].
+を[Chalk Book の参考文献][bibliography]で参照してください。
 
 [bibliography]: https://rust-lang.github.io/chalk/book/bibliography.html
 [pphhf]: https://rust-lang.github.io/chalk/book/bibliography.html#pphhf
 
-It turns out that supporting FOHH is not really all that hard. And
-once we are able to do that, we can easily describe the type-checking
-rule for generic functions like `foo` in our logic.
+FOHH をサポートすることは、実際にはそれほど難しくありません。そして、
+それができるようになれば、`foo` のようなジェネリック関数の型チェック規則を
+論理で簡単に記述できます。
 
-## Source
+## ソース
 
-This page is a lightly adapted version of a
-[blog post by Nicholas Matsakis][lrtl].
+このページは Nicholas Matsakis による[ブログ投稿][lrtl]を軽く修正したものです。
 
 [lrtl]: http://smallcultfollowing.com/babysteps/blog/2017/01/26/lowering-rust-traits-to-logic/

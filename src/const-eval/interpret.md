@@ -1,32 +1,31 @@
-# Interpreter
+# インタプリタ
 
-The interpreter is a virtual machine for executing MIR without compiling to
-machine code. It is usually invoked via `tcx.const_eval_*` functions. The
-interpreter is shared between the compiler (for compile-time function
-evaluation, CTFE) and the tool [Miri](https://github.com/rust-lang/miri/), which
-uses the same virtual machine to detect Undefined Behavior in (unsafe) Rust
-code.
+インタプリタは、マシンコードにコンパイルせずにMIRを実行するための仮想マシンです。
+通常、`tcx.const_eval_*`関数を介して呼び出されます。インタプリタは、
+コンパイラ（コンパイル時関数評価、CTFE用）とツール[Miri](https://github.com/rust-lang/miri/)の間で
+共有されています。Miriは同じ仮想マシンを使用して、（unsafe）Rustコードで
+未定義動作を検出します。
 
-If you start out with a constant:
+定数から始める場合：
 
 ```rust
 const FOO: usize = 1 << 12;
 ```
 
-rustc doesn't actually invoke anything until the constant is either used or
-placed into metadata.
+rustcは、定数が使用されるかメタデータに配置されるまで、
+実際には何も呼び出しません。
 
-Once you have a use-site like:
+次のような使用サイトがある場合：
 
 ```rust,ignore
 type Foo = [u8; FOO - 42];
 ```
 
-The compiler needs to figure out the length of the array before being able to
-create items that use the type (locals, constants, function arguments, ...).
+コンパイラは、型を使用するアイテム（ローカル、定数、関数引数、...）を
+作成できるようにする前に、配列の長さを把握する必要があります。
 
-To obtain the (in this case empty) parameter environment, one can call
-`let param_env = tcx.param_env(length_def_id);`. The `GlobalId` needed is
+（この場合は空の）パラメーター環境を取得するには、
+`let param_env = tcx.param_env(length_def_id);`を呼び出すことができます。必要な`GlobalId`は
 
 ```rust,ignore
 let gid = GlobalId {
@@ -35,8 +34,8 @@ let gid = GlobalId {
 };
 ```
 
-Invoking `tcx.const_eval(param_env.and(gid))` will now trigger the creation of
-the MIR of the array length expression. The MIR will look something like this:
+`tcx.const_eval(param_env.and(gid))`を呼び出すと、配列長式の
+MIRの作成がトリガーされます。MIRは次のようになります：
 
 ```mir
 Foo::{{constant}}#0: usize = {
@@ -55,47 +54,44 @@ Foo::{{constant}}#0: usize = {
 }
 ```
 
-Before the evaluation, a virtual memory location (in this case essentially a
-`vec![u8; 4]` or `vec![u8; 8]`) is created for storing the evaluation result.
+評価前に、評価結果を保存するための仮想メモリ位置（この場合、本質的に
+`vec![u8; 4]`または`vec![u8; 8]`）が作成されます。
 
-At the start of the evaluation, `_0` and `_1` are
-`Operand::Immediate(Immediate::Scalar(ScalarMaybeUndef::Undef))`. This is quite
-a mouthful: [`Operand`] can represent either data stored somewhere in the
-[interpreter memory](#memory) (`Operand::Indirect`), or (as an optimization)
-immediate data stored in-line.  And [`Immediate`] can either be a single
-(potentially uninitialized) [scalar value][`Scalar`] (integer or thin pointer),
-or a pair of two of them. In our case, the single scalar value is *not* (yet)
-initialized.
+評価の開始時、`_0`と`_1`は
+`Operand::Immediate(Immediate::Scalar(ScalarMaybeUndef::Undef))`です。これは非常に
+長い言い方です：[`Operand`]は、[インタプリタメモリ](#memory)のどこかに保存された
+データ（`Operand::Indirect`）、または（最適化として）インラインで保存された
+即値データのいずれかを表すことができます。そして[`Immediate`]は、単一の
+（潜在的に未初期化の）[スカラー値][`Scalar`]（整数または細いポインタ）、
+またはそれらの2つのペアのいずれかです。この場合、単一のスカラー値は（まだ）
+初期化されて*いません*。
 
-When the initialization of `_1` is invoked, the value of the `FOO` constant is
-required, and triggers another call to `tcx.const_eval_*`, which will not be shown
-here. If the evaluation of FOO is successful, `42` will be subtracted from its
-value `4096` and the result stored in `_1` as
+`_1`の初期化が呼び出されると、`FOO`定数の値が必要になり、
+別の`tcx.const_eval_*`への呼び出しがトリガーされます。これはここでは示しません。
+FOOの評価が成功した場合、`42`がその値`4096`から減算され、結果が
 `Operand::Immediate(Immediate::ScalarPair(Scalar::Raw { data: 4054, .. },
-Scalar::Raw { data: 0, .. })`. The first part of the pair is the computed value,
-the second part is a bool that's true if an overflow happened. A `Scalar::Raw`
-also stores the size (in bytes) of this scalar value; we are eliding that here.
+Scalar::Raw { data: 0, .. })`として`_1`に保存されます。ペアの最初の部分は計算された値、
+2番目の部分はオーバーフローが発生した場合にtrueになるboolです。`Scalar::Raw`は、
+このスカラー値のサイズ（バイト単位）も保存します；ここでは省略しています。
 
-The next statement asserts that said boolean is `0`. In case the assertion
-fails, its error message is used for reporting a compile-time error.
+次のステートメントは、そのbooleanが`0`であることをアサートします。アサーションが
+失敗した場合、そのエラーメッセージはコンパイル時エラーを報告するために使用されます。
 
-Since it does not fail, `Operand::Immediate(Immediate::Scalar(Scalar::Raw {
-data: 4054, .. }))` is stored in the virtual memory it was allocated before the
-evaluation. `_0` always refers to that location directly.
+失敗しないため、`Operand::Immediate(Immediate::Scalar(Scalar::Raw {
+data: 4054, .. }))`が、評価前に割り当てられた仮想メモリに保存されます。
+`_0`は常にその場所を直接参照します。
 
-After the evaluation is done, the return value is converted from [`Operand`] to
-[`ConstValue`] by [`op_to_const`]: the former representation is geared towards
-what is needed *during* const evaluation, while [`ConstValue`] is shaped by the
-needs of the remaining parts of the compiler that consume the results of const
-evaluation.  As part of this conversion, for types with scalar values, even if
-the resulting [`Operand`] is `Indirect`, it will return an immediate
-`ConstValue::Scalar(computed_value)` (instead of the usual `ConstValue::ByRef`).
-This makes using the result much more efficient and also more convenient, as no
-further queries need to be executed in order to get at something as simple as a
-`usize`.
+評価が完了すると、戻り値は[`op_to_const`]によって[`Operand`]から
+[`ConstValue`]に変換されます：前者の表現はconst評価*中*に必要なものに
+向けられていますが、[`ConstValue`]は、const評価の結果を消費するコンパイラの
+残りの部分のニーズによって形作られています。この変換の一部として、
+スカラー値を持つ型の場合、結果の[`Operand`]が`Indirect`であっても、
+即値の`ConstValue::Scalar(computed_value)`（通常の`ConstValue::ByRef`の代わりに）を
+返します。これにより、結果の使用がより効率的かつより便利になります。`usize`のような
+シンプルなものを取得するために、さらにクエリを実行する必要がないためです。
 
-Future evaluations of the same constants will not actually invoke
-the interpreter, but just use the cached result.
+同じ定数の将来の評価は、実際にはインタプリタを呼び出さず、
+キャッシュされた結果を使用するだけです。
 
 [`Operand`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_const_eval/interpret/operand/enum.Operand.html
 [`Immediate`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_const_eval/interpret/enum.Immediate.html
@@ -103,134 +99,123 @@ the interpreter, but just use the cached result.
 [`Scalar`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/mir/interpret/enum.Scalar.html
 [`op_to_const`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_const_eval/const_eval/eval_queries/fn.op_to_const.html
 
-## Datastructures
+## データ構造
 
-The interpreter's outside-facing datastructures can be found in
-[rustc_middle/src/mir/interpret](https://github.com/rust-lang/rust/blob/HEAD/compiler/rustc_middle/src/mir/interpret).
-This is mainly the error enum and the [`ConstValue`] and [`Scalar`] types. A
-`ConstValue` can be either `Scalar` (a single `Scalar`, i.e., integer or thin
-pointer), `Slice` (to represent byte slices and strings, as needed for pattern
-matching) or `ByRef`, which is used for anything else and refers to a virtual
-allocation. These allocations can be accessed via the methods on
-`tcx.interpret_interner`.  A `Scalar` is either some `Raw` integer or a pointer;
-see [the next section](#memory) for more on that.
+インタプリタの外部向けデータ構造は、
+[rustc_middle/src/mir/interpret](https://github.com/rust-lang/rust/blob/HEAD/compiler/rustc_middle/src/mir/interpret)にあります。
+これは主にエラー列挙型と[`ConstValue`]および[`Scalar`]型です。
+`ConstValue`は、`Scalar`（単一の`Scalar`、つまり整数または細いポインタ）、
+`Slice`（パターンマッチングに必要なバイトスライスと文字列を表すため）、
+または`ByRef`（他のすべてに使用され、仮想割り当てを参照します）のいずれかです。
+これらの割り当ては、`tcx.interpret_interner`のメソッドを介してアクセスできます。
+`Scalar`は、一部の`Raw`整数またはポインタのいずれかです；
+詳細については[次のセクション](#memory)を参照してください。
 
-If you are expecting a numeric result, you can use `eval_usize` (panics on
-anything that can't be represented as a `u64`) or `try_eval_usize` which results
-in an `Option<u64>` yielding the `Scalar` if possible.
+数値結果を期待している場合、`eval_usize`（`u64`として表現できないものでパニック）
+または`try_eval_usize`を使用できます。これは、可能な場合は`Scalar`を生成する
+`Option<u64>`になります。
 
-## Memory
+## メモリ
 
-To support any kind of pointers, the interpreter needs to have a "virtual memory" that the
-pointers can point to.  This is implemented in the [`Memory`] type.  In the
-simplest model, every global variable, stack variable and every dynamic
-allocation corresponds to an [`Allocation`] in that memory.  (Actually using an
-allocation for every MIR stack variable would be very inefficient; that's why we
-have `Operand::Immediate` for stack variables that are both small and never have
-their address taken.  But that is purely an optimization.)
+任意の種類のポインタをサポートするために、インタプリタには、ポインタが指すことができる
+「仮想メモリ」が必要です。これは[`Memory`]型で実装されています。最も単純なモデルでは、
+すべてのグローバル変数、スタック変数、および動的割り当てが、そのメモリ内の
+[`Allocation`]に対応します。（実際には、すべてのMIRスタック変数に割り当てを使用すると
+非常に非効率的です；そのため、小さく、アドレスが取られないスタック変数には
+`Operand::Immediate`があります。しかし、それは純粋な最適化です。）
 
-Such an `Allocation` is basically just a sequence of `u8` storing the value of
-each byte in this allocation.  (Plus some extra data, see below.)  Every
-`Allocation` has a globally unique `AllocId` assigned in `Memory`.  With that, a
-[`Pointer`] consists of a pair of an `AllocId` (indicating the allocation) and
-an offset into the allocation (indicating which byte of the allocation the
-pointer points to).  It may seem odd that a `Pointer` is not just an integer
-address, but remember that during const evaluation, we cannot know at which
-actual integer address the allocation will end up -- so we use `AllocId` as
-symbolic base addresses, which means we need a separate offset.  (As an aside,
-it turns out that pointers at run-time are
-[more than just integers, too](https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#pointer-provenance).)
+このような`Allocation`は、基本的に、この割り当ての各バイトの値を保存する`u8`の
+シーケンスです。（さらにいくつかの追加データがあります。以下を参照してください。）
+すべての`Allocation`には、`Memory`内でグローバルに一意の`AllocId`が割り当てられます。
+それにより、[`Pointer`]は、`AllocId`（割り当てを示す）と割り当てへのオフセット
+（ポインタが割り当てのどのバイトを指しているかを示す）のペアで構成されます。
+`Pointer`が単なる整数アドレスではないのは奇妙に見えるかもしれませんが、
+const評価中に、割り当てが実際にどの整数アドレスに配置されるかを知ることができないことを
+覚えておいてください -- したがって、`AllocId`をシンボリックベースアドレスとして使用します。
+つまり、別個のオフセットが必要です。（余談ですが、実行時のポインタも
+[単なる整数以上のもの](https://rust-lang.github.io/unsafe-code-guidelines/glossary.html#pointer-provenance)であることがわかります。）
 
-These allocations exist so that references and raw pointers have something to
-point to. There is no global linear heap in which things are allocated, but each
-allocation (be it for a local variable, a static or a (future) heap allocation)
-gets its own little memory with exactly the required size. So if you have a
-pointer to an allocation for a local variable `a`, there is no possible (no
-matter how unsafe) operation that you can do that would ever change said pointer
-to a pointer to a different local variable `b`.
-Pointer arithmetic on `a` will only ever change its offset; the `AllocId` stays the same.
+これらの割り当ては、参照と生ポインタが何かを指すために存在します。
+物事が割り当てられるグローバルな線形ヒープはありませんが、各割り当て
+（ローカル変数、静的、または（将来の）ヒープ割り当て用）は、必要なサイズとまったく
+同じサイズの独自の小さなメモリを取得します。したがって、ローカル変数`a`の割り当てへの
+ポインタがある場合、（どれだけunsafeであっても）それを異なるローカル変数`b`への
+ポインタに変更する可能性のある操作はありません。`a`でのポインタ演算は、
+そのオフセットを変更するだけです；`AllocId`は同じままです。
 
-This, however, causes a problem when we want to store a `Pointer` into an
-`Allocation`: we cannot turn it into a sequence of `u8` of the right length!
-`AllocId` and offset together are twice as big as a pointer "seems" to be.  This
-is what the `relocation` field of `Allocation` is for: the byte offset of the
-`Pointer` gets stored as a bunch of `u8`, while its `AllocId` gets stored
-out-of-band.  The two are reassembled when the `Pointer` is read from memory.
-The other bit of extra data an `Allocation` needs is `undef_mask` for keeping
-track of which of its bytes are initialized.
+ただし、これにより、`Pointer`を`Allocation`に保存したい場合に問題が発生します：
+適切な長さの`u8`のシーケンスに変換できません！`AllocId`とオフセットを合わせると、
+ポインタが「見える」べきサイズの2倍です。これが`Allocation`の`relocation`フィールドの
+目的です：`Pointer`のバイトオフセットは、いくつかの`u8`として保存され、
+その`AllocId`は帯域外で保存されます。2つは、`Pointer`がメモリから読み取られるときに
+再組み立てされます。`Allocation`が必要とする他のビットの追加データは、
+どのバイトが初期化されているかを追跡するための`undef_mask`です。
 
-### Global memory and exotic allocations
+### グローバルメモリとエキゾチックな割り当て
 
-`Memory` exists only during evaluation; it gets destroyed when the
-final value of the constant is computed.  In case that constant contains any
-pointers, those get "interned" and moved to a global "const eval memory" that is
-part of `TyCtxt`.  These allocations stay around for the remaining computation
-and get serialized into the final output (so that dependent crates can use
-them).
+`Memory`は評価中にのみ存在します；定数の最終値が計算されると破棄されます。
+その定数にポインタが含まれている場合、それらは「インターン化」され、
+`TyCtxt`の一部であるグローバルな「const eval memory」に移動されます。
+これらの割り当ては、残りの計算中に保持され、最終出力にシリアライズされます
+（依存クレートがそれらを使用できるようにするため）。
 
-Moreover, to also support function pointers, the global memory in `TyCtxt` can
-also contain "virtual allocations": instead of an `Allocation`, these contain an
-`Instance`.  That allows a `Pointer` to point to either normal data or a
-function, which is needed to be able to evaluate casts from function pointers to
-raw pointers.
+さらに、関数ポインタもサポートするために、`TyCtxt`のグローバルメモリには
+「仮想割り当て」も含めることができます：`Allocation`の代わりに、これらには
+`Instance`が含まれます。これにより、`Pointer`は通常のデータまたは関数のいずれかを
+指すことができ、関数ポインタから生ポインタへのキャストを評価できるようにするために
+必要です。
 
-Finally, the [`GlobalAlloc`] type used in the global memory also contains a
-variant `Static` that points to a particular `const` or `static` item.  This is
-needed to support circular statics, where we need to have a `Pointer` to a
-`static` for which we cannot yet have an `Allocation` as we do not know the
-bytes of its value.
+最後に、グローバルメモリで使用される[`GlobalAlloc`]型には、
+特定の`const`または`static`アイテムを指す`Static`バリアントも含まれています。
+これは、循環静的をサポートするために必要です。値のバイトをまだ知ることができないため、
+`Allocation`をまだ持つことができない`static`への`Pointer`を持つ必要があります。
 
 [`Memory`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_const_eval/interpret/struct.Memory.html
 [`Allocation`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/mir/interpret/struct.Allocation.html
 [`Pointer`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/mir/interpret/struct.Pointer.html
 [`GlobalAlloc`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/mir/interpret/enum.GlobalAlloc.html
 
-### Pointer values vs Pointer types
+### ポインタ値対ポインタ型
 
-One common cause of confusion in the interpreter is that being a pointer *value* and having
-a pointer *type* are entirely independent properties.  By "pointer value", we
-refer to a `Scalar::Ptr` containing a `Pointer` and thus pointing somewhere into
-the interpreter's virtual memory.  This is in contrast to `Scalar::Raw`, which is just some
-concrete integer.
+インタプリタでよくある混乱の原因の1つは、ポインタ*値*であることとポインタ*型*を
+持つことが完全に独立した特性であることです。「ポインタ値」とは、`Pointer`を含む
+`Scalar::Ptr`を指し、したがってインタプリタの仮想メモリのどこかを指しています。
+これは、いくつかの具体的な整数である`Scalar::Raw`とは対照的です。
 
-However, a variable of pointer or reference *type*, such as `*const T` or `&T`,
-does not have to have a pointer *value*: it could be obtained by casting or
-transmuting an integer to a pointer. 
-And similarly, when casting or transmuting a reference to some
-actual allocation to an integer, we end up with a pointer *value*
-(`Scalar::Ptr`) at integer *type* (`usize`).  This is a problem because we
-cannot meaningfully perform integer operations such as division on pointer
-values.
+ただし、`*const T`や`&T`のようなポインタまたは参照*型*の変数は、
+ポインタ*値*を持つ必要はありません：整数をポインタにキャストまたは変換することで
+取得できます。同様に、実際の割り当てへの参照を整数にキャストまたは変換すると、
+整数*型*（`usize`）でポインタ*値*（`Scalar::Ptr`）になります。これは、
+ポインタ値に対して除算などの整数演算を意味のある方法で実行できないため、
+問題です。
 
-## Interpretation
+## 解釈
 
-Although the main entry point to constant evaluation is the `tcx.const_eval_*`
-functions, there are additional functions in
-[rustc_const_eval/src/const_eval](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_const_eval/index.html)
-that allow accessing the fields of a `ConstValue` (`ByRef` or otherwise). You should
-never have to access an `Allocation` directly except for translating it to the
-compilation target (at the moment just LLVM).
+定数評価へのメインエントリポイントは`tcx.const_eval_*`関数ですが、
+[rustc_const_eval/src/const_eval](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_const_eval/index.html)には、
+`ConstValue`（`ByRef`またはその他）のフィールドにアクセスできる追加の関数があります。
+コンパイルターゲット（現時点ではLLVMだけ）に翻訳する場合を除いて、
+`Allocation`に直接アクセスする必要はありません。
 
-The interpreter starts by creating a virtual stack frame for the current constant that is
-being evaluated. There's essentially no difference between a constant and a
-function with no arguments, except that constants do not allow local (named)
-variables at the time of writing this guide.
+インタプリタは、評価されている現在の定数用の仮想スタックフレームを作成することから
+始まります。定数と引数のない関数の間には、本質的に違いはありません。
+ただし、このガイドを書いている時点では、定数はローカル（名前付き）変数を
+許可していません。
 
-A stack frame is defined by the `Frame` type in
-[rustc_const_eval/src/interpret/eval_context.rs](https://github.com/rust-lang/rust/blob/HEAD/compiler/rustc_const_eval/src/interpret/eval_context.rs)
-and contains all the local
-variables memory (`None` at the start of evaluation). Each frame refers to the
-evaluation of either the root constant or subsequent calls to `const fn`. The
-evaluation of another constant simply calls `tcx.const_eval_*`, which produce an
-entirely new and independent stack frame.
+スタックフレームは、
+[rustc_const_eval/src/interpret/eval_context.rs](https://github.com/rust-lang/rust/blob/HEAD/compiler/rustc_const_eval/src/interpret/eval_context.rs)の
+`Frame`型で定義され、すべてのローカル変数メモリ（評価の開始時は`None`）を含みます。
+各フレームは、ルート定数または`const fn`への後続の呼び出しのいずれかの評価を
+参照します。別の定数の評価は単に`tcx.const_eval_*`を呼び出すだけで、
+これは完全に新しい独立したスタックフレームを生成します。
 
-The frames are just a `Vec<Frame>`, there's no way to actually refer to a
-`Frame`'s memory even if horrible shenanigans are done via unsafe code. The only
-memory that can be referred to are `Allocation`s.
+フレームは単なる`Vec<Frame>`であり、ホラーな不正行為がunsafeコードを介して行われても、
+`Frame`のメモリを実際に参照する方法はありません。参照できる唯一のメモリは
+`Allocation`です。
 
-The interpreter now calls the `step` method (in
-[rustc_const_eval/src/interpret/step.rs](https://github.com/rust-lang/rust/blob/HEAD/compiler/rustc_const_eval/src/interpret/step.rs)
-) until it either returns an error or has no further statements to execute. Each
-statement will now initialize or modify the locals or the virtual memory
-referred to by a local. This might require evaluating other constants or
-statics, which just recursively invokes `tcx.const_eval_*`.
+インタプリタは、エラーを返すか、実行するステートメントがなくなるまで、
+`step`メソッド（
+[rustc_const_eval/src/interpret/step.rs](https://github.com/rust-lang/rust/blob/HEAD/compiler/rustc_const_eval/src/interpret/step.rs)内）を
+呼び出します。各ステートメントは、ローカルまたはローカルによって参照される仮想メモリを
+初期化または変更します。これには、他の定数または静的を評価する必要がある場合があり、
+その場合は単に`tcx.const_eval_*`を再帰的に呼び出します。

@@ -1,175 +1,139 @@
-# Testing the compiler
+# コンパイラのテスト
 
-The Rust project runs a wide variety of different tests, orchestrated by the
-build system (`./x test`). This section gives a brief overview of the different
-testing tools. Subsequent chapters dive into [running tests](running.md) and
-[adding new tests](adding.md).
+Rustプロジェクトは、ビルドシステム（`./x test`）によって調整されたさまざまな種類のテストを実行します。このセクションでは、さまざまなテストツールの簡単な概要を説明します。後続の章では、[テストの実行](running.md)と[新しいテストの追加](adding.md)について詳しく説明します。
 
-## Kinds of tests
+## テストの種類
 
-There are several kinds of tests to exercise things in the Rust distribution.
-Almost all of them are driven by `./x test`, with some exceptions noted below.
+Rustディストリビューションの物事を実行するためのいくつかの種類のテストがあります。ほとんどすべてが`./x test`によって駆動されますが、以下に記載されているいくつかの例外があります。
 
 ### Compiletest
 
-The main test harness for testing the compiler itself is a tool called
-[compiletest].
+コンパイラ自体をテストするためのメインテストハーネスは、[compiletest]と呼ばれるツールです。
 
-[compiletest] supports running different styles of tests, organized into *test
-suites*. A *test mode* may provide common presets/behavior for a set of *test
-suites*. [compiletest]-supported tests are located in the [`tests`] directory.
+[compiletest]は、*テストスイート*に整理されたさまざまなスタイルのテストの実行をサポートしています。*テストモード*は、一連の*テストスイート*に共通のプリセット/動作を提供する場合があります。[compiletest]サポートされたテストは、[`tests`]ディレクトリにあります。
 
-The [Compiletest chapter][compiletest] goes into detail on how to use this tool.
+[Compiletest章][compiletest]では、このツールの使用方法について詳しく説明しています。
 
-> Example: `./x test tests/ui`
+> 例：`./x test tests/ui`
 
 [compiletest]: compiletest.md
 [`tests`]: https://github.com/rust-lang/rust/tree/HEAD/tests
 
-### Package tests
+### パッケージテスト
 
-The standard library and many of the compiler packages include typical Rust
-`#[test]` unit tests, integration tests, and documentation tests. You can pass a
-path to `./x test` for almost any package in the `library/` or `compiler/`
-directory, and `x` will essentially run `cargo test` on that package.
+標準ライブラリと多くのコンパイラパッケージには、典型的なRustの`#[test]`ユニットテスト、統合テスト、およびドキュメンテーションテストが含まれています。`library/`または`compiler/`ディレクトリのほとんどすべてのパッケージへのパスを`./x test`に渡すことができ、`x`は基本的にそのパッケージで`cargo test`を実行します。
 
-Examples:
+例：
 
-| Command                                   | Description                           |
-|-------------------------------------------|---------------------------------------|
-| `./x test library/std`                    | Runs tests on `std` only              |
-| `./x test library/core`                   | Runs tests on `core` only             |
-| `./x test compiler/rustc_data_structures` | Runs tests on `rustc_data_structures` |
+| コマンド                                  | 説明                              |
+|-------------------------------------------|-----------------------------------|
+| `./x test library/std`                    | `std`のみのテストを実行           |
+| `./x test library/core`                   | `core`のみのテストを実行          |
+| `./x test compiler/rustc_data_structures` | `rustc_data_structures`のテストを実行 |
 
-The standard library relies very heavily on documentation tests to cover its
-functionality. However, unit tests and integration tests can also be used as
-needed. Almost all of the compiler packages have doctests disabled.
+標準ライブラリは、その機能をカバーするためにドキュメンテーションテストに大きく依存しています。ただし、必要に応じてユニットテストと統合テストも使用できます。ほとんどすべてのコンパイラパッケージでは、doctestが無効になっています。
 
-All standard library and compiler unit tests are placed in separate `tests` file
-(which is enforced in [tidy][tidy-unit-tests]). This ensures that when the test
-file is changed, the crate does not need to be recompiled. For example:
+すべての標準ライブラリとコンパイラのユニットテストは、別の`tests`ファイルに配置されます（これは[tidy][tidy-unit-tests]で強制されます）。これにより、テストファイルが変更されたときにクレートを再コンパイルする必要がなくなります。例：
 
 ```rust,ignore
 #[cfg(test)]
 mod tests;
 ```
 
-If it wasn't done this way, and you were working on something like `core`, that
-would require recompiling the entire standard library, and the entirety of
-`rustc`.
+このようにしなかった場合、`core`のような何かに取り組んでいた場合、標準ライブラリ全体、および`rustc`全体を再コンパイルする必要があります。
 
-`./x test` includes some CLI options for controlling the behavior with these
-package tests:
+`./x test`には、これらのパッケージテストの動作を制御するためのいくつかのCLIオプションが含まれています：
 
-* `--doc` — Only runs documentation tests in the package.
-* `--no-doc` — Run all tests *except* documentation tests.
+* `--doc` — パッケージ内のドキュメンテーションテストのみを実行します。
+* `--no-doc` — ドキュメンテーションテスト*以外*のすべてのテストを実行します。
 
 [tidy-unit-tests]: https://github.com/rust-lang/rust/blob/HEAD/src/tools/tidy/src/unit_tests.rs
 
 ### Tidy
 
-Tidy is a custom tool used for validating source code style and formatting
-conventions, such as rejecting long lines. There is more information in the
-[section on coding conventions](../conventions.md#formatting) or the [Tidy Readme].
+Tidyは、ソースコードのスタイルとフォーマット規則を検証するために使用されるカスタムツールです。たとえば、長い行を拒否します。詳細については、[コーディング規則のセクション](../conventions.md#formatting)または[Tidy Readme]を参照してください。
 
-> Examples: `./x test tidy`
+> 例：`./x test tidy`
 
 [Tidy Readme]: https://github.com/rust-lang/rust/blob/HEAD/src/tools/tidy/Readme.md
 
 
-### Formatting
+### フォーマット
 
-Rustfmt is integrated with the build system to enforce uniform style across the
-compiler. The formatting check is automatically run by the Tidy tool mentioned
-above.
+Rustfmtは、コンパイラ全体で統一されたスタイルを強制するためにビルドシステムと統合されています。フォーマットチェックは、上記のTidyツールによって自動的に実行されます。
 
-Examples:
+例：
 
-| Command                 | Description                                                        |
+| コマンド                | 説明                                                               |
 |-------------------------|--------------------------------------------------------------------|
-| `./x fmt --check`       | Checks formatting and exits with an error if formatting is needed. |
-| `./x fmt`               | Runs rustfmt across the entire codebase.                           |
-| `./x test tidy --bless` | First runs rustfmt to format the codebase, then runs tidy checks.  |
+| `./x fmt --check`       | フォーマットをチェックし、フォーマットが必要な場合はエラーで終了します。 |
+| `./x fmt`               | コードベース全体でrustfmtを実行します。                            |
+| `./x test tidy --bless` | 最初にrustfmtを実行してコードベースをフォーマットし、その後tidyチェックを実行します。 |
 
-### Book documentation tests
+### ブックドキュメンテーションテスト
 
-All of the books that are published have their own tests, primarily for
-validating that the Rust code examples pass. Under the hood, these are
-essentially using `rustdoc --test` on the markdown files. The tests can be run
-by passing a path to a book to `./x test`.
+公開されているすべてのブックには独自のテストがあり、主にRustコードの例が合格することを検証するためのものです。内部的には、これらは基本的にmarkdownファイルで`rustdoc --test`を使用しています。テストは、ブックへのパスを`./x test`に渡すことで実行できます。
 
-> Example: `./x test src/doc/book`
+> 例：`./x test src/doc/book`
 
-### Documentation link checker
+### ドキュメンテーションリンクチェッカー
 
-Links across all documentation is validated with a link checker tool,
-and it can be invoked so:
+すべてのドキュメンテーション間のリンクは、リンクチェッカーツールで検証され、次のように呼び出すことができます：
 
 ```console
 ./x test linkchecker
 ```
 
-This requires building all of the documentation, which might take a while.
+これには、すべてのドキュメンテーションをビルドする必要があり、しばらく時間がかかる場合があります。
 
 ### `distcheck`
 
-`distcheck` verifies that the source distribution tarball created by the build
-system will unpack, build, and run all tests.
+`distcheck`は、ビルドシステムによって作成されたソース配布tarballが解凍、ビルドされ、すべてのテストが実行されることを検証します。
 
 ```console
 ./x test distcheck
 ```
 
-### Tool tests
+### ツールテスト
 
-Packages that are included with Rust have all of their tests run as well. This
-includes things such as cargo, clippy, rustfmt, miri, bootstrap (testing the
-Rust build system itself), etc.
+Rustに含まれるパッケージは、すべてのテストも実行されます。これには、cargo、clippy、rustfmt、miri、bootstrap（Rustビルドシステム自体のテスト）などが含まれます。
 
-Most of the tools are located in the [`src/tools`] directory. To run the tool's
-tests, just pass its path to `./x test`.
+ほとんどのツールは[`src/tools`]ディレクトリにあります。ツールのテストを実行するには、そのパスを`./x test`に渡すだけです。
 
-> Example: `./x test src/tools/cargo`
+> 例：`./x test src/tools/cargo`
 
-Usually these tools involve running `cargo test` within the tool's directory.
+通常、これらのツールは、ツールのディレクトリ内で`cargo test`を実行することを含みます。
 
-If you want to run only a specified set of tests, append `--test-args
-FILTER_NAME` to the command.
+指定されたテストセットのみを実行したい場合は、コマンドに`--test-args FILTER_NAME`を追加してください。
 
-> Example: `./x test src/tools/miri --test-args padding`
+> 例：`./x test src/tools/miri --test-args padding`
 
-In CI, some tools are allowed to fail. Failures send notifications to the
-corresponding teams, and is tracked on the [toolstate website]. More information
-can be found in the [toolstate documentation].
+CIでは、一部のツールは失敗が許可されています。失敗は対応するチームに通知を送信し、[toolstate website]で追跡されます。詳細については、[toolstate documentation]を参照してください。
 
 [`src/tools`]: https://github.com/rust-lang/rust/tree/HEAD/src/tools/
 [toolstate documentation]: https://forge.rust-lang.org/infra/toolstate.html
 [toolstate website]: https://rust-lang-nursery.github.io/rust-toolstate/
 
-### Ecosystem testing
+### エコシステムテスト
 
-Rust tests integration with real-world code to catch regressions and make
-informed decisions about the evolution of the language. There are several kinds
-of ecosystem tests, including Crater. See the [Ecosystem testing
-chapter](ecosystem.md) for more details.
+Rustは、回帰を検出し、言語の進化について情報に基づいた決定を下すために、実際のコードとの統合をテストします。いくつかの種類のエコシステムテストがあり、Craterを含みます。詳細については、[エコシステムテスト章](ecosystem.md)を参照してください。
 
-### Performance testing
+### パフォーマンステスト
 
-A separate infrastructure is used for testing and tracking performance of the
-compiler. See the [Performance testing chapter](perf.md) for more details.
+コンパイラのパフォーマンスをテストおよび追跡するために、別のインフラストラクチャが使用されます。詳細については、[パフォーマンステスト章](perf.md)を参照してください。
 
-### Codegen backend testing
+### コードジェネレーションバックエンドテスト
 
-See [Codegen backend testing](./codegen-backend-tests/intro.md).
+[コードジェネレーションバックエンドテスト](./codegen-backend-tests/intro.md)を参照してください。
 
-## Miscellaneous information
+## その他の情報
 
-There are some other useful testing-related info at [Misc info](misc.md).
+[Misc info](misc.md)にいくつかの他の有用なテスト関連情報があります。
 
-## Further reading
+## 参考文献
 
-The following blog posts may also be of interest:
+以下のブログ投稿も興味深いかもしれません：
 
-- brson's classic ["How Rust is tested"][howtest]
+- brsonの古典的な["How Rust is tested"][howtest]
 
 [howtest]: https://brson.github.io/2017/07/10/how-rust-is-tested

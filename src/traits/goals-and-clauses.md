@@ -1,45 +1,43 @@
-# Goals and clauses
+# ゴールと節
 
-In logic programming terms, a **goal** is something that you must
-prove and a **clause** is something that you know is true. As
-described in the [lowering to logic](./lowering-to-logic.html)
-chapter, Rust's trait solver is based on an extension of hereditary
-harrop (HH) clauses, which extend traditional Prolog Horn clauses with
-a few new superpowers.
+論理プログラミング用語では、**ゴール**は証明しなければならないものであり、
+**節**は真であることがわかっているものです。[論理への降下](./lowering-to-logic.html)
+章で説明されているように、Rust のトレイトソルバーは、遺伝的
+ハロップ (HH) 節の拡張に基づいており、これは伝統的な Prolog ホーン節を
+いくつかの新しい超能力で拡張したものです。
 
-## Goals and clauses meta structure
+## ゴールと節のメタ構造
 
-In Rust's solver, **goals** and **clauses** have the following forms
-(note that the two definitions reference one another):
+Rust のソルバーでは、**ゴール**と**節**は次の形式を持ちます
+（2つの定義が互いに参照していることに注意してください）：
 
 ```text
-Goal = DomainGoal           // defined in the section below
+Goal = DomainGoal           // 以下のセクションで定義
         | Goal && Goal
         | Goal || Goal
-        | exists<K> { Goal }   // existential quantification
-        | forall<K> { Goal }   // universal quantification
-        | if (Clause) { Goal } // implication
-        | true                 // something that's trivially true
-        | ambiguous            // something that's never provable
+        | exists<K> { Goal }   // 存在量化
+        | forall<K> { Goal }   // 全称量化
+        | if (Clause) { Goal } // 含意
+        | true                 // 自明に真なもの
+        | ambiguous            // 証明不可能なもの
 
 Clause = DomainGoal
-        | Clause :- Goal     // if can prove Goal, then Clause is true
+        | Clause :- Goal     // Goal を証明できれば、Clause は真
         | Clause && Clause
         | forall<K> { Clause }
 
-K = <type>     // a "kind"
+K = <type>     // 「種類」
     | <lifetime>
 ```
 
-The proof procedure for these sorts of goals is actually quite
-straightforward.  Essentially, it's a form of depth-first search. The
-paper
+これらの種類のゴールの証明手続きは実際には非常に単純です。
+本質的には、深さ優先探索の一種です。論文
 ["A Proof Procedure for the Logic of Hereditary Harrop Formulas"][pphhf]
-gives the details.
+が詳細を提供しています。
 
-In terms of code, these types are defined in
-[`rustc_middle/src/traits/mod.rs`][traits_mod] in rustc, and in
-[`chalk-ir/src/lib.rs`][chalk_ir] in chalk.
+コードの観点から、これらの型は rustc の
+[`rustc_middle/src/traits/mod.rs`][traits_mod] と、chalk の
+[`chalk-ir/src/lib.rs`][chalk_ir] で定義されています。
 
 [pphhf]: https://rust-lang.github.io/chalk/book/bibliography.html#pphhf
 [traits_mod]: https://github.com/rust-lang/rust/blob/HEAD/compiler/rustc_middle/src/traits/mod.rs
@@ -47,45 +45,46 @@ In terms of code, these types are defined in
 
 <a id="domain-goals"></a>
 
-## Domain goals
+## ドメインゴール
 
-*Domain goals* are the atoms of the trait logic. As can be seen in the
-definitions given above, general goals basically consist in a combination of
-domain goals.
+*ドメインゴール*は、トレイト論理の原子です。上で示した定義で
+見られるように、一般的なゴールは基本的にドメインゴールの組み合わせで
+構成されています。
 
-Moreover, flattening a bit the definition of clauses given previously, one can
-see that clauses are always of the form:
+さらに、前に示した節の定義を少し平坦化すると、節は常に次の形式である
+ことがわかります：
 ```text
 forall<K1, ..., Kn> { DomainGoal :- Goal }
 ```
-hence domain goals are in fact clauses' LHS. That is, at the most granular level,
-domain goals are what the trait solver will end up trying to prove.
+したがって、ドメインゴールは実際には節の LHS です。つまり、最も細かい
+レベルでは、ドメインゴールはトレイトソルバーが最終的に証明しようとする
+ものです。
 
 <a id="trait-ref"></a>
 
-To define the set of domain goals in our system, we need to first
-introduce a few simple formulations. A **trait reference** consists of
-the name of a trait along with a suitable set of inputs P0..Pn:
+システム内のドメインゴールのセットを定義するには、まずいくつかの
+シンプルな定式化を導入する必要があります。**トレイト参照**は、
+トレイトの名前と適切な入力セット P0..Pn で構成されます：
 
 ```text
 TraitRef = P0: TraitName<P1..Pn>
 ```
 
-So, for example, `u32: Display` is a trait reference, as is `Vec<T>:
-IntoIterator`. Note that Rust surface syntax also permits some extra
-things, like associated type bindings (`Vec<T>: IntoIterator<Item =
-T>`), that are not part of a trait reference.
+したがって、例えば `u32: Display` はトレイト参照であり、`Vec<T>:
+IntoIterator` もそうです。Rust の表面構文では、関連型バインディング
+（`Vec<T>: IntoIterator<Item = T>`）など、いくつかの追加のものも
+許可されていますが、これらはトレイト参照の一部ではないことに注意してください。
 
 <a id="projection"></a>
 
-A **projection** consists of an associated item reference along with
-its inputs P0..Pm:
+**プロジェクション**は、関連アイテム参照とその入力 P0..Pm で
+構成されます：
 
 ```text
 Projection = <P0 as TraitName<P1..Pn>>::AssocItem<Pn+1..Pm>
 ```
 
-Given these, we can define a `DomainGoal` as follows:
+これらを考えると、`DomainGoal` を次のように定義できます：
 
 ```text
 DomainGoal = Holds(WhereClause)
@@ -101,45 +100,45 @@ WhereClause = Implemented(TraitRef)
             | Outlives(Region: Region)
 ```
 
-`WhereClause` refers to a `where` clause that a Rust user would actually be able
-to write in a Rust program. This abstraction exists only as a convenience as we
-sometimes want to only deal with domain goals that are effectively writable in
-Rust.
+`WhereClause` は、Rust ユーザーが Rust プログラムで実際に書くことができる
+`where` 句を指します。この抽象化は、Rust で効果的に書けるドメインゴール
+のみを扱いたい場合があるため、便宜上のみ存在します。
 
-Let's break down each one of these, one-by-one.
+これらを1つずつ分解してみましょう。
 
 #### Implemented(TraitRef)
-e.g. `Implemented(i32: Copy)`
+例：`Implemented(i32: Copy)`
 
-True if the given trait is implemented for the given input types and lifetimes.
+与えられたトレイトが与えられた入力型とライフタイムに対して実装されている
+場合に真です。
 
 #### ProjectionEq(Projection = Type)
-e.g. `ProjectionEq<T as Iterator>::Item = u8`
+例：`ProjectionEq<T as Iterator>::Item = u8`
 
-The given associated type `Projection` is equal to `Type`; this can be proved
-with either normalization or using placeholder associated types. See
-[the section on associated types in Chalk Book][at].
+与えられた関連型 `Projection` が `Type` と等しい場合。これは
+正規化を使用するか、プレースホルダー関連型を使用して証明できます。
+[Chalk Book の関連型に関するセクション][at]を参照してください。
 
 #### Normalize(Projection -> Type)
-e.g. `ProjectionEq<T as Iterator>::Item -> u8`
+例：`ProjectionEq<T as Iterator>::Item -> u8`
 
-The given associated type `Projection` can be [normalized][n] to `Type`.
+与えられた関連型 `Projection` が `Type` に[正規化][n]できる場合。
 
-As discussed in [the section on associated
-types in Chalk Book][at], `Normalize` implies `ProjectionEq`,
-but not vice versa. In general, proving `Normalize(<T as Trait>::Item -> U)`
-also requires proving `Implemented(T: Trait)`.
+[Chalk Book の関連型に関するセクション][at]で説明されているように、
+`Normalize` は `ProjectionEq` を意味しますが、その逆は成り立ちません。
+一般に、`Normalize(<T as Trait>::Item -> U)` を証明するには、
+`Implemented(T: Trait)` を証明する必要もあります。
 
 [n]: https://rust-lang.github.io/chalk/book/clauses/type_equality.html#normalize
 [at]: https://rust-lang.github.io/chalk/book/clauses/type_equality.html
 
 #### FromEnv(TraitRef)
-e.g. `FromEnv(Self: Add<i32>)`
+例：`FromEnv(Self: Add<i32>)`
 
-True if the inner `TraitRef` is *assumed* to be true,
-that is, if it can be derived from the in-scope where clauses.
+内部の `TraitRef` が真であると*仮定*されている場合、つまり、
+スコープ内の where 句から導出できる場合に真です。
 
-For example, given the following function:
+例えば、次の関数があるとします：
 
 ```rust
 fn loud_clone<T: Clone>(stuff: &T) -> T {
@@ -148,21 +147,22 @@ fn loud_clone<T: Clone>(stuff: &T) -> T {
 }
 ```
 
-Inside the body of our function, we would have `FromEnv(T: Clone)`. In-scope
-where clauses nest, so a function body inside an impl body inherits the
-impl body's where clauses, too.
+関数の本体内では、`FromEnv(T: Clone)` を持つことになります。スコープ内の
+where 句はネストするため、impl 本体内の関数本体も impl 本体の where 句を
+継承します。
 
-This and the next rule are used to implement [implied bounds]. As we'll see
-in the section on lowering, `FromEnv(TraitRef)` implies `Implemented(TraitRef)`,
-but not vice versa. This distinction is crucial to implied bounds.
+これと次の規則は[暗黙の境界]を実装するために使用されます。降下に関する
+セクションで見るように、`FromEnv(TraitRef)` は `Implemented(TraitRef)` を
+意味しますが、その逆は成り立ちません。この区別は暗黙の境界にとって
+重要です。
 
 #### FromEnv(Type)
-e.g. `FromEnv(HashSet<K>)`
+例：`FromEnv(HashSet<K>)`
 
-True if the inner `Type` is *assumed* to be well-formed, that is, if it is an
-input type of a function or an impl.
+内部の `Type` が整形式であると*仮定*されている場合、つまり、それが
+関数または impl の入力型である場合に真です。
 
-For example, given the following code:
+例えば、次のコードがあるとします：
 
 ```rust,ignore
 struct HashSet<K> where K: Hash { ... }
@@ -173,61 +173,61 @@ fn loud_insert<K>(set: &mut HashSet<K>, item: K) {
 }
 ```
 
-`HashSet<K>` is an input type of the `loud_insert` function. Hence, we assume it
-to be well-formed, so we would have `FromEnv(HashSet<K>)` inside the body of our
-function. As we'll see in the section on lowering, `FromEnv(HashSet<K>)` implies
-`Implemented(K: Hash)` because the
-`HashSet` declaration was written with a `K: Hash` where clause. Hence, we don't
-need to repeat that bound on the `loud_insert` function: we rather automatically
-assume that it is true.
+`HashSet<K>` は `loud_insert` 関数の入力型です。したがって、それが
+整形式であると仮定するため、関数の本体内に `FromEnv(HashSet<K>)` を
+持つことになります。降下に関するセクションで見るように、
+`FromEnv(HashSet<K>)` は `Implemented(K: Hash)` を意味します。なぜなら、
+`HashSet` 宣言が `K: Hash` という where 句で書かれているからです。
+したがって、`loud_insert` 関数でその境界を繰り返す必要はありません：
+それが真であると自動的に仮定します。
 
 #### WellFormed(Item)
-These goals imply that the given item is *well-formed*.
+これらのゴールは、与えられたアイテムが*整形式*であることを意味します。
 
-We can talk about different types of items being well-formed:
+異なる種類のアイテムが整形式であることについて話すことができます：
 
-* *Types*, like `WellFormed(Vec<i32>)`, which is true in Rust, or
-  `WellFormed(Vec<str>)`, which is not (because `str` is not `Sized`.)
+* *型*、例えば `WellFormed(Vec<i32>)` は Rust では真ですが、
+  `WellFormed(Vec<str>)` は真ではありません（`str` は `Sized` ではないため）。
 
-* *TraitRefs*, like `WellFormed(Vec<i32>: Clone)`.
+* *TraitRefs*、例えば `WellFormed(Vec<i32>: Clone)`。
 
-Well-formedness is important to [implied bounds]. In particular, the reason
-it is okay to assume `FromEnv(T: Clone)` in the `loud_clone` example is that we
-_also_ verify `WellFormed(T: Clone)` for each call site of `loud_clone`.
-Similarly, it is okay to assume `FromEnv(HashSet<K>)` in the `loud_insert`
-example because we will verify `WellFormed(HashSet<K>)` for each call site of
-`loud_insert`.
+整形式性は[暗黙の境界]にとって重要です。特に、`loud_clone` の例で
+`FromEnv(T: Clone)` を仮定することが問題ない理由は、`loud_clone` の
+各呼び出しサイトで `WellFormed(T: Clone)` を検証するからです。
+同様に、`loud_insert` の例で `FromEnv(HashSet<K>)` を仮定することが
+問題ない理由は、`loud_insert` の各呼び出しサイトで
+`WellFormed(HashSet<K>)` を検証するからです。
 
 #### Outlives(Type: Region), Outlives(Region: Region)
-e.g. `Outlives(&'a str: 'b)`, `Outlives('a: 'static)`
+例：`Outlives(&'a str: 'b)`、`Outlives('a: 'static)`
 
-True if the given type or region on the left outlives the right-hand region.
+左側の与えられた型または領域が右側の領域よりも長生きする場合に真です。
 
 <a id="coinductive"></a>
 
-## Coinductive goals
+## 帰納的ゴール
 
-Most goals in our system are "inductive". In an inductive goal,
-circular reasoning is disallowed. Consider this example clause:
+システム内のほとんどのゴールは「帰納的」です。帰納的ゴールでは、
+循環推論は許可されていません。この例の節を考えてみてください：
 
 ```text
     Implemented(Foo: Bar) :-
         Implemented(Foo: Bar).
 ```
 
-Considered inductively, this clause is useless: if we are trying to
-prove `Implemented(Foo: Bar)`, we would then recursively have to prove
-`Implemented(Foo: Bar)`, and that cycle would continue ad infinitum
-(the trait solver will terminate here, it would just consider that
-`Implemented(Foo: Bar)` is not known to be true).
+帰納的に考えると、この節は役に立ちません：`Implemented(Foo: Bar)` を
+証明しようとしている場合、再帰的に `Implemented(Foo: Bar)` を証明する
+必要があり、そのサイクルは無限に続きます（トレイトソルバーはここで
+終了し、`Implemented(Foo: Bar)` が真であることがわかっていないと
+見なすだけです）。
 
-However, some goals are *co-inductive*. Simply put, this means that
-cycles are OK. So, if `Bar` were a co-inductive trait, then the rule
-above would be perfectly valid, and it would indicate that
-`Implemented(Foo: Bar)` is true.
+しかし、いくつかのゴールは*余帰納的*です。簡単に言えば、これはサイクルが
+OK であることを意味します。したがって、`Bar` が余帰納的トレイトである場合、
+上記の規則は完全に有効であり、`Implemented(Foo: Bar)` が真であることを
+示します。
 
-*Auto traits* are one example in Rust where co-inductive goals are used.
-Consider the `Send` trait, and imagine that we have this struct:
+*自動トレイト*は、Rust で余帰納的ゴールが使用される一例です。
+`Send` トレイトを考えて、次の構造体があると想像してください：
 
 ```rust
 struct Foo {
@@ -235,36 +235,34 @@ struct Foo {
 }
 ```
 
-The default rules for auto traits say that `Foo` is `Send` if the
-types of its fields are `Send`. Therefore, we would have a rule like
+自動トレイトのデフォルト規則は、そのフィールドの型が `Send` である場合、
+`Foo` は `Send` であると言います。したがって、次のような規則があります
 
 ```text
 Implemented(Foo: Send) :-
     Implemented(Option<Box<Foo>>: Send).
 ```
 
-As you can probably imagine, proving that `Option<Box<Foo>>: Send` is
-going to wind up circularly requiring us to prove that `Foo: Send`
-again. So this would be an example where we wind up in a cycle – but
-that's ok, we *do* consider `Foo: Send` to hold, even though it
-references itself.
+おそらく想像できるように、`Option<Box<Foo>>: Send` を証明すると、
+`Foo: Send` を再び証明する必要が循環的に生じます。したがって、これは
+サイクルに巻き込まれる例ですが、問題ありません。`Foo: Send` が
+自分自身を参照していても、成り立つと*考えます*。
 
-In general, co-inductive traits are used in Rust trait solving when we
-want to enumerate a fixed set of possibilities. In the case of auto
-traits, we are enumerating the set of reachable types from a given
-starting point (i.e., `Foo` can reach values of type
-`Option<Box<Foo>>`, which implies it can reach values of type
-`Box<Foo>`, and then of type `Foo`, and then the cycle is complete).
+一般に、余帰納的トレイトは、固定された可能性のセットを列挙したいときに
+Rust のトレイト解決で使用されます。自動トレイトの場合、与えられた
+開始点から到達可能な型のセットを列挙しています（つまり、`Foo` は
+`Option<Box<Foo>>` 型の値に到達でき、これは `Box<Foo>` 型の値に到達でき、
+そして `Foo` 型に到達でき、そしてサイクルが完成します）。
 
-In addition to auto traits, `WellFormed` predicates are co-inductive.
-These are used to achieve a similar "enumerate all the cases" pattern,
-as described in the section on [implied bounds].
+自動トレイトに加えて、`WellFormed` 述語は余帰納的です。
+これらは、[暗黙の境界]のセクションで説明されているように、同様の
+「すべてのケースを列挙する」パターンを実現するために使用されます。
 
 [implied bounds]: https://rust-lang.github.io/chalk/book/clauses/implied_bounds.html#implied-bounds
 
-## Incomplete chapter
+## 不完全な章
 
-Some topics yet to be written:
+まだ書かれていないトピック：
 
-- Elaborate on the proof procedure
-- SLG solving – introduce negative reasoning
+- 証明手続きの詳細
+- SLG 解決 - 否定的推論の導入

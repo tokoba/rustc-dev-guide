@@ -1,13 +1,12 @@
-# Higher-ranked trait bounds
+# 高階トレイト境界
 
-One of the more subtle concepts in trait resolution is *higher-ranked trait
-bounds*. An example of such a bound is `for<'a> MyTrait<&'a isize>`.
-Let's walk through how selection on higher-ranked trait references
-works.
+トレイト解決におけるより微妙な概念の1つは*高階トレイト境界*です。
+そのような境界の例は `for<'a> MyTrait<&'a isize>` です。
+高階トレイト参照の選択がどのように機能するかを見ていきましょう。
 
-## Basic matching and placeholder leaks
+## 基本的なマッチングとプレースホルダーリーク
 
-Suppose we have a trait `Foo`:
+トレイト `Foo` があるとします：
 
 ```rust
 trait Foo<X> {
@@ -15,82 +14,80 @@ trait Foo<X> {
 }
 ```
 
-Let's say we have a function `want_hrtb` that wants a type which
-implements `Foo<&'a isize>` for any `'a`:
+任意の `'a` に対して `Foo<&'a isize>` を実装する型を必要とする関数 `want_hrtb` が
+あるとしましょう：
 
 ```rust,ignore
 fn want_hrtb<T>() where T : for<'a> Foo<&'a isize> { ... }
 ```
 
-Now we have a struct `AnyInt` that implements `Foo<&'a isize>` for any
-`'a`:
+さて、任意の `'a` に対して `Foo<&'a isize>` を実装する構造体 `AnyInt` が
+あります：
 
 ```rust,ignore
 struct AnyInt;
 impl<'a> Foo<&'a isize> for AnyInt { }
 ```
 
-And the question is, does `AnyInt : for<'a> Foo<&'a isize>`? We want the
-answer to be yes. The algorithm for figuring it out is closely related
-to the subtyping for higher-ranked types (which is described [here][hrsubtype]
-and also in a [paper by SPJ]. If you wish to understand higher-ranked
-subtyping, we recommend you read the paper). There are a few parts:
+そして、問題は `AnyInt : for<'a> Foo<&'a isize>` か？ということです。答えは
+イエスであってほしいです。それを理解するためのアルゴリズムは、
+高階型のサブタイピングと密接に関連しています（これは[ここ][hrsubtype]および
+[SPJ による論文]で説明されています。高階サブタイピングを理解したい場合は、
+論文を読むことをお勧めします）。いくつかの部分があります：
 
-1. Replace bound regions in the obligation with placeholders.
-2. Match the impl against the [placeholder] obligation.
-3. Check for _placeholder leaks_.
+1. 義務内の束縛された領域をプレースホルダーに置き換える。
+2. impl を[プレースホルダー]義務と照合する。
+3. _プレースホルダーリーク_をチェックする。
 
 [hrsubtype]: ./hrtb.md
 [placeholder]: ../appendix/glossary.html#placeholder
 [paper by SPJ]: https://www.microsoft.com/en-us/research/publication/practical-type-inference-for-arbitrary-rank-types
 
-So let's work through our example.
+では、例を通して作業しましょう。
 
-1. The first thing we would do is to
-replace the bound region in the obligation with a placeholder, yielding 
-`AnyInt : Foo<&'0 isize>` (here `'0` represents placeholder region #0). 
-Note that we now have no quantifiers;
-in terms of the compiler type, this changes from a `ty::PolyTraitRef`
-to a `TraitRef`. We would then create the `TraitRef` from the impl,
-using fresh variables for it's bound regions (and thus getting
-`Foo<&'$a isize>`, where `'$a` is the inference variable for `'a`).
+1. 最初に行うことは、義務内の束縛された領域をプレースホルダーに
+置き換えることです。これにより、`AnyInt : Foo<&'0 isize>` が得られます
+（ここで `'0` はプレースホルダー領域 #0 を表します）。今、量化子が
+なくなったことに注意してください。コンパイラの型の観点では、これは
+`ty::PolyTraitRef` から `TraitRef` に変更されます。次に、impl から
+`TraitRef` を作成し、その束縛された領域に新しい変数を使用します
+（したがって、`Foo<&'$a isize>` が得られます。ここで `'$a` は `'a` の
+推論変数です）。
 
-2. Next
-we relate the two trait refs, yielding a graph with the constraint
-that `'0 == '$a`.
+2. 次に、2つのトレイト参照を関連付けて、`'0 == '$a` という制約を
+持つグラフを生成します。
 
-3. Finally, we check for placeholder "leaks" – a
-leak is basically any attempt to relate a placeholder region to another
-placeholder region, or to any region that pre-existed the impl match.
-The leak check is done by searching from the placeholder region to find
-the set of regions that it is related to in any way. This is called
-the "taint" set. To pass the check, that set must consist *solely* of
-itself and region variables from the impl. If the taint set includes
-any other region, then the match is a failure. In this case, the taint
-set for `'0` is `{'0, '$a}`, and hence the check will succeed.
+3. 最後に、プレースホルダー「リーク」をチェックします - リークは
+基本的にプレースホルダー領域を別のプレースホルダー領域、または
+impl マッチより前に存在した任意の領域に関連付けようとする試みです。
+リークチェックは、プレースホルダー領域から検索して、何らかの方法で
+関連している領域のセットを見つけることによって行われます。これは
+「汚染」セットと呼ばれます。チェックに合格するには、そのセットは
+*のみ*それ自体と impl の領域変数で構成されている必要があります。
+汚染セットに他の領域が含まれている場合、マッチは失敗です。この場合、
+`'0` の汚染セットは `{'0, '$a}` であり、したがってチェックは成功します。
 
-Let's consider a failure case. Imagine we also have a struct
+失敗ケースを考えてみましょう。次のような構造体もあると想像してください
 
 ```rust,ignore
 struct StaticInt;
 impl Foo<&'static isize> for StaticInt;
 ```
 
-We want the obligation `StaticInt : for<'a> Foo<&'a isize>` to be
-considered unsatisfied. The check begins just as before. `'a` is
-replaced with a placeholder `'0` and the impl trait reference is instantiated to
-`Foo<&'static isize>`. When we relate those two, we get a constraint
-like `'static == '0`. This means that the taint set for `'0` is `{'0,
-'static}`, which fails the leak check.
+義務 `StaticInt : for<'a> Foo<&'a isize>` が満たされないと見なされることを
+望んでいます。チェックは以前と同じように始まります。`'a` はプレースホルダー
+`'0` に置き換えられ、impl トレイト参照は `Foo<&'static isize>` に
+インスタンス化されます。これら2つを関連付けると、`'static == '0` のような
+制約が得られます。これは、`'0` の汚染セットが `{'0, 'static}` であることを
+意味し、リークチェックに失敗します。
 
-**TODO**: This is because `'static` is not a region variable but is in the
-taint set, right?
+**TODO**: これは `'static` が領域変数ではなく、汚染セットに含まれているからですよね？
 
-## Higher-ranked trait obligations
+## 高階トレイト義務
 
-Once the basic matching is done, we get to another interesting topic:
-how to deal with impl obligations. I'll work through a simple example
-here. Imagine we have the traits `Foo` and `Bar` and an associated impl:
+基本的なマッチングが完了したら、別の興味深いトピックに入ります：
+impl 義務の扱い方です。ここで簡単な例を通して作業します。
+トレイト `Foo` と `Bar`、および関連する impl があると想像してください：
 
 ```rust
 trait Foo<X> {
@@ -107,21 +104,20 @@ impl<X,F> Foo<X> for F
 }
 ```
 
-Now let's say we have an obligation `Baz: for<'a> Foo<&'a isize>` and we match
-this impl. What obligation is generated as a result? We want to get
-`Baz: for<'a> Bar<&'a isize>`, but how does that happen?
+さて、義務 `Baz: for<'a> Foo<&'a isize>` があり、この impl と
+マッチさせるとしましょう。結果としてどのような義務が生成されますか？
+`Baz: for<'a> Bar<&'a isize>` を取得したいのですが、それはどのように
+起こるのでしょうか？
 
-After the matching, we are in a position where we have a placeholder
-substitution like `X => &'0 isize`. If we apply this substitution to the
-impl obligations, we get `F : Bar<&'0 isize>`. Obviously this is not
-directly usable because the placeholder region `'0` cannot leak out of
-our computation.
+マッチング後、`X => &'0 isize` のようなプレースホルダー置換がある状態に
+あります。この置換を impl 義務に適用すると、`F : Bar<&'0 isize>` が
+得られます。明らかに、プレースホルダー領域 `'0` が計算から漏れ出すことが
+できないため、これは直接使用できません。
 
-What we do is to create an inverse mapping from the taint set of `'0`
-back to the original bound region (`'a`, here) that `'0` resulted
-from. (This is done in `higher_ranked::plug_leaks`). We know that the
-leak check passed, so this taint set consists solely of the placeholder
-region itself plus various intermediate region variables. We then walk
-the trait-reference and convert every region in that taint set back to
-a late-bound region, so in this case we'd wind up with
-`Baz: for<'a> Bar<&'a isize>`.
+私たちが行うことは、`'0` の汚染セットから、`'0` が導出された元の
+束縛された領域（ここでは `'a`）への逆マッピングを作成することです。
+（これは `higher_ranked::plug_leaks` で行われます。）リークチェックに
+合格したことがわかっているので、この汚染セットはプレースホルダー領域自体と
+さまざまな中間領域変数のみで構成されています。次に、トレイト参照を歩いて、
+その汚染セット内のすべての領域を遅延束縛領域に戻します。この場合、
+`Baz: for<'a> Bar<&'a isize>` になります。

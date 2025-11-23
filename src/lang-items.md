@@ -1,41 +1,41 @@
-# Lang items
+# Langアイテム
 
-The compiler has certain pluggable operations; that is, functionality that isn't hard-coded into
-the language, but is implemented in libraries, with a special marker to tell the compiler it
-exists. The marker is the attribute `#[lang = "..."]`, and there are various different values of
-`...`, i.e. various different 'lang items'.
+コンパイラには、特定のプラグ可能な操作があります。つまり、言語にハードコードされていないが、
+ライブラリに実装されており、それが存在することをコンパイラに伝える特別なマーカーがある機能です。
+マーカーは属性`#[lang = "..."]`であり、`...`のさまざまな値、
+つまりさまざまな「langアイテム」があります。
 
-Many such lang items can be implemented only in one sensible way, such as `add` (`trait
-core::ops::Add`) or `future_trait` (`trait core::future::Future`). Others can be overridden to
-achieve some specific goals; for example, you can control your binary's entrypoint.
+多くのlangアイテムは、`add`（`trait core::ops::Add`）や
+`future_trait`（`trait core::future::Future`）など、
+1つの賢明な方法でのみ実装できます。他のものは、特定の目標を達成するために
+オーバーライドできます。たとえば、バイナリのエントリポイントを制御できます。
 
-Features provided by lang items include:
+langアイテムによって提供される機能には、次のものがあります。
 
-- overloadable operators via traits: the traits corresponding to the
-  `==`, `<`, dereference (`*`), `+`, etc. operators are all
-  marked with lang items; those specific four are `eq`, `ord`,
-  `deref`, and `add` respectively.
-- panicking and stack unwinding; the `eh_personality`, `panic` and
-  `panic_bounds_checks` lang items.
-- the traits in `std::marker` used to indicate properties of types used by the compiler;
-  lang items `send`, `sync` and `copy`.
-- the special marker types used for variance indicators found in
-  `core::marker`; lang item `phantom_data`.
+- トレイトによるオーバーロード可能な演算子：`==`、`<`、逆参照（`*`）、`+`などの
+  演算子に対応するトレイトはすべて、langアイテムでマークされています。
+  これらの特定の4つは、それぞれ`eq`、`ord`、`deref`、`add`です。
+- パニックとスタック巻き戻し：`eh_personality`、`panic`、
+  `panic_bounds_checks` langアイテム。
+- コンパイラが使用する型のプロパティを示すために使用される`std::marker`のトレイト。
+  langアイテム`send`、`sync`、`copy`。
+- `core::marker`にある分散インジケータに使用される特別なマーカー型。
+  langアイテム`phantom_data`。
 
-Lang items are loaded lazily by the compiler; e.g. if one never uses `Box`
-then there is no need to define functions for `exchange_malloc` and
-`box_free`. `rustc` will emit an error when an item is needed but not found
-in the current crate or any that it depends on.
+Langアイテムはコンパイラによって遅延ロードされます。たとえば、`Box`を使用しない場合、
+`exchange_malloc`と`box_free`の関数を定義する必要はありません。`rustc`は、
+アイテムが必要だが、現在のクレートまたはそれが依存するクレートで見つからない場合、
+エラーを出力します。
 
-Most lang items are defined by the `core` library, but if you're trying to build an
-executable with `#![no_std]`, you'll still need to define a few lang items that are
-usually provided by `std`.
+ほとんどのlangアイテムは`core`ライブラリによって定義されていますが、
+`#![no_std]`で実行可能ファイルをビルドしようとしている場合、
+通常`std`によって提供されるいくつかのlangアイテムを定義する必要があります。
 
-## Retrieving a language item
+## 言語アイテムの取得
 
-You can retrieve lang items by calling [`tcx.lang_items()`].
+[`tcx.lang_items()`]を呼び出すことで、langアイテムを取得できます。
 
-Here's a small example of retrieving the `trait Sized {}` language item:
+`trait Sized {}`言語アイテムを取得する小さな例を次に示します。
 
 ```rust
 // Note that in case of `#![no_core]`, the trait is not available.
@@ -44,24 +44,24 @@ if let Some(sized_trait_def_id) = tcx.lang_items().sized_trait() {
 }
 ```
 
-Note that `sized_trait()` returns an `Option`, not the `DefId` itself.
-That's because language items are defined in the standard library, so if someone compiles with
-`#![no_core]` (or for some lang items, `#![no_std]`), the lang item may not be present.
-You can either:
+`sized_trait()`は、`DefId`自体ではなく、`Option`を返すことに注意してください。
+これは、langアイテムが標準ライブラリで定義されているため、誰かが
+`#![no_core]`（または一部のlangアイテムでは`#![no_std]`）でコンパイルした場合、
+langアイテムが存在しない可能性があるためです。
+次のいずれかを実行できます。
 
-- Give a hard error if the lang item is necessary to continue (don't panic, since this can happen in
-  user code).
-- Proceed with limited functionality, by just omitting whatever you were going to do with the
-  `DefId`.
+- 続行するためにlangアイテムが必要な場合は、ハードエラーを発生させます（これはユーザーコードで
+  発生する可能性があるため、パニックしないでください）。
+- `DefId`で行う予定だったことを省略するだけで、限定された機能で続行します。
 
 [`tcx.lang_items()`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html#method.lang_items
 
-## List of all language items
+## すべての言語アイテムのリスト
 
-You can find language items in the following places:
-- An exhaustive reference in the compiler documentation: [`rustc_hir::LangItem`]
-- An auto-generated list with source locations by using ripgrep: `rg '#\[.*lang =' library/`
+次の場所で言語アイテムを見つけることができます。
+- コンパイラドキュメントの網羅的なリファレンス：[`rustc_hir::LangItem`]
+- ripgrepを使用してソースの場所を含む自動生成されたリスト：`rg '#\[.*lang =' library/`
 
-Note that language items are explicitly unstable and may change in any new release.
+言語アイテムは明示的に不安定であり、新しいリリースで変更される可能性があることに注意してください。
 
 [`rustc_hir::LangItem`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/lang_items/enum.LangItem.html

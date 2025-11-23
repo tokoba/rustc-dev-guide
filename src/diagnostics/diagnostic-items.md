@@ -1,107 +1,101 @@
-# Diagnostic Items
+# 診断アイテム
 
-While writing lints it's common to check for specific types, traits and
-functions. This raises the question on how to check for these. Types can be
-checked by their complete type path. However, this requires hard coding paths
-and can lead to misclassifications in some edge cases. To counteract this,
-rustc has introduced diagnostic items that are used to identify types via
-[`Symbol`]s.
+リントを書く際、特定の型、トレイト、関数をチェックすることは一般的です。
+これにより、これらをチェックする方法の問題が生じます。型は完全な型パスで
+チェックできます。しかし、これにはパスをハードコードする必要があり、
+いくつかのエッジケースで誤分類につながる可能性があります。これに対抗するため、
+rustcは診断アイテムを導入しました。これは[`Symbol`]sを介して型を識別するために使用されます。
 
-## Finding diagnostic items
+## 診断アイテムの検索
 
-Diagnostic items are added to items inside `rustc`/`std`/`core`/`alloc` with the
-`rustc_diagnostic_item` attribute. The item for a specific type can be found by
-opening the source code in the documentation and looking for this attribute.
-Note that it's often added with the `cfg_attr` attribute to avoid compilation
-errors during tests. A definition often looks like this:
+診断アイテムは、`rustc_diagnostic_item`属性を使用して、`rustc`/`std`/`core`/`alloc`内の
+アイテムに追加されます。特定の型のアイテムは、ドキュメント内のソースコードを開いて
+この属性を探すことで見つけることができます。テスト中のコンパイルエラーを避けるために、
+`cfg_attr`属性と一緒に追加されることが多いことに注意してください。定義は多くの場合、
+次のようになります：
 
 ```rs
-// This is the diagnostic item for this type   vvvvvvv
+// これはこの型の診断アイテムです   vvvvvvv
 #[cfg_attr(not(test), rustc_diagnostic_item = "Penguin")]
 struct Penguin;
 ```
 
-Diagnostic items are usually only added to traits,
-types,
-and standalone functions.
-If the goal is to check for an associated type or method,
-please use the diagnostic item of the item and reference
-[*Using Diagnostic Items*](#using-diagnostic-items).
+診断アイテムは通常、トレイト、型、およびスタンドアロン関数にのみ追加されます。
+関連型やメソッドをチェックすることが目標の場合は、
+アイテムの診断アイテムを使用し、
+[*診断アイテムの使用*](#using-diagnostic-items)を参照してください。
 
-## Adding diagnostic items
+## 診断アイテムの追加
 
-A new diagnostic item can be added with these two steps:
+新しい診断アイテムは、次の2つのステップで追加できます：
 
-1. Find the target item inside the Rust repo. Now add the diagnostic item as a
-   string via the `rustc_diagnostic_item` attribute. This can sometimes cause
-   compilation errors while running tests. These errors can be avoided by using
-   the `cfg_attr` attribute with the `not(test)` condition (it's fine adding
-   then for all `rustc_diagnostic_item` attributes as a preventive manner). At
-   the end, it should look like this:
+1. Rustリポジトリ内でターゲットアイテムを見つけます。次に、`rustc_diagnostic_item`属性を介して
+   文字列として診断アイテムを追加します。これにより、テストの実行中にコンパイルエラーが
+   発生する場合があります。これらのエラーは、`not(test)`条件で`cfg_attr`属性を使用することで
+   回避できます（予防的な方法として、すべての`rustc_diagnostic_item`属性に対して追加しても
+   問題ありません）。最終的には、次のようになります：
 
     ```rs
-    // This will be the new diagnostic item        vvv
+    // これが新しい診断アイテムになります        vvv
     #[cfg_attr(not(test), rustc_diagnostic_item = "Cat")]
     struct Cat;
     ```
 
-    For the naming conventions of diagnostic items, please refer to
-    [*Naming Conventions*](#naming-conventions).
+    診断アイテムの命名規則については、
+    [*命名規則*](#naming-conventions)を参照してください。
 
 2. <!-- date-check: Feb 2023 -->
-   Diagnostic items in code are accessed via symbols in
-   [`rustc_span::symbol::sym`].
-   To add your newly-created diagnostic item,
-   simply open the module file,
-   and add the name (In this case `Cat`) at the correct point in the list.
+   コード内の診断アイテムは、[`rustc_span::symbol::sym`]のシンボルを介して
+   アクセスされます。新しく作成した診断アイテムを追加するには、
+   モジュールファイルを開いて、
+   リストの正しい位置に名前（この場合は`Cat`）を追加するだけです。
 
-Now you can create a pull request with your changes. :tada:
+これで、変更を含むプルリクエストを作成できます。:tada:
 
-> NOTE:
-> When using diagnostic items in other projects like Clippy,
-> it might take some time until the repos get synchronized.
+> 注意：
+> Clippyのような他のプロジェクトで診断アイテムを使用する場合、
+> リポジトリが同期されるまでに時間がかかる場合があります。
 
-## Naming conventions
+## 命名規則
 
-Diagnostic items don't have a naming convention yet.
-Following are some guidelines that should be used in future,
-but might differ from existing names:
+診断アイテムにはまだ命名規則がありません。
+以下は、将来使用すべきいくつかのガイドラインですが、
+既存の名前とは異なる場合があります：
 
-* Types, traits, and enums are named using UpperCamelCase
-  (Examples: `Iterator` and `HashMap`)
-* For type names that are used multiple times,
-  like `Writer`,
-  it's good to choose a more precise name,
-  maybe by adding the module to it
-  (Example: `IoWriter`)
-* Associated items should not get their own diagnostic items,
-  but instead be accessed indirectly by the diagnostic item
-  of the type they're originating from.
-* Freestanding functions like `std::mem::swap()` should be named using
-  `snake_case` with one important (export) module as a prefix
-  (Examples: `mem_swap` and `cmp_max`)
-* Modules should usually not have a diagnostic item attached to them.
-  Diagnostic items were added to avoid the usage of paths,
-  and using them on modules would therefore most likely be counterproductive.
+* 型、トレイト、列挙型は、UpperCamelCaseを使用して命名されます
+  （例：`Iterator`と`HashMap`）
+* `Writer`のように複数回使用される型名の場合、
+  より正確な名前を選択することをお勧めします。
+  おそらくモジュールを追加することで
+  （例：`IoWriter`）
+* 関連アイテムには独自の診断アイテムを取得すべきではなく、
+  代わりに、それらが起源とする型の診断アイテムによって
+  間接的にアクセスされるべきです。
+* `std::mem::swap()`のようなフリースタンディング関数は、
+  1つの重要な（エクスポート）モジュールをプレフィックスとして使用して
+  `snake_case`を使用して命名されるべきです
+  （例：`mem_swap`と`cmp_max`）
+* モジュールには通常、診断アイテムを添付すべきではありません。
+  診断アイテムは、パスの使用を避けるために追加されたため、
+  モジュールでそれらを使用することは、おそらく逆効果です。
 
-## Using diagnostic items
+## 診断アイテムの使用
 
-In rustc, diagnostic items are looked up via [`Symbol`]s from inside the
-[`rustc_span::symbol::sym`] module. These can then be mapped to [`DefId`]s
-using [`TyCtxt::get_diagnostic_item()`] or checked if they match a [`DefId`]
-using [`TyCtxt::is_diagnostic_item()`]. When mapping from a diagnostic item to
-a [`DefId`], the method will return a `Option<DefId>`. This can be `None` if
-either the symbol isn't a diagnostic item or the type is not registered, for
-instance when compiling with `#[no_std]`.
-All the following examples are based on [`DefId`]s and their usage.
+rustc内では、診断アイテムは[`rustc_span::symbol::sym`]モジュール内の
+[`Symbol`]sを介して検索されます。これらは、[`TyCtxt::get_diagnostic_item()`]を使用して
+[`DefId`]sにマッピングするか、[`TyCtxt::is_diagnostic_item()`]を使用して
+[`DefId`]に一致するかどうかをチェックできます。診断アイテムから[`DefId`]にマッピングする場合、
+メソッドは`Option<DefId>`を返します。これは、シンボルが診断アイテムでない場合、
+または例えば`#[no_std]`でコンパイルする場合に型が登録されていない場合、`None`になる可能性があります。
+以下のすべての例は、[`DefId`]sとその使用に基づいています。
 
-### Example: Checking for a type
+### 例：型のチェック
 
 ```rust
 use rustc_span::symbol::sym;
 
-/// This example checks if the given type (`ty`) has the type `HashMap` using
-/// `TyCtxt::is_diagnostic_item()`
+/// この例は、与えられた型（`ty`）が`TyCtxt::is_diagnostic_item()`を使用して
+/// `HashMap`型を持っているかどうかをチェックします
 fn example_1(cx: &LateContext<'_>, ty: Ty<'_>) -> bool {
     match ty.kind() {
         ty::Adt(adt, _) => cx.tcx.is_diagnostic_item(sym::HashMap, adt.did()),
@@ -110,11 +104,11 @@ fn example_1(cx: &LateContext<'_>, ty: Ty<'_>) -> bool {
 }
 ```
 
-### Example: Checking for a trait implementation
+### 例：トレイト実装のチェック
 
 ```rust
-/// This example checks if a given [`DefId`] from a method is part of a trait
-/// implementation defined by a diagnostic item.
+/// この例は、与えられたメソッドの[`DefId`]が診断アイテムによって定義された
+/// トレイト実装の一部であるかどうかをチェックします。
 fn is_diag_trait_item(
     cx: &LateContext<'_>,
     def_id: DefId,
@@ -127,29 +121,27 @@ fn is_diag_trait_item(
 }
 ```
 
-### Associated Types
+### 関連型
 
-Associated types of diagnostic items can be accessed indirectly by first
-getting the [`DefId`] of the trait and then calling
-[`TyCtxt::associated_items()`]. This returns an [`AssocItems`] object which can
-be used for further checks. Checkout
-[`clippy_utils::ty::get_iterator_item_ty()`] for an example usage of this.
+診断アイテムの関連型は、最初にトレイトの[`DefId`]を取得し、
+次に[`TyCtxt::associated_items()`]を呼び出すことで間接的にアクセスできます。
+これは、さらなるチェックに使用できる[`AssocItems`]オブジェクトを返します。
+この使用例については、[`clippy_utils::ty::get_iterator_item_ty()`]を参照してください。
 
-### Usage in Clippy
+### Clippyでの使用
 
-Clippy tries to use diagnostic items where possible and has developed some
-wrapper and utility functions. Please also refer to its documentation when
-using diagnostic items in Clippy. (See [*Common tools for writing
-lints*][clippy-Common-tools-for-writing-lints].)
+Clippyは、可能な限り診断アイテムを使用しようとし、いくつかの
+ラッパーおよびユーティリティ関数を開発しました。Clippyで診断アイテムを使用する際は、
+そのドキュメントも参照してください。（[*リント作成のための共通ツール*][clippy-Common-tools-for-writing-lints]を参照。）
 
-## Related issues
+## 関連するissue
 
-These are probably only interesting to people
-who really want to take a deep dive into the topic :)
+これらは、トピックに本当に深く潜りたい人にとって
+おそらく興味深いものです :)
 
-* [rust#60966]: The Rust PR that introduced diagnostic items
-* [rust-clippy#5393]: Clippy's tracking issue for moving away from hard coded paths to
-  diagnostic item
+* [rust#60966]: 診断アイテムを導入したRust PR
+* [rust-clippy#5393]: ハードコードされたパスから診断アイテムへの移行のための
+  Clippyの追跡issue
 
 <!-- Links -->
 

@@ -1,21 +1,14 @@
-# Debugging the compiler
+# コンパイラのデバッグ
 
-This chapter contains a few tips to debug the compiler. These tips aim to be
-useful no matter what you are working on.  Some of the other chapters have
-advice about specific parts of the compiler (e.g. the [Queries Debugging and
-Testing chapter](./incrcomp-debugging.html) or the [LLVM Debugging
-chapter](./backend/debugging.md)).
+本章では、コンパイラをデバッグするためのいくつかのヒントを紹介します。これらのヒントは、作業内容に関わらず役立つことを目指しています。他の章の中には、コンパイラの特定の部分についてのアドバイスがあるものもあります(例えば、[Queries Debugging and Testing chapter](./incrcomp-debugging.html)や[LLVM Debugging chapter](./backend/debugging.md))。
 
-## Configuring the compiler
+## コンパイラの設定
 
-By default, rustc is built without most debug information. To enable debug info,
-set `debug = true` in your bootstrap.toml.
+デフォルトでは、rustcはほとんどのデバッグ情報なしでビルドされます。デバッグ情報を有効にするには、bootstrap.tomlで`debug = true`を設定してください。
 
-Setting `debug = true` turns on many different debug options (e.g., `debug-assertions`,
-`debug-logging`, etc.) which can be individually tweaked if you want to, but many people
-simply set `debug = true`.
+`debug = true`を設定すると、多くの異なるデバッグオプション(例:`debug-assertions`、`debug-logging`など)が有効になります。これらは必要に応じて個別に調整することもできますが、多くの人は単に`debug = true`を設定します。
 
-If you want to use GDB to debug rustc, please set `bootstrap.toml` with options:
+GDBを使用してrustcをデバッグしたい場合は、以下のオプションで`bootstrap.toml`を設定してください:
 
 ```toml
 [rust]
@@ -24,43 +17,36 @@ debuginfo-level = 2
 ```
 
 > NOTE:
-> This will use a lot of disk space
-> (upwards of <!-- date-check Aug 2022 --> 35GB),
-> and will take a lot more compile time.
-> With `debuginfo-level = 1` (the default when `debug = true`),
-> you will be able to track the execution path,
-> but will lose the symbol information for debugging.
+> これは大量のディスク容量を使用します
+> (<!-- date-check Aug 2022 -->35GB以上)、
+> そしてコンパイル時間も大幅に長くなります。
+> `debuginfo-level = 1`(`debug = true`の場合のデフォルト)では、
+> 実行パスを追跡できますが、
+> デバッグ用のシンボル情報は失われます。
 
-The default configuration will enable `symbol-mangling-version` v0.
-This requires at least GDB v10.2,
-otherwise you need to disable new symbol-mangling-version in `bootstrap.toml`.
+デフォルト設定では、`symbol-mangling-version` v0が有効になります。
+これには少なくともGDB v10.2が必要です。
+それ以外の場合は、`bootstrap.toml`で新しいsymbol-mangling-versionを無効にする必要があります。
 
 ```toml
 [rust]
 new-symbol-mangling = false
 ```
 
-> See the comments in `bootstrap.example.toml` for more info.
+> 詳細については、`bootstrap.example.toml`のコメントを参照してください。
 
-You will need to rebuild the compiler after changing any configuration option.
+設定オプションを変更した後は、コンパイラを再ビルドする必要があります。
 
-## Suppressing the ICE file
+## ICEファイルの抑制
 
-By default, if rustc encounters an Internal Compiler Error (ICE) it will dump the ICE contents to an
-ICE file within the current working directory named `rustc-ice-<timestamp>-<pid>.txt`. If this is
-not desirable, you can prevent the ICE file from being created with `RUSTC_ICE=0`.
+デフォルトでは、rustcが内部コンパイラエラー(ICE)に遭遇すると、現在の作業ディレクトリ内に`rustc-ice-<timestamp>-<pid>.txt`という名前のICEファイルにICEの内容をダンプします。これが望ましくない場合は、`RUSTC_ICE=0`を設定することでICEファイルの作成を防ぐことができます。
 
-## Getting a backtrace
+## バックトレースの取得
 [getting-a-backtrace]: #getting-a-backtrace
 
-When you have an ICE (panic in the compiler), you can set
-`RUST_BACKTRACE=1` to get the stack trace of the `panic!` like in
-normal Rust programs. IIRC backtraces **don't work** on MinGW,
-sorry. If you have trouble or the backtraces are full of `unknown`,
-you might want to find some way to use Linux, Mac, or MSVC on Windows.
+ICE(コンパイラ内のパニック)が発生した場合、`RUST_BACKTRACE=1`を設定することで、通常のRustプログラムと同様に`panic!`のスタックトレースを取得できます。MinGWではバックトレースが**動作しません**。バックトレースが`unknown`で埋め尽くされている場合や問題がある場合は、Linux、Mac、またはWindows上のMSVCを使用する方法を見つけることをお勧めします。
 
-In the default configuration (without `debug` set to `true`), you don't have line numbers
-enabled, so the backtrace looks like this:
+デフォルト設定(`debug`を`true`に設定していない場合)では、行番号が有効になっていないため、バックトレースは次のようになります:
 
 ```text
 stack backtrace:
@@ -79,8 +65,8 @@ stack backtrace:
   37: rustc_driver::run_compiler
 ```
 
-If you set `debug = true`, you will get line numbers for the stack trace.
-Then the backtrace will look like this:
+`debug = true`を設定すると、スタックトレースに行番号が表示されます。
+その場合、バックトレースは次のようになります:
 
 ```text
 stack backtrace:
@@ -98,26 +84,20 @@ stack backtrace:
              at /home/user/rust/compiler/rustc_driver/src/lib.rs:253
 ```
 
-## `-Z` flags
+## `-Z`フラグ
 
-The compiler has a bunch of `-Z *` flags. These are unstable flags that are only
-enabled on nightly. Many of them are useful for debugging. To get a full listing
-of `-Z` flags, use `-Z help`.
+コンパイラには多数の`-Z *`フラグがあります。これらは、ナイトリーでのみ有効な不安定なフラグです。その多くはデバッグに役立ちます。`-Z`フラグの完全なリストを取得するには、`-Z help`を使用してください。
 
-One useful flag is `-Z verbose-internals`, which generally enables printing more
-info that could be useful for debugging.
+便利なフラグの1つは`-Z verbose-internals`です。これは一般的に、デバッグに役立つ可能性のある詳細情報の出力を有効にします。
 
-Right below you can find elaborate explainers on a selected few.
+以下では、選ばれたいくつかについて詳しく説明します。
 
-### Getting a backtrace for errors
+### エラーのバックトレースを取得する
 [getting-a-backtrace-for-errors]: #getting-a-backtrace-for-errors
 
-If you want to get a backtrace to the point where the compiler emits an
-error message, you can pass the `-Z treat-err-as-bug=n`, which will make
-the compiler panic on the `nth` error. If you leave off `=n`, the compiler will
-assume `1` for `n` and thus panic on the first error it encounters.
+コンパイラがエラーメッセージを出力する地点までのバックトレースを取得したい場合は、`-Z treat-err-as-bug=n`を渡すことができます。これにより、コンパイラは`n`番目のエラーでパニックします。`=n`を省略すると、コンパイラは`n`に`1`を仮定し、最初のエラーでパニックします。
 
-For example:
+例:
 
 ```bash
 $ cat error.rs
@@ -142,7 +122,7 @@ error[E0277]: cannot add `()` to `{integer}`
 error: aborting due to previous error
 ```
 
-Now, where does the error above come from?
+さて、上記のエラーはどこから来ているのでしょうか?
 
 ```
 $ RUST_BACKTRACE=1 rustc +stage1 error.rs -Z treat-err-as-bug
@@ -184,19 +164,16 @@ stack backtrace:
              at /home/user/rust/compiler/rustc_driver/src/lib.rs:253
 ```
 
-Cool, now I have a backtrace for the error!
+素晴らしい!エラーのバックトレースが得られました!
 
-### Debugging delayed bugs
+### 遅延バグのデバッグ
 
-The `-Z eagerly-emit-delayed-bugs` option makes it easy to debug delayed bugs.
-It turns them into normal errors, i.e. makes them visible. This can be used in
-combination with `-Z treat-err-as-bug` to stop at a particular delayed bug and
-get a backtrace.
+`-Z eagerly-emit-delayed-bugs`オプションを使用すると、遅延バグのデバッグが簡単になります。
+これは遅延バグを通常のエラーに変換し、表示されるようにします。これは`-Z treat-err-as-bug`と組み合わせて使用することで、特定の遅延バグで停止してバックトレースを取得できます。
 
-### Getting the error creation location
+### エラー作成場所の取得
 
-`-Z track-diagnostics` can help figure out where errors are emitted. It uses `#[track_caller]`
-for this and prints its location alongside the error:
+`-Z track-diagnostics`は、エラーが出力される場所を把握するのに役立ちます。これは`#[track_caller]`を使用し、エラーと一緒にその場所を出力します:
 
 ```
 $ RUST_BACKTRACE=1 rustc +stage1 error.rs -Z track-diagnostics
@@ -222,67 +199,55 @@ error[E0277]: cannot add `()` to `{integer}`
 For more information about this error, try `rustc --explain E0277`.
 ```
 
-This is similar but different to `-Z treat-err-as-bug`:
-- it will print the locations for all errors emitted
-- it does not require a compiler built with debug symbols
-- you don't have to read through a big stack trace.
+これは`-Z treat-err-as-bug`と似ていますが異なります:
+- 出力されるすべてのエラーの場所を出力します
+- デバッグシンボル付きでビルドされたコンパイラは必要ありません
+- 大きなスタックトレースを読む必要がありません
 
-## Getting logging output
+## ログ出力の取得
 
-The compiler uses the [`tracing`] crate for logging.
+コンパイラはログ記録のために[`tracing`]クレートを使用しています。
 
 [`tracing`]: https://docs.rs/tracing
 
-For details see [the guide section on tracing](./tracing.md)
+詳細については、[the guide section on tracing](./tracing.md)を参照してください。
 
-## Narrowing (Bisecting) Regressions
+## リグレッションの絞り込み(二分探索)
 
-The [cargo-bisect-rustc][bisect] tool can be used as a quick and easy way to
-find exactly which PR caused a change in `rustc` behavior. It automatically
-downloads `rustc` PR artifacts and tests them against a project you provide
-until it finds the regression. You can then look at the PR to get more context
-on *why* it was changed.  See [this tutorial][bisect-tutorial] on how to use
-it.
+[cargo-bisect-rustc][bisect]ツールは、`rustc`の動作を変更した正確なPRを見つけるための迅速で簡単な方法として使用できます。提供したプロジェクトに対して、リグレッションが見つかるまで`rustc`のPRアーティファクトを自動的にダウンロードしてテストします。その後、そのPRを調べて*なぜ*変更されたかのコンテキストを得ることができます。使用方法については、[this tutorial][bisect-tutorial]を参照してください。
 
 [bisect]: https://github.com/rust-lang/cargo-bisect-rustc
 [bisect-tutorial]: https://rust-lang.github.io/cargo-bisect-rustc/tutorial.html
 
-## Downloading Artifacts from Rust's CI
+## RustのCIからアーティファクトをダウンロードする
 
-The [rustup-toolchain-install-master][rtim] tool by kennytm can be used to
-download the artifacts produced by Rust's CI for a specific SHA1 -- this
-basically corresponds to the successful landing of some PR -- and then sets
-them up for your local use. This also works for artifacts produced by `@bors
-try`. This is helpful when you want to examine the resulting build of a PR
-without doing the build yourself.
+kennytmによる[rustup-toolchain-install-master][rtim]ツールを使用して、特定のSHA1に対してRustのCIによって生成されたアーティファクトをダウンロードできます。これは基本的に、いくつかのPRの正常なランディングに対応します。ローカル使用のためにそれらをセットアップします。これは`@bors try`によって生成されたアーティファクトでも機能します。これは、自分でビルドせずにPRの結果ビルドを調べたい場合に役立ちます。
 
 [rtim]: https://github.com/kennytm/rustup-toolchain-install-master
 
-## `#[rustc_*]` TEST attributes
+## `#[rustc_*]` TEST属性
 
-The compiler defines a whole lot of internal (perma-unstable) attributes some of which are useful
-for debugging by dumping extra compiler-internal information. These are prefixed with `rustc_` and
-are gated behind the internal feature `rustc_attrs` (enabled via e.g. `#![feature(rustc_attrs)]`).
+コンパイラは、多くの内部(永続的に不安定な)属性を定義しています。その一部は、追加のコンパイラ内部情報をダンプすることによってデバッグに役立ちます。これらには`rustc_`というプレフィックスが付けられ、内部機能`rustc_attrs`の背後にゲートされています(例:`#![feature(rustc_attrs)]`で有効化)。
 
-For a complete and up to date list, see [`builtin_attrs`]. More specifically, the ones marked `TEST`.
-Here are some notable ones:
+完全かつ最新のリストについては、[`builtin_attrs`]を参照してください。より具体的には、`TEST`とマークされたものです。
+注目すべきものをいくつか紹介します:
 
-| Attribute | Description |
+| 属性 | 説明 |
 |----------------|-------------|
-| `rustc_def_path` | Dumps the [`def_path_str`] of an item. |
-| `rustc_dump_def_parents` | Dumps the chain of `DefId` parents of certain definitions. |
-| `rustc_dump_item_bounds` | Dumps the [`item_bounds`] of an item. |
-| `rustc_dump_predicates` | Dumps the [`predicates_of`] an item. |
-| `rustc_dump_vtable` | Dumps the vtable layout of an impl, or a type alias of a dyn type. |
-| `rustc_hidden_type_of_opaques` | Dumps the [hidden type of each opaque types][opaq] in the crate. |
-| `rustc_layout` | [See this section](#debugging-type-layouts). |
-| `rustc_object_lifetime_default` | Dumps the [object lifetime defaults] of an item. |
-| `rustc_outlives` | Dumps implied bounds of an item. More precisely, the [`inferred_outlives_of`] an item. |
-| `rustc_regions` | Dumps NLL closure region requirements. |
-| `rustc_symbol_name` | Dumps the mangled & demangled [`symbol_name`] of an item. |
-| `rustc_variances` | Dumps the [variances] of an item. |
+| `rustc_def_path` | アイテムの[`def_path_str`]をダンプします。 |
+| `rustc_dump_def_parents` | 特定の定義の`DefId`親のチェーンをダンプします。 |
+| `rustc_dump_item_bounds` | アイテムの[`item_bounds`]をダンプします。 |
+| `rustc_dump_predicates` | アイテムの[`predicates_of`]をダンプします。 |
+| `rustc_dump_vtable` | implまたはdyn型の型エイリアスのvtableレイアウトをダンプします。 |
+| `rustc_hidden_type_of_opaques` | クレート内の各不透明型の[hidden type][opaq]をダンプします。 |
+| `rustc_layout` | [このセクション](#debugging-type-layouts)を参照してください。 |
+| `rustc_object_lifetime_default` | アイテムの[object lifetime defaults]をダンプします。 |
+| `rustc_outlives` | アイテムの暗黙的な境界をダンプします。より正確には、アイテムの[`inferred_outlives_of`]です。 |
+| `rustc_regions` | NLLクロージャのリージョン要件をダンプします。 |
+| `rustc_symbol_name` | アイテムのマングルされた&デマングルされた[`symbol_name`]をダンプします。 |
+| `rustc_variances` | アイテムの[variances]をダンプします。 |
 
-Right below you can find elaborate explainers on a selected few.
+以下では、選ばれたいくつかについて詳しく説明します。
 
 [`builtin_attrs`]: https://github.com/rust-lang/rust/blob/HEAD/compiler/rustc_feature/src/builtin_attrs.rs
 [`def_path_str`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/context/struct.TyCtxt.html#method.def_path_str
@@ -294,26 +259,21 @@ Right below you can find elaborate explainers on a selected few.
 [opaq]: ./opaque-types-impl-trait-inference.md
 [variances]: ./variance.md
 
-### Formatting Graphviz output (.dot files)
+### Graphviz出力のフォーマット(.dotファイル)
 [formatting-graphviz-output]: #formatting-graphviz-output
 
-Some compiler options for debugging specific features yield graphviz graphs -
-e.g. the `#[rustc_mir(borrowck_graphviz_postflow="suffix.dot")]` attribute
-on a function dumps various borrow-checker dataflow graphs in conjunction with
-`-Zdump-mir-dataflow`.
+特定の機能をデバッグするためのコンパイラオプションの中には、graphvizグラフを生成するものがあります。例えば、関数に付けられた`#[rustc_mir(borrowck_graphviz_postflow="suffix.dot")]`属性は、`-Zdump-mir-dataflow`と組み合わせて、様々なボローチェッカーのデータフローグラフをダンプします。
 
-These all produce `.dot` files. To view these files, install graphviz (e.g.
-`apt-get install graphviz`) and then run the following commands:
+これらはすべて`.dot`ファイルを生成します。これらのファイルを表示するには、graphvizをインストールし(例:`apt-get install graphviz`)、次のコマンドを実行してください:
 
 ```bash
 $ dot -T pdf maybe_init_suffix.dot > maybe_init_suffix.pdf
-$ firefox maybe_init_suffix.pdf # Or your favorite pdf viewer
+$ firefox maybe_init_suffix.pdf # またはお好みのPDFビューア
 ```
 
-### Debugging type layouts
+### 型レイアウトのデバッグ
 
-The internal attribute `#[rustc_layout]` can be used to dump the [`Layout`] of
-the type it is attached to. For example:
+内部属性`#[rustc_layout]`を使用して、それが付けられた型の[`Layout`]をダンプできます。例:
 
 ```rust
 #![feature(rustc_attrs)]
@@ -322,7 +282,7 @@ the type it is attached to. For example:
 type T<'a> = &'a u32;
 ```
 
-Will emit the following:
+次のように出力されます:
 
 ```text
 error: layout_of(&'a u32) = Layout {
@@ -370,14 +330,11 @@ error: aborting due to previous error
 [`Layout`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_public/abi/struct.Layout.html
 
 
-## Configuring CodeLLDB for debugging `rustc`
+## `rustc`をデバッグするためのCodeLLDBの設定
 
-If you are using VSCode, and have edited your `bootstrap.toml` to request debugging
-level 1 or 2 for the parts of the code you're interested in, then you should be
-able to use the [CodeLLDB] extension in VSCode to debug it.
+VSCodeを使用していて、関心のあるコードの部分に対してデバッグレベル1または2をリクエストするように`bootstrap.toml`を編集した場合、VSCodeの[CodeLLDB]拡張機能を使用してデバッグできるはずです。
 
-Here is a sample `launch.json` file, being used to run a stage 1 compiler direct
-from the directory where it is built (does not have to be "installed"):
+以下は、ビルドされたディレクトリから直接ステージ1コンパイラを実行するために使用される`launch.json`ファイルのサンプルです(「インストール」する必要はありません):
 
 ```javascript
 // .vscode/launch.json
@@ -388,12 +345,12 @@ from the directory where it is built (does not have to be "installed"):
         "type": "lldb",
         "request": "launch",
         "name": "Launch",
-        "args": [],  // array of string command-line arguments to pass to compiler
+        "args": [],  // コンパイラに渡す文字列コマンドライン引数の配列
         "program": "${workspaceFolder}/build/host/stage1/bin/rustc",
-        "windows": {  // applicable if using windows
+        "windows": {  // windowsを使用している場合に適用
             "program": "${workspaceFolder}/build/host/stage1/bin/rustc.exe"
         },
-        "cwd": "${workspaceFolder}",  // current working directory at program start
+        "cwd": "${workspaceFolder}",  // プログラム起動時の現在の作業ディレクトリ
         "stopOnEntry": false,
         "sourceLanguages": ["rust"]
       }

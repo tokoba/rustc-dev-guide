@@ -1,42 +1,38 @@
-# Trait solving (new)
+# トレイト解決（新）
 
-This chapter describes how trait solving works with the new WIP solver located in
-[`rustc_trait_selection/solve`][solve]. Feel free to also look at the docs for
-[the current solver](../traits/resolution.md) and [the chalk solver](../traits/chalk.md).
+この章では、[`rustc_trait_selection/solve`][solve]にある新しいWIPソルバーでトレイト解決がどのように機能するかを説明します。[現在のソルバー](../traits/resolution.md)および[chalkソルバー](../traits/chalk.md)のドキュメントも自由に参照してください。
 
-## Core concepts
+## コア概念
 
-The goal of the trait system is to check whether a given trait bound is satisfied.
-Most notably when typechecking the body of - potentially generic - functions.
-For example:
+トレイトシステムの目標は、与えられたトレイト境界が満たされているかどうかをチェックすることです。
+最も顕著なのは、潜在的にジェネリックな関数の本文を型チェックする際です。
+例：
 
 ```rust
 fn uses_vec_clone<T: Clone>(x: Vec<T>) -> (Vec<T>, Vec<T>) {
     (x.clone(), x)
 }
 ```
-Here the call to `x.clone()` requires us to prove that `Vec<T>` implements `Clone` given
-the assumption that `T: Clone` is true. We can assume `T: Clone` as that will be proven by
-callers of this function.
+ここで、`x.clone()`への呼び出しは、`T: Clone`が真であるという仮定の下で、`Vec<T>`が`Clone`を実装することを証明する必要があります。`T: Clone`を仮定できるのは、
+この関数の呼び出し側によって証明されるためです。
 
-The concept of "prove the `Vec<T>: Clone` with the assumption `T: Clone`" is called a [`Goal`].
-Both `Vec<T>: Clone` and `T: Clone` are represented using [`Predicate`]. There are other
-predicates, most notably equality bounds on associated items: `<Vec<T> as IntoIterator>::Item == T`.
-See the `PredicateKind` enum for an exhaustive list. A `Goal` is represented as the `predicate` we
-have to prove and the `param_env` in which this predicate has to hold.
+「`T: Clone`という仮定の下で`Vec<T>: Clone`を証明する」という概念は[`Goal`]と呼ばれます。
+`Vec<T>: Clone`と`T: Clone`の両方は[`Predicate`]を使用して表されます。他の
+述語、最も顕著なのは関連アイテムの等価性境界もあります：`<Vec<T> as IntoIterator>::Item == T`。
+すべてのリストについては、`PredicateKind`列挙型を参照してください。`Goal`は、証明する必要がある`predicate`と、
+この述語が成り立つ必要がある`param_env`として表されます。
 
-We prove goals by checking whether each possible [`Candidate`] applies for the given goal by
-recursively proving its nested goals. For a list of possible candidates with examples, look at
-[`CandidateSource`]. The most important candidates are `Impl` candidates, i.e. trait implementations
-written by the user, and `ParamEnv` candidates, i.e. assumptions in our current environment.
+与えられたゴールに対して各可能な[`Candidate`]が適用されるかどうかをチェックすることで、ゴールを証明します。
+再帰的にそのネストされたゴールを証明します。例を含む可能な候補のリストについては、
+[`CandidateSource`]を参照してください。最も重要な候補は、`Impl`候補、つまりユーザーによって書かれたトレイト実装、および`ParamEnv`候補、つまり現在の環境での仮定です。
 
-Looking at the above example, to prove `Vec<T>: Clone` we first use
-`impl<T: Clone> Clone for Vec<T>`. To use this impl we have to prove the nested
-goal that `T: Clone` holds. This can use the assumption `T: Clone` from the `ParamEnv`
-which does not have any nested goals. Therefore `Vec<T>: Clone` holds.
+上記の例を見ると、`Vec<T>: Clone`を証明するために、まず
+`impl<T: Clone> Clone for Vec<T>`を使用します。このimplを使用するには、ネストされた
+ゴール`T: Clone`が成り立つことを証明する必要があります。これは、`ParamEnv`からの仮定`T: Clone`を使用でき、
+ネストされたゴールがありません。したがって、`Vec<T>: Clone`は成り立ちます。
 
-The trait solver can either return success, ambiguity or an error as a [`CanonicalResponse`].
-For success and ambiguity it also returns constraints inference and region constraints.
+トレイトソルバーは、[`CanonicalResponse`]として成功、曖昧性、またはエラーを返すことができます。
+成功と曖昧性の場合、推論と領域制約も返します。
 
 [solve]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_trait_selection/solve/index.html
 [`Goal`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_infer/infer/canonical/ir/solve/struct.Goal.html

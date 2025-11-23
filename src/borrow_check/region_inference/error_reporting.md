@@ -1,3 +1,3 @@
-# Reporting region errors
+# 領域エラーの報告
 
-TODO: we should discuss how to generate errors from the results of these analyses.
+TODO: これらの分析の結果からエラーを生成する方法について議論する必要があります。

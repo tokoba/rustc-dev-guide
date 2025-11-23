@@ -1,43 +1,30 @@
-# What Bootstrapping does
+# ブートストラップが何をするか
 
-[*Bootstrapping*][boot] is the process of using a compiler to compile itself.
-More accurately, it means using an older compiler to compile a newer version of
-the same compiler.
+[*ブートストラップ*][boot] とは、コンパイラを使用してそれ自身をコンパイルするプロセスです。より正確には、古いコンパイラを使用して同じコンパイラの新しいバージョンをコンパイルすることを意味します。
 
-This raises a chicken-and-egg paradox: where did the first compiler come from?
-It must have been written in a different language. In Rust's case it was
-[written in OCaml][ocaml-compiler]. However, it was abandoned long ago, and the
-only way to build a modern version of `rustc` is with a slightly less modern version.
+これは鶏と卵のパラドックスを引き起こします：最初のコンパイラはどこから来たのでしょうか？それは異なる言語で書かれたに違いありません。Rust の場合、それは [OCaml で書かれました][ocaml-compiler]。しかし、それは遥か昔に放棄され、現代のバージョンの `rustc` をビルドする唯一の方法は、少し古いバージョンを使用することです。
 
-This is exactly how [`./x.py`] works: it downloads the current beta release of
-`rustc`, then uses it to compile the new compiler.
+これはまさに [`./x.py`] が行うことです：現在のベータリリースの `rustc` をダウンロードし、それを使用して新しいコンパイラをコンパイルします。
 
 [`./x.py`]: https://github.com/rust-lang/rust/blob/HEAD/x.py
 
-Note that this documentation mostly covers user-facing information. See
-[bootstrap/README.md][bootstrap-internals] to read about bootstrap internals.
+このドキュメントは主にユーザー向けの情報をカバーしていることに注意してください。ブートストラップの内部について読むには、[bootstrap/README.md][bootstrap-internals] をご覧ください。
 
 [bootstrap-internals]: https://github.com/rust-lang/rust/blob/HEAD/src/bootstrap/README.md
 
-## Stages of bootstrapping
+## ブートストラップのステージ
 
-### Overview
+### 概要
 
-- Stage 0: the pre-compiled compiler and standard library
-- Stage 1: from current code, by an earlier compiler
-- Stage 2: the truly current compiler
-- Stage 3: the same-result test
+- ステージ 0：事前コンパイルされたコンパイラと標準ライブラリ
+- ステージ 1：現在のコードから、以前のコンパイラによって
+- ステージ 2：真に現在のコンパイラ
+- ステージ 3：同一結果のテスト
 
-Compiling `rustc` is done in stages. Here's a diagram, adapted from Jynn
-Nelson's [talk on bootstrapping][rustconf22-talk] at RustConf 2022, with
-detailed explanations below.
+`rustc` のコンパイルはステージで行われます。以下は、RustConf 2022 での Jynn Nelson の [ブートストラップに関するトーク][rustconf22-talk] から適応した図で、以下に詳細な説明があります。
 
-The `A`, `B`, `C`, and `D` show the ordering of the stages of bootstrapping.
-<span style="background-color: lightblue; color: black">Blue</span> nodes are
-downloaded, <span style="background-color: yellow; color: black">yellow</span>
-nodes are built with the `stage0` compiler, and <span style="background-color:
-lightgreen; color: black">green</span> nodes are built with the `stage1`
-compiler.
+`A`、`B`、`C`、`D` はブートストラップのステージの順序を示しています。
+<span style="background-color: lightblue; color: black">青</span> のノードはダウンロードされたもの、<span style="background-color: yellow; color: black">黄色</span> のノードは `stage0` コンパイラでビルドされたもの、<span style="background-color: lightgreen; color: black">緑</span> のノードは `stage1` コンパイラでビルドされたものです。
 
 [rustconf22-talk]: https://www.youtube.com/watch?v=oUIjG-y4zaA
 
@@ -58,62 +45,42 @@ graph TD
     classDef with-s1c fill: lightgreen;
 ```
 
-### Stage 0: the pre-compiled compiler
+### ステージ 0：事前コンパイルされたコンパイラ
 
-The stage0 compiler is by default the very recent _beta_ `rustc` compiler and its
-associated dynamic libraries, which `./x.py` will download for you. (You can
-also configure `./x.py` to change stage0 to something else.)
+stage0 コンパイラは、デフォルトでは非常に最近の _ベータ_ `rustc` コンパイラとそれに関連する動的ライブラリであり、`./x.py` がダウンロードします。（`./x.py` を設定して stage0 を別のものに変更することもできます。）
 
-The precompiled stage0 compiler is then used only to compile [`src/bootstrap`] and [`compiler/rustc`]
-with precompiled stage0 std.
+事前コンパイルされた stage0 コンパイラは、事前コンパイルされた stage0 std で [`src/bootstrap`] と [`compiler/rustc`] をコンパイルするためにのみ使用されます。
 
-Note that to build the stage1 compiler we use the precompiled stage0 compiler and std.
-Therefore, to use a compiler with a std that is freshly built from the tree, you need to
-build the stage2 compiler.
+stage1 コンパイラをビルドするために、事前コンパイルされた stage0 コンパイラと std を使用することに注意してください。したがって、ツリーから新しくビルドされた std を持つコンパイラを使用するには、stage2 コンパイラをビルドする必要があります。
 
-There are two concepts at play here: a compiler (with its set of dependencies) and its
-'target' or 'object' libraries (`std` and `rustc`). Both are staged, but in a staggered manner.
+ここには2つの概念があります：コンパイラ（その依存関係のセットとともに）と、その「ターゲット」または「オブジェクト」ライブラリ（`std` と `rustc`）です。両方ともステージングされますが、交互に行われます。
 
 [`compiler/rustc`]: https://github.com/rust-lang/rust/tree/HEAD/compiler/rustc
 [`src/bootstrap`]: https://github.com/rust-lang/rust/tree/HEAD/src/bootstrap
 
-### Stage 1: from current code, by an earlier compiler
+### ステージ 1：現在のコードから、以前のコンパイラによって
 
-The rustc source code is then compiled with the `stage0` compiler to produce the
-`stage1` compiler.
+rustc のソースコードは、`stage0` コンパイラでコンパイルされて `stage1` コンパイラを生成します。
 
-### Stage 2: the truly current compiler
+### ステージ 2：真に現在のコンパイラ
 
-We then rebuild the compiler using `stage1` compiler with in-tree std to produce the `stage2`
-compiler.
+次に、インツリーの std を持つ stage1 コンパイラを使用してコンパイラを再ビルドし、`stage2` コンパイラを生成します。
 
-The `stage1` compiler itself was built by precompiled `stage0` compiler and std
-and hence not by the source in your working directory. This means that the ABI
-generated by the `stage0` compiler may not match the ABI that would have been made
-by the `stage1` compiler, which can cause problems for dynamic libraries, tests
-and tools using `rustc_private`.
+`stage1` コンパイラ自体は、事前コンパイルされた `stage0` コンパイラと std によってビルドされたため、作業ディレクトリのソースによってビルドされていません。これは、`stage0` コンパイラによって生成された ABI が、`stage1` コンパイラによって作成された ABI と一致しない可能性があることを意味し、これは動的ライブラリ、テスト、および `rustc_private` を使用するツールに問題を引き起こす可能性があります。
 
-Note that the `proc_macro` crate avoids this issue with a `C` FFI layer called
-`proc_macro::bridge`, allowing it to be used with `stage1`.
+`proc_macro` クレートは、`proc_macro::bridge` と呼ばれる `C` FFI レイヤーを使用してこの問題を回避し、`stage1` で使用できるようにしていることに注意してください。
 
-The `stage2` compiler is the one distributed with `rustup` and all other install
-methods. However, it takes a very long time to build because one must first
-build the new compiler with an older compiler and then use that to build the new
-compiler with itself.
+`stage2` コンパイラは、`rustup` およびその他のすべてのインストール方法で配布されるものです。ただし、古いコンパイラで新しいコンパイラを最初にビルドし、次にそれを使用して新しいコンパイラをそれ自体でビルドする必要があるため、ビルドには非常に長い時間がかかります。
 
-For development, you usually only want to use `--stage 1` flag to build things.
-See [Building the compiler](../how-to-build-and-run.html#building-the-compiler).
+開発のために、通常は `--stage 1` フラグを使用してものをビルドしたいだけです。[コンパイラのビルド](../how-to-build-and-run.html#building-the-compiler) をご覧ください。
 
-### Stage 3: the same-result test
+### ステージ 3：同一結果のテスト
 
-Stage 3 is optional. To sanity check our new compiler we can build the libraries
-with the `stage2` compiler. The result ought to be identical to before, unless
-something has broken.
+ステージ 3 はオプションです。新しいコンパイラの健全性をチェックするために、`stage2` コンパイラでライブラリをビルドできます。結果は以前と同一であるべきです。何かが壊れていない限り。
 
-### Building the stages
+### ステージのビルド
 
-The script [`./x`] tries to be helpful and pick the stage you most likely meant
-for each subcommand. Here are some `x` commands with their default stages:
+スクリプト [`./x`] は、各サブコマンドに対して最も意図している可能性の高いステージを選択しようとします。以下は、デフォルトのステージを持つ `x` コマンドです：
 
 - `check`: `--stage 1`
 - `clippy`: `--stage 1`
@@ -124,166 +91,104 @@ for each subcommand. Here are some `x` commands with their default stages:
 - `install`: `--stage 2`
 - `bench`: `--stage 2`
 
-You can always override the stage by passing `--stage N` explicitly.
+`--stage N` を明示的に渡すことで、常にステージをオーバーライドできます。
 
-For more information about stages, [see
-below](#understanding-stages-of-bootstrap).
+ステージについての詳細は、[以下を参照してください](#understanding-stages-of-bootstrap)。
 
 [`./x`]: https://github.com/rust-lang/rust/blob/HEAD/x
 
-## Complications of bootstrapping
+## ブートストラップの複雑さ
 
-Since the build system uses the current beta compiler to build a `stage1`
-bootstrapping compiler, the compiler source code can't use some features until
-they reach beta (because otherwise the beta compiler doesn't support them). On
-the other hand, for [compiler intrinsics][intrinsics] and internal features, the
-features _have_ to be used. Additionally, the compiler makes heavy use of
-`nightly` features (`#![feature(...)]`). How can we resolve this problem?
+ビルドシステムは現在のベータコンパイラを使用して `stage1` ブートストラッピングコンパイラをビルドするため、コンパイラのソースコードは、ベータに到達するまで一部の機能を使用できません（そうでなければ、ベータコンパイラがそれらをサポートしないため）。一方、[コンパイライントリンシック][intrinsics] と内部機能については、機能を使用する _必要があります_。さらに、コンパイラは `nightly` 機能（`#![feature(...)]`）を多用しています。この問題をどのように解決できるでしょうか？
 
-There are two methods used:
+使用される方法は2つあります：
 
-1. The build system sets `--cfg bootstrap` when building with `stage0`, so we
-   can use `cfg(not(bootstrap))` to only use features when built with `stage1`.
-   Setting `--cfg bootstrap` in this way is used for features that were just
-   stabilized, which require `#![feature(...)]` when built with `stage0`, but
-   not for `stage1`.
-2. The build system sets `RUSTC_BOOTSTRAP=1`. This special variable means to
-   _break the stability guarantees_ of Rust: allowing use of `#![feature(...)]`
-   with a compiler that's not `nightly`. _Setting `RUSTC_BOOTSTRAP=1` should
-   never be used except when bootstrapping the compiler._
+1. ビルドシステムは `stage0` でビルドする際に `--cfg bootstrap` を設定するため、`cfg(not(bootstrap))` を使用して `stage1` でビルドする際にのみ機能を使用できます。この方法で `--cfg bootstrap` を設定することは、安定化されたばかりの機能に使用され、`stage0` でビルドする際には `#![feature(...)]` が必要ですが、`stage1` では必要ありません。
+2. ビルドシステムは `RUSTC_BOOTSTRAP=1` を設定します。この特別な変数は、Rust の安定性保証を _破る_ ことを意味します：`nightly` でないコンパイラで `#![feature(...)]` の使用を許可します。_`RUSTC_BOOTSTRAP=1` の設定は、コンパイラをブートストラップする場合を除いて決して使用すべきではありません。_
 
 [boot]: https://en.wikipedia.org/wiki/Bootstrapping_(compilers)
 [intrinsics]: ../../appendix/glossary.md#intrinsic
 [ocaml-compiler]: https://github.com/rust-lang/rust/tree/ef75860a0a72f79f97216f8aaa5b388d98da6480/src/boot
 
-## Understanding stages of bootstrap
+## ブートストラップのステージの理解
 
-### Overview
+### 概要
 
-This is a detailed look into the separate bootstrap stages.
+これはブートストラップの個別のステージについての詳細な説明です。
 
-The convention `./x` uses is that:
+`./x` が使用する規約は次のとおりです：
 
-- A `--stage N` flag means to run the stage N compiler (`stageN/rustc`).
-- A "stage N artifact" is a build artifact that is _produced_ by the stage N
-  compiler.
-- The stage N+1 compiler is assembled from stage N *artifacts*. This process is
-  called _uplifting_.
+- `--stage N` フラグは、ステージ N コンパイラ（`stageN/rustc`）を実行することを意味します。
+- 「ステージ N アーティファクト」は、ステージ N コンパイラによって _生成された_ ビルドアーティファクトです。
+- ステージ N+1 コンパイラは、ステージ N の *アーティファクト* から組み立てられます。このプロセスは _アップリフト_ と呼ばれます。
 
-#### Build artifacts
+#### ビルドアーティファクト
 
-Anything you can build with `./x` is a _build artifact_. Build artifacts
-include, but are not limited to:
+`./x` でビルドできるものはすべて _ビルドアーティファクト_ です。ビルドアーティファクトには以下が含まれますが、これに限定されません：
 
-- binaries, like `stage0-rustc/rustc-main`
-- shared objects, like `stage0-sysroot/rustlib/libstd-6fae108520cf72fe.so`
-- [rlib] files, like `stage0-sysroot/rustlib/libstd-6fae108520cf72fe.rlib`
-- HTML files generated by rustdoc, like `doc/std`
+- バイナリ、`stage0-rustc/rustc-main` など
+- 共有オブジェクト、`stage0-sysroot/rustlib/libstd-6fae108520cf72fe.so` など
+- [rlib] ファイル、`stage0-sysroot/rustlib/libstd-6fae108520cf72fe.rlib` など
+- rustdoc によって生成された HTML ファイル、`doc/std` など
 
 [rlib]: ../../serialization.md
 
-#### Examples
+#### 例
 
-- `./x test tests/ui` means to build the `stage1` compiler and run `compiletest`
-  on it. If you're working on the compiler, this is normally the test command
-  you want.
-- `./x test --stage 0 library/std` means to run tests on the standard library
-  without building `rustc` from source ('build with `stage0`, then test the
-  artifacts'). If you're working on the standard library, this is normally the
-  test command you want.
-- `./x build --stage 0` means to build with the stage0 `rustc`.
-- `./x doc --stage 1` means to document using the stage0 `rustdoc`.
+- `./x test tests/ui` は、`stage1` コンパイラをビルドし、それに対して `compiletest` を実行することを意味します。コンパイラに取り組んでいる場合、これは通常使用したいテストコマンドです。
+- `./x test --stage 0 library/std` は、ソースから `rustc` をビルドせずに標準ライブラリのテストを実行することを意味します（「stage0 でビルドし、次にアーティファクトをテストする」）。標準ライブラリに取り組んでいる場合、これは通常使用したいテストコマンドです。
+- `./x build --stage 0` は、stage0 `rustc` でビルドすることを意味します。
+- `./x doc --stage 1` は、stage0 `rustdoc` を使用してドキュメント化することを意味します。
 
-#### Examples of what *not* to do
+#### やるべきでないことの例
 
-- `./x test --stage 0 tests/ui` is not useful: it runs tests on the _beta_
-  compiler and doesn't build `rustc` from source. Use `test tests/ui` instead,
-  which builds `stage1` from source.
-- `./x test --stage 0 compiler/rustc` builds the compiler but runs no tests:
-  it's running `cargo test -p rustc`, but `cargo` doesn't understand Rust's
-  tests. You shouldn't need to use this, use `test` instead (without arguments).
-- `./x build --stage 0 compiler/rustc` builds the compiler, but does not build
-  `libstd` or even `libcore`. Most of the time, you'll want `./x build library`
-  instead, which allows compiling programs without needing to define lang items.
+- `./x test --stage 0 tests/ui` は有用ではありません：_ベータ_ コンパイラでテストを実行し、ソースから `rustc` をビルドしません。代わりに `test tests/ui` を使用してください。これはソースから `stage1` をビルドします。
+- `./x test --stage 0 compiler/rustc` はコンパイラをビルドしますが、テストを実行しません：`cargo test -p rustc` を実行していますが、`cargo` は Rust のテストを理解しません。これを使用する必要はありません。代わりに `test`（引数なし）を使用してください。
+- `./x build --stage 0 compiler/rustc` はコンパイラをビルドしますが、`libstd` や `libcore` さえもビルドしません。ほとんどの場合、代わりに `./x build library` を使用したいでしょう。これにより、lang アイテムを定義せずにプログラムをコンパイルできます。
 
-### Building vs. running
+### ビルドと実行
 
-In short, _stage 0 uses the `stage0` compiler to create `stage0` artifacts which
-will later be uplifted to be the stage1 compiler_.
+簡単に言うと、_ステージ 0 は `stage0` コンパイラを使用して `stage0` アーティファクトを作成し、後で stage1 コンパイラにアップリフトされます_。
 
-In each stage besides 0, two major steps are performed:
+0 以外の各ステージでは、2つの主要なステップが実行されます：
 
-1. `std` is compiled by the stage N compiler.
-2. That `std` is linked to programs built by the stage N compiler, including the
-   stage N artifacts (stage N+1 compiler).
+1. `std` がステージ N コンパイラによってコンパイルされます。
+2. その `std` は、ステージ N アーティファクト（ステージ N+1 コンパイラ）を含む、ステージ N コンパイラによってビルドされたプログラムにリンクされます。
 
-This is somewhat intuitive if one thinks of the stage N artifacts as "just"
-another program we are building with the stage N compiler: `build --stage N
-compiler/rustc` is linking the stage N artifacts to the `std` built by the stage
-N compiler.
+これは、ステージ N アーティファクトをステージ N コンパイラでビルドしている「単なる」別のプログラムと考えると、やや直感的です：`build --stage N compiler/rustc` は、ステージ N アーティファクトをステージ N コンパイラでビルドした `std` にリンクしています。
 
-### Stages and `std`
+### ステージと `std`
 
-Note that there are two `std` libraries in play here:
+ここでは2つの `std` ライブラリが関係していることに注意してください：
 
-1. The library _linked_ to `stageN/rustc`, which was built by stage N-1 (stage
-   N-1 `std`)
-2. The library _used to compile programs_ with `stageN/rustc`, which was built
-   by stage N (stage N `std`).
+1. `stageN/rustc` に _リンクされた_ ライブラリ。これはステージ N-1 によってビルドされました（ステージ N-1 `std`）
+2. `stageN/rustc` でプログラムを _コンパイルするために使用される_ ライブラリ。これはステージ N によってビルドされました（ステージ N `std`）。
 
-Stage N `std` is pretty much necessary for any useful work with the stage N
-compiler. Without it, you can only compile programs with `#![no_core]` -- not
-terribly useful!
+ステージ N `std` は、ステージ N コンパイラで有用な作業を行うためにほぼ必須です。それがなければ、`#![no_core]` のプログラムのみをコンパイルできます -- あまり有用ではありません！
 
-The reason these need to be different is because they aren't necessarily
-ABI-compatible: there could be new layout optimizations, changes to `MIR`, or
-other changes to Rust metadata on `nightly` that aren't present in beta.
+これらが異なる必要がある理由は、それらが必ずしも ABI 互換ではないためです：新しいレイアウト最適化、`MIR` への変更、または `nightly` にあるがベータにはない Rust メタデータへのその他の変更がある可能性があります。
 
-This is also where `--keep-stage 1 library/std` comes into play. Since most
-changes to the compiler don't actually change the ABI, once you've produced a
-`std` in `stage1`, you can probably just reuse it with a different compiler. If
-the ABI hasn't changed, you're good to go, no need to spend time recompiling
-that `std`. The flag `--keep-stage` simply instructs the build script to assumes
-the previous compile is fine and copies those artifacts into the appropriate
-place, skipping the `cargo` invocation.
+これは、`--keep-stage 1 library/std` が機能する場所でもあります。コンパイラへのほとんどの変更は実際には ABI を変更しないため、`stage1` で `std` を生成したら、別のコンパイラでそれを再利用できる可能性があります。ABI が変更されていなければ、問題なく、その `std` を再コンパイルする時間を費やす必要はありません。フラグ `--keep-stage` は、ビルドスクリプトに以前のコンパイルが問題ないと想定し、それらのアーティファクトを適切な場所にコピーするように指示し、`cargo` の呼び出しをスキップします。
 
-### Cross-compiling rustc
+### rustc のクロスコンパイル
 
-*Cross-compiling* is the process of compiling code that will run on another
-architecture. For instance, you might want to build an ARM version of rustc
-using an x86 machine. Building `stage2` `std` is different when you are
-cross-compiling.
+*クロスコンパイル* は、別のアーキテクチャで実行されるコードをコンパイルするプロセスです。たとえば、x86 マシンを使用して ARM バージョンの rustc をビルドしたい場合があります。`stage2` `std` のビルドは、クロスコンパイルしている場合に異なります。
 
-This is because `./x` uses the following logic: if `HOST` and `TARGET` are the
-same, it will reuse `stage1` `std` for `stage2`! This is sound because `stage1`
-`std` was compiled with the `stage1` compiler, i.e. a compiler using the source
-code you currently have checked out. So it should be identical (and therefore
-ABI-compatible) to the `std` that `stage2/rustc` would compile.
+これは、`./x` が次のロジックを使用するためです：`HOST` と `TARGET` が同じ場合、`stage2` に `stage1` `std` を再利用します！これは、`stage1` `std` が `stage1` コンパイラでコンパイルされた、つまり現在チェックアウトしているソースコードを使用するコンパイラでコンパイルされたため、健全です。したがって、`stage2/rustc` がコンパイルする `std` と同一（したがって ABI 互換）であるべきです。
 
-However, when cross-compiling, `stage1` `std` will only run on the host. So the
-`stage2` compiler has to recompile `std` for the target.
+ただし、クロスコンパイルする場合、`stage1` `std` はホストでのみ実行されます。したがって、`stage2` コンパイラは、ターゲット用に `std` を再コンパイルする必要があります。
 
-(See in the table how `stage2` only builds non-host `std` targets).
+（テーブルで `stage2` が非ホスト `std` ターゲットのみをビルドする方法を参照してください）。
 
-### What is a 'sysroot'?
+### 'sysroot' とは何ですか？
 
-When you build a project with `cargo`, the build artifacts for dependencies are
-normally stored in `target/debug/deps`. This only contains dependencies `cargo`
-knows about; in particular, it doesn't have the standard library. Where do `std`
-or `proc_macro` come from? They come from the **sysroot**, the root of a number
-of directories where the compiler loads build artifacts at runtime. The
-`sysroot` doesn't just store the standard library, though - it includes anything
-that needs to be loaded at runtime. That includes (but is not limited to):
+`cargo` でプロジェクトをビルドすると、依存関係のビルドアーティファクトは通常 `target/debug/deps` に保存されます。これには、`cargo` が知っている依存関係のみが含まれます。特に、標準ライブラリは含まれません。`std` や `proc_macro` はどこから来るのでしょうか？それらは **sysroot** から来ます。これは、コンパイラが実行時にビルドアーティファクトをロードする多数のディレクトリのルートです。`sysroot` は標準ライブラリだけを保存するのではありません -- 実行時にロードする必要があるものすべてが含まれます。それには以下が含まれます（ただし、これに限定されません）：
 
-- Libraries `libstd`/`libtest`/`libproc_macro`.
-- Compiler crates themselves, when using `rustc_private`. In-tree these are
-  always present; out of tree, you need to install `rustc-dev` with `rustup`.
-- Shared object file `libLLVM.so` for the LLVM project. In-tree this is either
-  built from source or downloaded from CI; out-of-tree, you need to install
-  `llvm-tools-preview` with `rustup`.
+- ライブラリ `libstd`/`libtest`/`libproc_macro`。
+- `rustc_private` を使用する場合のコンパイラクレート自体。インツリーでは常に存在します。ツリー外では、`rustup` で `rustc-dev` をインストールする必要があります。
+- LLVM プロジェクトの共有オブジェクトファイル `libLLVM.so`。インツリーでは、これはソースからビルドされるか、CI からダウンロードされます。ツリー外では、`rustup` で `llvm-tools-preview` をインストールする必要があります。
 
-All the artifacts listed so far are *compiler* runtime dependencies. You can see
-them with `rustc --print sysroot`:
+これまでにリストされたすべてのアーティファクトは *コンパイラ* の実行時依存関係です。それらは `rustc --print sysroot` で確認できます：
 
 ```
 $ ls $(rustc --print sysroot)/lib
@@ -293,8 +198,7 @@ librustc_driver-4f0cc9f50e53f0ba.so  libtracing_attributes-e4be92c35ab2a33b.so
 librustc_macros-5f0ec4a119c6ac86.so  rustlib
 ```
 
-There are also runtime dependencies for the standard library! These are in
-`lib/rustlib/`, not `lib/` directly.
+標準ライブラリの実行時依存関係もあります！これらは `lib/` ではなく `lib/rustlib/` にあります。
 
 ```
 $ ls $(rustc --print sysroot)/lib/rustlib/x86_64-unknown-linux-gnu/lib | head -n 5
@@ -305,109 +209,58 @@ libcfg_if-512eb53291f6de7e.rlib
 libcompiler_builtins-ef2408da76957905.rlib
 ```
 
-Directory `lib/rustlib/` includes libraries like `hashbrown` and `cfg_if`, which
-are not part of the public API of the standard library, but are used to
-implement it. Also `lib/rustlib/` is part of the search path for linkers, but
-`lib` will never be part of the search path.
+ディレクトリ `lib/rustlib/` には、標準ライブラリの公開 API の一部ではないが、それを実装するために使用される `hashbrown` や `cfg_if` などのライブラリが含まれます。また、`lib/rustlib/` はリンカーの検索パスの一部ですが、`lib` は検索パスの一部になることはありません。
 
 #### `-Z force-unstable-if-unmarked`
 
-Since `lib/rustlib/` is part of the search path we have to be careful about
-which crates are included in it. In particular, all crates except for the
-standard library are built with the flag `-Z force-unstable-if-unmarked`, which
-means that you have to use `#![feature(rustc_private)]` in order to load it (as
-opposed to the standard library, which is always available).
+`lib/rustlib/` は検索パスの一部であるため、そこに含まれるクレートについて慎重である必要があります。特に、標準ライブラリを除くすべてのクレートは、`-Z force-unstable-if-unmarked` フラグでビルドされます。これは、それをロードするために `#![feature(rustc_private)]` を使用する必要があることを意味します（常に利用可能な標準ライブラリとは対照的に）。
 
-The `-Z force-unstable-if-unmarked` flag has a variety of purposes to help
-enforce that the correct crates are marked as `unstable`. It was introduced
-primarily to allow rustc and the standard library to link to arbitrary crates on
-crates.io which do not themselves use `staged_api`. `rustc` also relies on this
-flag to mark all of its crates as `unstable` with the `rustc_private` feature so
-that each crate does not need to be carefully marked with `unstable`.
+`-Z force-unstable-if-unmarked` フラグには、正しいクレートが `unstable` としてマークされていることを強制するためのさまざまな目的があります。これは主に、rustc と標準ライブラリが、`staged_api` 自体を使用しない crates.io 上の任意のクレートにリンクできるようにするために導入されました。`rustc` はまた、このフラグに依存して、すべてのクレートを `rustc_private` 機能で `unstable` としてマークしており、各クレートを慎重に `unstable` でマークする必要がありません。
 
-This flag is automatically applied to all of `rustc` and the standard library by
-the bootstrap scripts. This is needed because the compiler and all of its
-dependencies are shipped in `sysroot` to all users.
+このフラグは、ブートストラップスクリプトによって `rustc` と標準ライブラリのすべてに自動的に適用されます。これは、コンパイラとそのすべての依存関係が、すべてのユーザーに `sysroot` で配布されるために必要です。
 
-This flag has the following effects:
+このフラグには次の効果があります：
 
-- Marks the crate as "`unstable`" with the `rustc_private` feature if it is not
-  itself marked as `stable` or `unstable`.
-- Allows these crates to access other forced-unstable crates without any need
-  for attributes. Normally a crate would need a `#![feature(rustc_private)]`
-  attribute to use other `unstable` crates. However, that would make it
-  impossible for a crate from crates.io to access its own dependencies since
-  that crate won't have a `feature(rustc_private)` attribute, but *everything*
-  is compiled with `-Z force-unstable-if-unmarked`.
+- クレート自体が `stable` または `unstable` としてマークされていない場合、`rustc_private` 機能でクレートを「`unstable`」としてマークします。
+- これらのクレートが、属性を必要とせずに他の強制的に不安定なクレートにアクセスできるようにします。通常、クレートは他の `unstable` クレートを使用するために `#![feature(rustc_private)]` 属性が必要です。ただし、それは crates.io のクレートが自身の依存関係にアクセスすることを不可能にします。なぜなら、そのクレートには `feature(rustc_private)` 属性がありませんが、*すべて* が `-Z force-unstable-if-unmarked` でコンパイルされるからです。
 
-Code which does not use `-Z force-unstable-if-unmarked` should include the
-`#![feature(rustc_private)]` crate attribute to access these forced-unstable
-crates. This is needed for things which link `rustc` its self, such as `MIRI` or
-`clippy`.
+`-Z force-unstable-if-unmarked` を使用しないコードは、これらの強制的に不安定なクレートにアクセスするために `#![feature(rustc_private)]` クレート属性を含める必要があります。これは、`MIRI` や `clippy` などの `rustc` 自体をリンクするものに必要です。
 
-You can find more discussion about sysroots in:
-- The [rustdoc PR] explaining why it uses `extern crate` for dependencies loaded
-  from `sysroot`
-- [Discussions about sysroot on
-  Zulip](https://rust-lang.zulipchat.com/#narrow/stream/182449-t-compiler.2Fhelp/topic/deps.20in.20sysroot/)
-- [Discussions about building rustdoc out of
-  tree](https://rust-lang.zulipchat.com/#narrow/stream/182449-t-compiler.2Fhelp/topic/How.20to.20create.20an.20executable.20accessing.20.60rustc_private.60.3F)
+sysroot についてのさらなる議論は以下で見つけることができます：
+- `sysroot` からロードされた依存関係に `extern crate` を使用する理由を説明する [rustdoc PR]
+- [Zulip での sysroot に関する議論](https://rust-lang.zulipchat.com/#narrow/stream/182449-t-compiler.2Fhelp/topic/deps.20in.20sysroot/)
+- [ツリー外で rustdoc をビルドすることに関する議論](https://rust-lang.zulipchat.com/#narrow/stream/182449-t-compiler.2Fhelp/topic/How.20to.20create.20an.20executable.20accessing.20.60rustc_private.60.3F)
 
 [rustdoc PR]: https://github.com/rust-lang/rust/pull/76728
 
-## Passing flags to commands invoked by `bootstrap`
+## `bootstrap` によって呼び出されるコマンドへのフラグの渡し方
 
-Conveniently `./x` allows you to pass stage-specific flags to `rustc` and
-`cargo` when bootstrapping. The `RUSTFLAGS_BOOTSTRAP` environment variable is
-passed as `RUSTFLAGS` to the bootstrap stage (`stage0`), and
-`RUSTFLAGS_NOT_BOOTSTRAP` is passed when building artifacts for later stages.
-`RUSTFLAGS` will work, but also affects the build of `bootstrap` itself, so it
-will be rare to want to use it. Finally, `MAGIC_EXTRA_RUSTFLAGS` bypasses the
-`cargo` cache to pass flags to rustc without recompiling all dependencies.
+便利なことに、`./x` を使用すると、ブートストラップ時に `rustc` と `cargo` にステージ固有のフラグを渡すことができます。`RUSTFLAGS_BOOTSTRAP` 環境変数は、ブートストラップステージ（`stage0`）に `RUSTFLAGS` として渡され、`RUSTFLAGS_NOT_BOOTSTRAP` は後のステージのアーティファクトをビルドする際に渡されます。`RUSTFLAGS` は機能しますが、`bootstrap` 自体のビルドにも影響するため、使用したいことはまれです。最後に、`MAGIC_EXTRA_RUSTFLAGS` は、すべての依存関係を再コンパイルせずに rustc にフラグを渡すために `cargo` キャッシュをバイパスします。
 
-- `RUSTDOCFLAGS`, `RUSTDOCFLAGS_BOOTSTRAP` and `RUSTDOCFLAGS_NOT_BOOTSTRAP` are
-  analogous to `RUSTFLAGS`, but for `rustdoc`.
-- `CARGOFLAGS` will pass arguments to cargo itself (e.g. `--timings`).
-  `CARGOFLAGS_BOOTSTRAP` and `CARGOFLAGS_NOT_BOOTSTRAP` work analogously to
-  `RUSTFLAGS_BOOTSTRAP`.
-- `--test-args` will pass arguments through to the test runner. For `tests/ui`,
-  this is `compiletest`. For unit tests and doc tests this is the `libtest`
-  runner.
+- `RUSTDOCFLAGS`、`RUSTDOCFLAGS_BOOTSTRAP`、`RUSTDOCFLAGS_NOT_BOOTSTRAP` は `RUSTFLAGS` に類似していますが、`rustdoc` 用です。
+- `CARGOFLAGS` は cargo 自体に引数を渡します（例：`--timings`）。`CARGOFLAGS_BOOTSTRAP` と `CARGOFLAGS_NOT_BOOTSTRAP` は `RUSTFLAGS_BOOTSTRAP` と同様に機能します。
+- `--test-args` はテストランナーに引数を渡します。`tests/ui` の場合、これは `compiletest` です。ユニットテストと doc テストの場合、これは `libtest` ランナーです。
 
-Most test runners accept `--help`,
-which you can use to find out the options accepted by the runner.
+ほとんどのテストランナーは `--help` を受け入れ、これを使用してランナーが受け入れるオプションを見つけることができます。
 
-## Environment Variables
+## 環境変数
 
-During bootstrapping, there are a bunch of compiler-internal environment
-variables that are used. If you are trying to run an intermediate version of
-`rustc`, sometimes you may need to set some of these environment variables
-manually. Otherwise, you get an error like the following:
+ブートストラップ中には、使用されるコンパイラ内部の環境変数が多数あります。中間バージョンの `rustc` を実行しようとしている場合、これらの環境変数の一部を手動で設定する必要がある場合があります。そうでないと、次のようなエラーが発生します：
 
 ```text
 thread 'main' panicked at 'RUSTC_STAGE was not set: NotPresent', library/core/src/result.rs:1165:5
 ```
 
-If `./stageN/bin/rustc` gives an error about environment variables, that usually
-means something is quite wrong -- such as you're trying to compile `rustc` or
-`std` or something which depends on environment variables. In the unlikely case
-that you actually need to invoke `rustc` in such a situation, you can tell the
-bootstrap shim to print all `env` variables by adding `-vvv` to your `x`
-command.
+`./stageN/bin/rustc` が環境変数に関するエラーを出す場合、通常は何かが非常に間違っていることを意味します -- `rustc` や `std` または環境変数に依存する何かをコンパイルしようとしているなど。そのような状況で実際に `rustc` を呼び出す必要がある unlikely なケースでは、`x` コマンドに `-vvv` を追加することで、ブートストラップ shim にすべての `env` 変数を出力させることができます。
 
-Finally, bootstrap makes use of the [cc-rs crate] which has [its own
-method][env-vars] of configuring `C` compilers and `C` flags via environment
-variables.
+最後に、ブートストラップは [cc-rs crate] を使用しており、これには環境変数を介して `C` コンパイラと `C` フラグを設定する [独自の方法][env-vars] があります。
 
 [cc-rs crate]: https://github.com/rust-lang/cc-rs
 [env-vars]: https://docs.rs/cc/latest/cc/#external-configuration-via-environment-variables
 
-## Clarification of build command's `stdout`
+## ビルドコマンドの `stdout` の説明
 
-In this part, we will investigate the build command's `stdout` in an action
-(similar, but more detailed and complete documentation compare to topic above).
-When you execute `x build --dry-run` command, the build output will be something
-like the following:
+このパートでは、アクション内のビルドコマンドの `stdout` を調査します（上記のトピックと同様ですが、より詳細で完全なドキュメント）。`x build --dry-run` コマンドを実行すると、ビルド出力は次のようになります：
 
 ```text
 Building stage0 library artifacts (x86_64-unknown-linux-gnu -> x86_64-unknown-linux-gnu)
@@ -423,22 +276,14 @@ Building rustdoc for stage1 (x86_64-unknown-linux-gnu)
 
 ### Building stage0 {std,compiler} artifacts
 
-These steps use the provided (downloaded, usually) compiler to compile the local
-Rust source into libraries we can use.
+これらのステップは、提供された（通常はダウンロードされた）コンパイラを使用して、ローカルの Rust ソースを使用できるライブラリにコンパイルします。
 
 ### Copying stage0 \{std,rustc\}
 
-This copies the library and compiler artifacts from `cargo` into
-`stage0-sysroot/lib/rustlib/{target-triple}/lib`
+これは、ライブラリとコンパイラのアーティファクトを `cargo` から `stage0-sysroot/lib/rustlib/{target-triple}/lib` にコピーします
 
 ### Assembling stage1 compiler
 
-This copies the libraries we built in "building `stage0` ... artifacts" into the
-`stage1` compiler's `lib/` directory. These are the host libraries that the
-compiler itself uses to run. These aren't actually used by artifacts the new
-compiler generates. This step also copies the `rustc` and `rustdoc` binaries we
-generated into `build/$HOST/stage/bin`.
+これは、「stage0 ... artifacts のビルド」でビルドしたライブラリを `stage1` コンパイラの `lib/` ディレクトリにコピーします。これらは、コンパイラ自体が実行するために使用するホストライブラリです。これらは、新しいコンパイラが生成するアーティファクトによって実際に使用されるわけではありません。このステップでは、生成した `rustc` と `rustdoc` バイナリも `build/$HOST/stage/bin` にコピーします。
 
-The `stage1/bin/rustc` is a fully functional compiler built with stage0 (precompiled) compiler and std.
-To use a compiler built entirely from source with the in-tree compiler and std, you need to build the
-stage2 compiler, which is compiled using the stage1 (in-tree) compiler and std.
+`stage1/bin/rustc` は、stage0（事前コンパイルされた）コンパイラと std でビルドされた完全に機能的なコンパイラです。インツリーのコンパイラと std で完全にソースからビルドされたコンパイラを使用するには、stage1（インツリー）コンパイラと std を使用してコンパイルされた stage2 コンパイラをビルドする必要があります。

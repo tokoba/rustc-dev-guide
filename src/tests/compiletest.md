@@ -1,165 +1,124 @@
 # Compiletest
 
-## Introduction
+## 序論
 
-`compiletest` is the main test harness of the Rust test suite. It allows test
-authors to organize large numbers of tests (the Rust compiler has many
-thousands), efficient test execution (parallel execution is supported), and
-allows the test author to configure behavior and expected results of both
-individual and groups of tests.
+`compiletest`は、Rustテストスイートのメインテストハーネスです。テスト作成者が大量のテストを整理し（Rustコンパイラには何千ものテストがあります）、効率的なテスト実行（並列実行がサポートされています）を可能にし、テスト作成者が個々のテストやテストグループの動作と期待される結果を設定できるようにします。
 
-> **Note for macOS users**
+> **macOSユーザーへの注意**
 >
-> For macOS users, `SIP` (System Integrity Protection) [may consistently check
-> the compiled binary by sending network requests to Apple][zulip], so you may
-> get a huge performance degradation when running tests.
+> macOSユーザーの場合、`SIP`（System Integrity Protection）が[Appleにネットワークリクエストを送信してコンパイル済みバイナリを一貫してチェックする][zulip]可能性があるため、テスト実行時に大幅なパフォーマンス低下が発生する可能性があります。
 >
-> You can resolve it by tweaking the following settings: `Privacy & Security ->
-> Developer Tools -> Add Terminal (Or VsCode, etc.)`.
+> 以下の設定を調整することで解決できます：`Privacy & Security -> Developer Tools -> Add Terminal (Or VsCode, etc.)`。
 
 [zulip]: https://rust-lang.zulipchat.com/#narrow/stream/182449-t-compiler.2Fhelp/topic/.E2.9C.94.20Is.20there.20any.20performance.20issue.20for.20MacOS.3F
 
-`compiletest` may check test code for compile-time or run-time success/failure.
+`compiletest`は、コンパイル時または実行時の成功/失敗をテストコードでチェックできます。
 
-Tests are typically organized as a Rust source file with annotations in comments
-before and/or within the test code. These comments serve to direct `compiletest`
-on if or how to run the test, what behavior to expect, and more. See
-[directives](directives.md) and the test suite documentation below for more details
-on these annotations.
+テストは通常、テストコードの前や内部にコメントで注釈を付けたRustソースファイルとして整理されます。これらのコメントは、`compiletest`にテストを実行するかどうか、どのように実行するか、どのような動作を期待するかなどを指示する役割を果たします。これらの注釈の詳細については、[directives](directives.md)と以下のテストスイートのドキュメントを参照してください。
 
-See the [Adding new tests](adding.md) and [Best practices](best-practices.md)
-chapters for a tutorial on creating a new test and advice on writing a good
-test, and the [Running tests](running.md) chapter on how to run the test suite.
+新しいテストの作成に関するチュートリアルと良いテストを書くためのアドバイスについては、[Adding new tests](adding.md)と[Best practices](best-practices.md)の章を、テストスイートの実行方法については[Running tests](running.md)の章を参照してください。
 
-Arguments can be passed to compiletest using `--test-args` or by placing them after `--`, e.g.
+引数は`--test-args`を使用するか、`--`の後に配置することでcompiletestに渡すことができます。例：
 - `x test --test-args --force-rerun`
 - `x test -- --force-rerun`
 
-Additionally, bootstrap accepts several common arguments directly, e.g.
+さらに、bootstrapはいくつかの一般的な引数を直接受け入れます。例：
 
-`x test --no-capture --force-rerun --run --pass`.
+`x test --no-capture --force-rerun --run --pass`。
 
-Compiletest itself tries to avoid running tests when the artifacts that are
-involved (mainly the compiler) haven't changed. You can use `x test --test-args
---force-rerun` to rerun a test even when none of the inputs have changed.
+Compiletest自体は、関連するアーティファクト（主にコンパイラ）が変更されていない場合、テストの実行を避けようとします。入力が変更されていない場合でもテストを再実行するには、`x test --test-args --force-rerun`を使用できます。
 
-## Test suites
+## テストスイート
 
-All of the tests are in the [`tests`] directory. The tests are organized into
-"suites", with each suite in a separate subdirectory. Each test suite behaves a
-little differently, with different compiler behavior and different checks for
-correctness. For example, the [`tests/incremental`] directory contains tests for
-incremental compilation. The various suites are defined in
-[`src/tools/compiletest/src/common.rs`] in the `pub enum Mode` declaration.
+すべてのテストは[`tests`]ディレクトリにあります。テストは「スイート」に整理されており、各スイートは別々のサブディレクトリにあります。各テストスイートは少し異なる動作をし、異なるコンパイラの動作と正しさのための異なるチェックを行います。例えば、[`tests/incremental`]ディレクトリにはインクリメンタルコンパイルのテストが含まれています。さまざまなスイートは[`src/tools/compiletest/src/common.rs`]の`pub enum Mode`宣言で定義されています。
 
-The following test suites are available, with links for more information:
+以下のテストスイートが利用可能で、詳細情報へのリンクがあります：
 
 [`tests`]: https://github.com/rust-lang/rust/blob/HEAD/tests
 [`src/tools/compiletest/src/common.rs`]: https://github.com/rust-lang/rust/tree/HEAD/src/tools/compiletest/src/common.rs
 
-### Compiler-specific test suites
+### コンパイラ固有のテストスイート
 
-| Test suite                                | Purpose                                                                                                             |
+| テストスイート                                | 目的                                                                                                             |
 |-------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
-| [`ui`](ui.md)                             | Check the stdout/stderr snapshots from the compilation and/or running the resulting executable                      |
-| `ui-fulldeps`                             | `ui` tests which require a linkable build of `rustc` (such as using `extern crate rustc_span;` or used as a plugin) |
-| [`pretty`](#pretty-printer-tests)         | Check pretty printing                                                                                               |
-| [`incremental`](#incremental-tests)       | Check incremental compilation behavior                                                                              |
-| [`debuginfo`](#debuginfo-tests)           | Check debuginfo generation running debuggers                                                                        |
-| [`codegen-*`](#codegen-tests)             | Check code generation                                                                                               |
-| [`codegen-units`](#codegen-units-tests)   | Check codegen unit partitioning                                                                                     |
-| [`assembly`](#assembly-tests)             | Check assembly output                                                                                               |
-| [`mir-opt`](#mir-opt-tests)               | Check MIR generation and optimizations                                                                              |
-| [`coverage`](#coverage-tests)             | Check coverage instrumentation                                                                                      |
-| [`coverage-run-rustdoc`](#coverage-tests) | `coverage` tests that also run instrumented doctests                                                                |
-| [`crashes`](#crash-tests)               | Check that the compiler ICEs/panics/crashes on certain inputs to catch accidental fixes                             |
+| [`ui`](ui.md)                             | コンパイルおよび/または結果の実行可能ファイルの実行からのstdout/stderrスナップショットをチェック                      |
+| `ui-fulldeps`                             | リンク可能な`rustc`のビルドを必要とする`ui`テスト（`extern crate rustc_span;`の使用やプラグインとしての使用など） |
+| [`pretty`](#pretty-printer-tests)         | プリティプリントをチェック                                                                                               |
+| [`incremental`](#incremental-tests)       | インクリメンタルコンパイルの動作をチェック                                                                              |
+| [`debuginfo`](#debuginfo-tests)           | デバッガを実行するデバッグ情報生成をチェック                                                                        |
+| [`codegen-*`](#codegen-tests)             | コード生成をチェック                                                                                               |
+| [`codegen-units`](#codegen-units-tests)   | codegenユニットのパーティショニングをチェック                                                                                     |
+| [`assembly`](#assembly-tests)             | アセンブリ出力をチェック                                                                                               |
+| [`mir-opt`](#mir-opt-tests)               | MIR生成と最適化をチェック                                                                              |
+| [`coverage`](#coverage-tests)             | カバレッジ計装をチェック                                                                                      |
+| [`coverage-run-rustdoc`](#coverage-tests) | 計装されたdoctestsも実行する`coverage`テスト                                                                |
+| [`crashes`](#crash-tests)               | コンパイラが特定の入力でICE/パニック/クラッシュすることをチェックして、偶発的な修正を捕捉                             |
 
-### General purpose test suite
+### 汎用テストスイート
 
-[`run-make`](#run-make-tests) are general purpose tests using Rust programs.
+[`run-make`](#run-make-tests)は、Rustプログラムを使用する汎用テストです。
 
-### Rustdoc test suites
+### Rustdocテストスイート
 
-| Test suite                           | Purpose                                                                  |
+| テストスイート                           | 目的                                                                  |
 |--------------------------------------|--------------------------------------------------------------------------|
-| [`rustdoc`][rustdoc-html-tests]      | Check HTML output of `rustdoc`                                           |
-| [`rustdoc-gui`][rustdoc-gui-tests]   | Check `rustdoc`'s GUI using a web browser                                |
-| [`rustdoc-js`][rustdoc-js-tests]     | Check `rustdoc`'s search engine and index                                |
-| [`rustdoc-js-std`][rustdoc-js-tests] | Check `rustdoc`'s search engine and index on the std library docs        |
-| [`rustdoc-json`][rustdoc-json-tests] | Check JSON output of `rustdoc`                                           |
-| `rustdoc-ui`                         | Check terminal output of `rustdoc` ([see also](ui.md))                   |
+| [`rustdoc`][rustdoc-html-tests]      | `rustdoc`のHTML出力をチェック                                           |
+| [`rustdoc-gui`][rustdoc-gui-tests]   | Webブラウザを使用して`rustdoc`のGUIをチェック                                |
+| [`rustdoc-js`][rustdoc-js-tests]     | `rustdoc`の検索エンジンとインデックスをチェック                                |
+| [`rustdoc-js-std`][rustdoc-js-tests] | 標準ライブラリドキュメントでの`rustdoc`の検索エンジンとインデックスをチェック        |
+| [`rustdoc-json`][rustdoc-json-tests] | `rustdoc`のJSON出力をチェック                                           |
+| `rustdoc-ui`                         | `rustdoc`の端末出力をチェック（[こちらも参照](ui.md)）                   |
 
-Some rustdoc-specific tests can also be found in `ui/rustdoc/`.
-These check rustdoc-related or -specific lints that (also) run as part of `rustc`, not (only) `rustdoc`.
-Run-make tests pertaining to rustdoc are typically named `run-make/rustdoc-*/`.
+一部のrustdoc固有のテストは`ui/rustdoc/`にもあります。
+これらは`rustc`の一部として実行される（`rustdoc`だけでなく）rustdoc関連またはrustdoc固有のlintをチェックします。
+rustdocに関連するrun-makeテストは通常`run-make/rustdoc-*/`という名前です。
 
 [rustdoc-html-tests]: ../rustdoc-internals/rustdoc-test-suite.md
 [rustdoc-gui-tests]: ../rustdoc-internals/rustdoc-gui-test-suite.md
 [rustdoc-js-tests]: ../rustdoc-internals/search.md#testing-the-search-engine
 [rustdoc-json-tests]: ../rustdoc-internals/rustdoc-json-test-suite.md
 
-### Pretty-printer tests
+### プリティプリンタテスト
 
-The tests in [`tests/pretty`] exercise the "pretty-printing" functionality of
-`rustc`. The `-Z unpretty` CLI option for `rustc` causes it to translate the
-input source into various different formats, such as the Rust source after macro
-expansion.
+[`tests/pretty`]のテストは、`rustc`の「プリティプリンティング」機能を実行します。`rustc`の`-Z unpretty` CLIオプションは、入力ソースをマクロ展開後のRustソースなどのさまざまな異なる形式に変換します。
 
-The pretty-printer tests have several [directives](directives.md) described below.
-These commands can significantly change the behavior of the test, but the
-default behavior without any commands is to:
+プリティプリンタテストには、以下で説明するいくつかの[directives](directives.md)があります。
+これらのコマンドはテストの動作を大幅に変更できますが、コマンドなしのデフォルトの動作は次のとおりです：
 
-1. Run `rustc -Zunpretty=normal` on the source file.
-2. Run `rustc -Zunpretty=normal` on the output of the previous step.
-3. The output of the previous two steps should be the same.
-4. Run `rustc -Zno-codegen` on the output to make sure that it can type check
-   (similar to `cargo check`).
+1. ソースファイルで`rustc -Zunpretty=normal`を実行します。
+2. 前のステップの出力で`rustc -Zunpretty=normal`を実行します。
+3. 前の2つのステップの出力は同じである必要があります。
+4. 出力で`rustc -Zno-codegen`を実行して、型チェックができることを確認します
+   （`cargo check`に似ています）。
 
-If any of the commands above fail, then the test fails.
+上記のいずれかのコマンドが失敗した場合、テストは失敗します。
 
-The directives for pretty-printing tests are:
+プリティプリンティングテストのディレクティブは次のとおりです：
 
-- `pretty-mode` specifies the mode pretty-print tests should run in (that is,
-  the argument to `-Zunpretty`). The default is `normal` if not specified.
-- `pretty-compare-only` causes a pretty test to only compare the pretty-printed
-  output (stopping after step 3 from above). It will not try to compile the
-  expanded output to type check it. This is needed for a pretty-mode that does
-  not expand to valid Rust, or for other situations where the expanded output
-  cannot be compiled.
-- `pp-exact` is used to ensure a pretty-print test results in specific output.
-  If specified without a value, then it means the pretty-print output should
-  match the original source. If specified with a value, as in `//@
-  pp-exact:foo.pp`, it will ensure that the pretty-printed output matches the
-  contents of the given file. Otherwise, if `pp-exact` is not specified, then
-  the pretty-printed output will be pretty-printed one more time, and the output
-  of the two pretty-printing rounds will be compared to ensure that the
-  pretty-printed output converges to a steady state.
+- `pretty-mode`は、プリティプリントテストが実行されるべきモード（つまり、`-Zunpretty`への引数）を指定します。指定されていない場合のデフォルトは`normal`です。
+- `pretty-compare-only`は、プリティテストがプリティプリントされた出力を比較するだけにします（上記のステップ3の後に停止します）。展開された出力をコンパイルして型チェックを試みません。これは、有効なRustに展開されないプリティモード、または展開された出力をコンパイルできない他の状況で必要です。
+- `pp-exact`は、プリティプリントテストが特定の出力を生成することを確認するために使用されます。値なしで指定された場合、プリティプリント出力は元のソースと一致する必要があります。`//@
+  pp-exact:foo.pp`のように値を指定すると、プリティプリントされた出力が指定されたファイルの内容と一致することを確認します。それ以外の場合、`pp-exact`が指定されていない場合、プリティプリントされた出力はもう一度プリティプリントされ、2回のプリティプリントラウンドの出力が比較されて、プリティプリントされた出力が定常状態に収束することを確認します。
 
 [`tests/pretty`]: https://github.com/rust-lang/rust/tree/HEAD/tests/pretty
 
-### Incremental tests
+### インクリメンタルテスト
 
-The tests in [`tests/incremental`] exercise incremental compilation. They use
-[`revisions` directive](#revisions) to tell compiletest to run the compiler in a
-series of steps.
+[`tests/incremental`]のテストは、インクリメンタルコンパイルを実行します。これらは[`revisions` directive](#revisions)を使用して、compiletestに一連のステップでコンパイラを実行するよう指示します。
 
-Compiletest starts with an empty directory with the `-C incremental` flag, and
-then runs the compiler for each revision, reusing the incremental results from
-previous steps.
+Compiletestは、`-C incremental`フラグを使用して空のディレクトリから開始し、各リビジョンに対してコンパイラを実行し、前のステップからのインクリメンタル結果を再利用します。
 
-The revisions should start with:
+リビジョンは次のように始める必要があります：
 
-* `rpass` — the test should compile and run successfully
-* `rfail` — the test should compile successfully, but the executable should fail to run
-* `cfail` — the test should fail to compile
+* `rpass` — テストはコンパイルして正常に実行される必要があります
+* `rfail` — テストは正常にコンパイルされる必要がありますが、実行可能ファイルは実行に失敗する必要があります
+* `cfail` — テストはコンパイルに失敗する必要があります
 
-To make the revisions unique, you should add a suffix like `rpass1` and
-`rpass2`.
+リビジョンを一意にするには、`rpass1`と`rpass2`のようにサフィックスを追加する必要があります。
 
-To simulate changing the source, compiletest also passes a `--cfg` flag with the
-current revision name.
+ソースの変更をシミュレートするために、compiletestは現在のリビジョン名で`--cfg`フラグも渡します。
 
-For example, this will run twice, simulating changing a function:
+例えば、これは2回実行され、関数の変更をシミュレートします：
 
 ```rust,ignore
 //@ revisions: rpass1 rpass2
@@ -177,53 +136,38 @@ fn foo() {
 fn main() { foo(); }
 ```
 
-`cfail` tests support the `forbid-output` directive to specify that a certain
-substring must not appear anywhere in the compiler output. This can be useful to
-ensure certain errors do not appear, but this can be fragile as error messages
-change over time, and a test may no longer be checking the right thing but will
-still pass.
+`cfail`テストは、特定の部分文字列がコンパイラ出力のどこにも表示されてはならないことを指定する`forbid-output`ディレクティブをサポートします。これは特定のエラーが表示されないことを確認するのに役立ちますが、エラーメッセージは時間とともに変化し、テストが正しいことをチェックしなくなっても合格する可能性があるため、脆弱です。
 
-`cfail` tests support the `should-ice` directive to specify that a test should
-cause an Internal Compiler Error (ICE). This is a highly specialized directive
-to check that the incremental cache continues to work after an ICE.
+`cfail`テストは、テストが内部コンパイラエラー（ICE）を引き起こすべきことを指定する`should-ice`ディレクティブをサポートします。これは、ICE後もインクリメンタルキャッシュが引き続き機能することをチェックするための非常に特殊なディレクティブです。
 
 [`tests/incremental`]: https://github.com/rust-lang/rust/tree/HEAD/tests/incremental
 
 
-### Debuginfo tests
+### デバッグ情報テスト
 
-The tests in [`tests/debuginfo`] test debuginfo generation. They build a
-program, launch a debugger, and issue commands to the debugger. A single test
-can work with cdb, gdb, and lldb.
+[`tests/debuginfo`]のテストは、デバッグ情報生成をテストします。これらはプログラムをビルドし、デバッガを起動し、デバッガにコマンドを発行します。1つのテストでcdb、gdb、lldbを使用できます。
 
-Most tests should have the `//@ compile-flags: -g` directive or something
-similar to generate the appropriate debuginfo.
+ほとんどのテストには、適切なデバッグ情報を生成するために`//@ compile-flags: -g`ディレクティブまたは類似のものが必要です。
 
-To set a breakpoint on a line, add a `// #break` comment on the line.
+行にブレークポイントを設定するには、その行に`// #break`コメントを追加します。
 
-The debuginfo tests consist of a series of debugger commands along with
-"check" lines which specify output that is expected from the debugger.
+デバッグ情報テストは、一連のデバッガコマンドと、デバッガからの期待される出力を指定する「チェック」行で構成されます。
 
-The commands are comments of the form `// $DEBUGGER-command:$COMMAND` where
-`$DEBUGGER` is the debugger being used and `$COMMAND` is the debugger command
-to execute.
+コマンドは`// $DEBUGGER-command:$COMMAND`の形式のコメントで、`$DEBUGGER`は使用されているデバッガで、`$COMMAND`は実行するデバッガコマンドです。
 
-The debugger values can be:
+デバッガの値は次のとおりです：
 
 - `cdb`
 - `gdb`
-- `gdbg` — GDB without Rust support (versions older than 7.11)
-- `gdbr` — GDB with Rust support
+- `gdbg` — RustサポートなしのGDB（7.11より古いバージョン）
+- `gdbr` — Rustサポート付きのGDB
 - `lldb`
-- `lldbg` — LLDB without Rust support
-- `lldbr` — LLDB with Rust support (this no longer exists)
+- `lldbg` — RustサポートなしのLLDB
+- `lldbr` — Rustサポート付きのLLDB（これはもう存在しません）
 
-The command to check the output are of the form `// $DEBUGGER-check:$OUTPUT`
-where `$OUTPUT` is the output to expect.
+出力をチェックするコマンドは`// $DEBUGGER-check:$OUTPUT`の形式で、`$OUTPUT`は期待される出力です。
 
-For example, the following will build the test, start the debugger, set a
-breakpoint, launch the program, inspect a value, and check what the debugger
-prints:
+例えば、以下はテストをビルドし、デバッガを起動し、ブレークポイントを設定し、プログラムを起動し、値を検査し、デバッガが出力するものをチェックします：
 
 ```rust,ignore
 //@ compile-flags: -g
@@ -240,120 +184,83 @@ fn main() {
 fn b() {}
 ```
 
-The following [directives](directives.md) are available to disable a test based on
-the debugger currently being used:
+次の[directives](directives.md)は、現在使用されているデバッガに基づいてテストを無効にするために使用できます：
 
-- `min-cdb-version: 10.0.18317.1001` — ignores the test if the version of cdb
-  is below the given version
-- `min-gdb-version: 8.2` — ignores the test if the version of gdb is below the
-  given version
-- `ignore-gdb-version: 9.2` — ignores the test if the version of gdb is equal
-  to the given version
-- `ignore-gdb-version: 7.11.90 - 8.0.9` — ignores the test if the version of
-  gdb is in a range (inclusive)
-- `min-lldb-version: 310` — ignores the test if the version of lldb is below
-  the given version
-- `rust-lldb` — ignores the test if lldb is not contain the Rust plugin. NOTE:
-  The "Rust" version of LLDB doesn't exist anymore, so this will always be
-  ignored. This should probably be removed.
+- `min-cdb-version: 10.0.18317.1001` — cdbのバージョンが指定されたバージョンより低い場合、テストを無視します
+- `min-gdb-version: 8.2` — gdbのバージョンが指定されたバージョンより低い場合、テストを無視します
+- `ignore-gdb-version: 9.2` — gdbのバージョンが指定されたバージョンと等しい場合、テストを無視します
+- `ignore-gdb-version: 7.11.90 - 8.0.9` — gdbのバージョンが範囲内（両端を含む）にある場合、テストを無視します
+- `min-lldb-version: 310` — lldbのバージョンが指定されたバージョンより低い場合、テストを無視します
+- `rust-lldb` — lldbがRustプラグインを含んでいない場合、テストを無視します。注：LLDBの「Rust」バージョンはもう存在しないため、これは常に無視されます。これはおそらく削除されるべきです。
 
-By passing the `--debugger` option to compiletest, you can specify a single debugger to run tests with.
-For example, `./x test tests/debuginfo -- --debugger gdb` will only test GDB commands.
+`--debugger`オプションをcompiletestに渡すことで、テストを実行する単一のデバッガを指定できます。
+例えば、`./x test tests/debuginfo -- --debugger gdb`はGDBコマンドのみをテストします。
 
-> **Note on running lldb debuginfo tests locally**
+> **lldbデバッグ情報テストをローカルで実行する際の注意**
 >
-> If you want to run lldb debuginfo tests locally, then currently on Windows it
-> is required that:
-> 
-> - You have Python 3.10 installed.
-> - You have `python310.dll` available in your `PATH` env var. This is not
->   provided by the standard Python installer you obtain from `python.org`; you
->   need to add this to `PATH` manually.
-> 
-> Otherwise the lldb debuginfo tests can produce crashes in mysterious ways.
+> lldbデバッグ情報テストをローカルで実行したい場合、現在Windowsでは次のことが必要です：
+>
+> - Python 3.10がインストールされていること。
+> - `python310.dll`が`PATH`環境変数で利用可能であること。これは`python.org`から入手する標準のPythonインストーラでは提供されていません。
+>   手動で`PATH`に追加する必要があります。
+>
+> そうでない場合、lldbデバッグ情報テストは不可解な方法でクラッシュを引き起こす可能性があります。
 
 [`tests/debuginfo`]: https://github.com/rust-lang/rust/tree/HEAD/tests/debuginfo
 
-> **Note on acquiring `cdb.exe` on Windows 11**
+> **Windows 11で`cdb.exe`を取得する際の注意**
 >
-> `cdb.exe` is acquired alongside a suitable "Windows 11 SDK" which is part of
-> the "Desktop Development with C++" workload profile in a Visual Studio
-> installer (e.g. Visual Studio 2022 installer).
+> `cdb.exe`は、Visual Studioインストーラ（Visual Studio 2022インストーラなど）の「Desktop Development with C++」ワークロードプロファイルの一部である適切な「Windows 11 SDK」と一緒に取得されます。
 >
-> **HOWEVER** this is not sufficient by default alone. If you need `cdb.exe`,
-> you must go to Installed Apps, find the newest "Windows Software Development
-> Kit" (and yes, this can still say `Windows 10.0.22161.3233` even though the OS
-> is called Windows 11). You must then click "Modify" -> "Change" and then
-> selected "Debugging Tools for Windows" in order to acquire `cdb.exe`.
+> **ただし**、これだけではデフォルトで十分ではありません。`cdb.exe`が必要な場合は、インストール済みアプリに移動し、最新の「Windows Software Development
+> Kit」を見つけ（OSがWindows 11と呼ばれていても、これは`Windows 10.0.22161.3233`と表示される可能性があります）、「Modify」→「Change」をクリックしてから「Debugging Tools for Windows」を選択して`cdb.exe`を取得する必要があります。
 
-### Codegen tests
+### コード生成テスト
 
-The tests in [`tests/codegen-llvm`] test LLVM code generation. They compile the test
-with the `--emit=llvm-ir` flag to emit LLVM IR. They then run the LLVM
-[FileCheck] tool. The test is annotated with various `// CHECK` comments to
-check the generated code. See the [FileCheck] documentation for a tutorial and
-more information.
+[`tests/codegen-llvm`]のテストは、LLVMコード生成をテストします。これらは`--emit=llvm-ir`フラグを使用してテストをコンパイルし、LLVM IRを出力します。次に、LLVM [FileCheck]ツールを実行します。テストには、生成されたコードをチェックするためのさまざまな`// CHECK`コメントが注釈として付けられています。チュートリアルと詳細については、[FileCheck]ドキュメントを参照してください。
 
-See also the [assembly tests](#assembly-tests) for a similar set of tests.
+同様のテストセットについては、[アセンブリテスト](#assembly-tests)も参照してください。
 
-If you need to work with `#![no_std]` cross-compiling tests, consult the
-[`minicore` test auxiliary](./minicore.md) chapter.
+`#![no_std]`クロスコンパイルテストを使用する必要がある場合は、[`minicore`テスト補助](./minicore.md)の章を参照してください。
 
 [`tests/codegen-llvm`]: https://github.com/rust-lang/rust/tree/HEAD/tests/codegen-llvm
 [FileCheck]: https://llvm.org/docs/CommandGuide/FileCheck.html
 
 
-### Assembly tests
+### アセンブリテスト
 
-The tests in [`tests/assembly-llvm`] test LLVM assembly output. They compile the test
-with the `--emit=asm` flag to emit a `.s` file with the assembly output. They
-then run the LLVM [FileCheck] tool.
+[`tests/assembly-llvm`]のテストは、LLVMアセンブリ出力をテストします。これらは`--emit=asm`フラグを使用してテストをコンパイルし、アセンブリ出力を含む`.s`ファイルを出力します。次に、LLVM [FileCheck]ツールを実行します。
 
-Each test should be annotated with the `//@ assembly-output:` directive with a
-value of either `emit-asm` or `ptx-linker` to indicate the type of assembly
-output.
+各テストには、アセンブリ出力のタイプを示す`emit-asm`または`ptx-linker`の値を持つ`//@ assembly-output:`ディレクティブで注釈を付ける必要があります。
 
-Then, they should be annotated with various `// CHECK` comments to check the
-assembly output. See the [FileCheck] documentation for a tutorial and more
-information.
+次に、アセンブリ出力をチェックするためのさまざまな`// CHECK`コメントで注釈を付ける必要があります。チュートリアルと詳細については、[FileCheck]ドキュメントを参照してください。
 
-See also the [codegen tests](#codegen-tests) for a similar set of tests.
+同様のテストセットについては、[コード生成テスト](#codegen-tests)も参照してください。
 
-If you need to work with `#![no_std]` cross-compiling tests, consult the
-[`minicore` test auxiliary](./minicore.md) chapter.
+`#![no_std]`クロスコンパイルテストを使用する必要がある場合は、[`minicore`テスト補助](./minicore.md)の章を参照してください。
 
 [`tests/assembly-llvm`]: https://github.com/rust-lang/rust/tree/HEAD/tests/assembly-llvm
 
 
-### Codegen-units tests
+### コード生成ユニットテスト
 
-The tests in [`tests/codegen-units`] test the
-[monomorphization](../backend/monomorph.md) collector and CGU partitioning.
+[`tests/codegen-units`]のテストは、[単相化](../backend/monomorph.md)コレクタとCGUパーティショニングをテストします。
 
-These tests work by running `rustc` with a flag to print the result of the
-monomorphization collection pass, i.e., `-Zprint-mono-items`, and then special
-annotations in the file are used to compare against that.
+これらのテストは、単相化収集パスの結果を出力するフラグ、つまり`-Zprint-mono-items`を使用して`rustc`を実行し、ファイル内の特別な注釈を使用してそれと比較します。
 
-Then, the test should be annotated with comments of the form `//~ MONO_ITEM
-name` where `name` is the monomorphized string printed by rustc like `fn <u32 as
-Trait>::foo`.
+次に、テストには、`name`が`fn <u32 as Trait>::foo`のようなrustcによって出力される単相化された文字列である`//~ MONO_ITEM name`の形式のコメントで注釈を付ける必要があります。
 
-To check for CGU partitioning, a comment of the form `//~ MONO_ITEM name @@ cgu`
-where `cgu` is a space separated list of the CGU names and the linkage
-information in brackets. For example: `//~ MONO_ITEM static function::FOO @@
+CGUパーティショニングをチェックするには、`//~ MONO_ITEM name @@ cgu`の形式のコメントを使用します。ここで、`cgu`はCGU名と括弧内のリンケージ情報のスペース区切りリストです。例：`//~ MONO_ITEM static function::FOO @@
 statics[Internal]`
 
 [`tests/codegen-units`]: https://github.com/rust-lang/rust/tree/HEAD/tests/codegen-units
 
 
-### Mir-opt tests
+### MIR最適化テスト
 
-The tests in [`tests/mir-opt`] check parts of the generated MIR to make sure it
-is generated correctly and is doing the expected optimizations. Check out the
-[MIR Optimizations](../mir/optimizations.md) chapter for more.
+[`tests/mir-opt`]のテストは、生成されたMIRの一部をチェックして、正しく生成され、期待される最適化を実行していることを確認します。詳細については、[MIR Optimizations](../mir/optimizations.md)の章を参照してください。
 
-Compiletest will build the test with several flags to dump the MIR output and
-set a baseline for optimizations:
+Compiletestは、いくつかのフラグを使用してテストをビルドし、MIR出力をダンプし、最適化のベースラインを設定します：
 
 * `-Copt-level=1`
 * `-Zdump-mir=all`
@@ -361,97 +268,66 @@ set a baseline for optimizations:
 * `-Zvalidate-mir`
 * `-Zdump-mir-exclude-pass-number`
 
-The test should be annotated with `// EMIT_MIR` comments that specify files that
-will contain the expected MIR output. You can use `x test --bless` to create the
-initial expected files.
+テストには、期待されるMIR出力を含むファイルを指定する`// EMIT_MIR`コメントで注釈を付ける必要があります。`x test --bless`を使用して、初期の期待ファイルを作成できます。
 
-There are several forms the `EMIT_MIR` comment can take:
+`EMIT_MIR`コメントには、いくつかの形式があります：
 
-- `// EMIT_MIR $MIR_PATH.mir` — This will check that the given filename matches
-  the exact output from the MIR dump. For example,
-  `my_test.main.SimplifyCfg-elaborate-drops.after.mir` will load that file from
-  the test directory, and compare it against the dump from rustc.
+- `// EMIT_MIR $MIR_PATH.mir` — これは、指定されたファイル名がMIRダンプからの正確な出力と一致することをチェックします。例えば、
+  `my_test.main.SimplifyCfg-elaborate-drops.after.mir`は、テストディレクトリからそのファイルをロードし、rustcからのダンプと比較します。
 
-  Checking the "after" file (which is after optimization) is useful if you are
-  interested in the final state after an optimization. Some rare cases may want
-  to use the "before" file for completeness.
+  「after」ファイル（最適化後）をチェックすることは、最適化後の最終状態に興味がある場合に便利です。まれに、完全性のために「before」ファイルを使用したい場合があります。
 
-- `// EMIT_MIR $MIR_PATH.diff` — where `$MIR_PATH` is the filename of the MIR
-  dump, such as `my_test_name.my_function.EarlyOtherwiseBranch`. Compiletest
-  will diff the `.before.mir` and `.after.mir` files, and compare the diff
-  output to the expected `.diff` file from the `EMIT_MIR` comment.
+- `// EMIT_MIR $MIR_PATH.diff` — `$MIR_PATH`は、`my_test_name.my_function.EarlyOtherwiseBranch`のようなMIRダンプのファイル名です。Compiletestは、`.before.mir`と`.after.mir`ファイルを差分し、差分出力を`EMIT_MIR`コメントからの期待される`.diff`ファイルと比較します。
 
-  This is useful if you want to see how an optimization changes the MIR.
+  これは、最適化がMIRをどのように変更するかを確認したい場合に便利です。
 
-- `// EMIT_MIR $MIR_PATH.dot` — When using specific flags that dump additional
-  MIR data (e.g. `-Z dump-mir-graphviz` to produce `.dot` files), this will
-  check that the output matches the given file.
+- `// EMIT_MIR $MIR_PATH.dot` — 追加のMIRデータをダンプする特定のフラグ（例：`.dot`ファイルを生成する`-Z dump-mir-graphviz`）を使用する場合、これは出力が指定されたファイルと一致することをチェックします。
 
-By default 32 bit and 64 bit targets use the same dump files, which can be
-problematic in the presence of pointers in constants or other bit width
-dependent things. In that case you can add `// EMIT_MIR_FOR_EACH_BIT_WIDTH` to
-your test, causing separate files to be generated for 32bit and 64bit systems.
+デフォルトでは、32ビットと64ビットのターゲットは同じダンプファイルを使用しますが、定数内のポインタや他のビット幅依存のものが存在する場合に問題が生じる可能性があります。その場合、テストに`// EMIT_MIR_FOR_EACH_BIT_WIDTH`を追加すると、32ビットシステムと64ビットシステム用に別々のファイルが生成されます。
 
 [`tests/mir-opt`]: https://github.com/rust-lang/rust/tree/HEAD/tests/mir-opt
 
 
-### `run-make` tests
+### `run-make`テスト
 
-The tests in [`tests/run-make`] and [`tests/run-make-cargo`] are general-purpose
-tests using Rust *recipes*, which are small programs (`rmake.rs`) allowing
-arbitrary Rust code such as `rustc` invocations, and is supported by a
-[`run_make_support`] library. Using Rust recipes provide the ultimate in
-flexibility.
+[`tests/run-make`]と[`tests/run-make-cargo`]のテストは、Rust *レシピ*を使用する汎用テストです。これらは、`rustc`呼び出しなどの任意のRustコードを可能にする小さなプログラム（`rmake.rs`）で、[`run_make_support`]ライブラリによってサポートされます。Rustレシピを使用すると、究極の柔軟性が提供されます。
 
-`run-make` tests should be used if no other test suites better suit your needs.
+`run-make`テストは、他のテストスイートがニーズに適さない場合に使用する必要があります。
 
-The `run-make-cargo` test suite additionally builds an in-tree `cargo` to support
-use cases that require testing in-tree `cargo` in conjunction with in-tree `rustc`.
-The `run-make` test suite does not have access to in-tree `cargo` (so it can be the
-faster-to-iterate test suite).
+`run-make-cargo`テストスイートは、ツリー内の`cargo`とツリー内の`rustc`を連携してテストする必要があるユースケースをサポートするために、追加でツリー内の`cargo`をビルドします。
+`run-make`テストスイートはツリー内の`cargo`にアクセスできません（そのため、反復が高速なテストスイートになります）。
 
-#### Using Rust recipes
+#### Rustレシピの使用
 
-Each test should be in a separate directory with a `rmake.rs` Rust program,
-called the *recipe*. A recipe will be compiled and executed by compiletest with
-the `run_make_support` library linked in.
+各テストは、*レシピ*と呼ばれる`rmake.rs` Rustプログラムを含む別のディレクトリに配置する必要があります。レシピは、`run_make_support`ライブラリがリンクされた状態でcompiletestによってコンパイルおよび実行されます。
 
-If you need new utilities or functionality, consider extending and improving the
-[`run_make_support`] library.
+新しいユーティリティや機能が必要な場合は、[`run_make_support`]ライブラリを拡張および改善することを検討してください。
 
-Compiletest directives like `//@ only-<target>` or `//@ ignore-<target>` are
-supported in `rmake.rs`, like in UI tests. However, revisions or building
-auxiliary via directives are not currently supported.
+`//@ only-<target>`や`//@ ignore-<target>`のようなCompiletestディレクティブは、UIテストと同様に`rmake.rs`でサポートされています。ただし、リビジョンやディレクティブによる補助のビルドは現在サポートされていません。
 
-`rmake.rs` and `run-make-support` may *not* use any nightly/unstable features,
-as they must be compilable by a stage 0 rustc that may be a beta or even stable
-rustc.
+`rmake.rs`と`run-make-support`は、nightly/不安定な機能を使用*してはいけません*。ステージ0のrustcがベータ版または安定版のrustcである可能性があるため、それらでコンパイル可能である必要があります。
 
-#### Quickly check if `rmake.rs` tests can be compiled
+#### `rmake.rs`テストがコンパイル可能かどうかを素早くチェック
 
-You can quickly check if `rmake.rs` tests can be compiled without having to
-build stage1 rustc by forcing `rmake.rs` to be compiled with the stage0
-compiler:
+ステージ1のrustcをビルドせずに`rmake.rs`テストがコンパイル可能かどうかを素早くチェックできます。ステージ0のコンパイラで`rmake.rs`を強制的にコンパイルします：
 
 ```bash
 $ COMPILETEST_FORCE_STAGE0=1 x test --stage 0 tests/run-make/<test-name>
 ```
 
-Of course, some tests will not successfully *run* in this way.
+もちろん、一部のテストはこの方法では正常に*実行*されません。
 
-#### Using rust-analyzer with `rmake.rs`
+#### `rmake.rs`でrust-analyzerを使用
 
-Like other test programs, the `rmake.rs` scripts used by run-make tests do not
-have rust-analyzer integration by default.
+他のテストプログラムと同様に、run-makeテストで使用される`rmake.rs`スクリプトは、デフォルトではrust-analyzer統合がありません。
 
-To work around this when working on a particular test, temporarily create a
-`Cargo.toml` file in the test's directory
-(e.g. `tests/run-make/sysroot-crates-are-unstable/Cargo.toml`)
-with these contents:
+特定のテストで作業する際にこれを回避するには、テストのディレクトリに一時的に`Cargo.toml`ファイルを作成します
+（例：`tests/run-make/sysroot-crates-are-unstable/Cargo.toml`）
+次の内容で：
 
 <div class="warning">
 
-Be careful not to add this `Cargo.toml` or its `Cargo.lock` to your actual PR!
+この`Cargo.toml`やその`Cargo.lock`を実際のPRに追加しないように注意してください！
 
 </div>
 
@@ -472,8 +348,8 @@ name = "rmake"
 path = "rmake.rs"
 ```
 
-Then add a corresponding entry to `"rust-analyzer.linkedProjects"`
-(e.g. in `.vscode/settings.json`):
+次に、対応するエントリを`"rust-analyzer.linkedProjects"`に追加します
+（例：`.vscode/settings.json`）：
 
 ```json
 "rust-analyzer.linkedProjects": [
@@ -485,58 +361,39 @@ Then add a corresponding entry to `"rust-analyzer.linkedProjects"`
 [`tests/run-make-cargo`]: https://github.com/rust-lang/rust/tree/HEAD/tests/run-make-cargo
 [`run_make_support`]: https://github.com/rust-lang/rust/tree/HEAD/src/tools/run-make-support
 
-### Coverage tests
+### カバレッジテスト
 
-The tests in [`tests/coverage`] are shared by multiple test modes that test
-coverage instrumentation in different ways. Running the `coverage` test suite
-will automatically run each test in all of the different coverage modes.
+[`tests/coverage`]のテストは、異なる方法でカバレッジ計装をテストする複数のテストモードで共有されます。`coverage`テストスイートを実行すると、すべてのカバレッジモードで各テストが自動的に実行されます。
 
-Each mode also has an alias to run the coverage tests in just that mode:
+各モードには、そのモードでのみカバレッジテストを実行するためのエイリアスもあります：
 
 ```bash
-./x test coverage # runs all of tests/coverage in all coverage modes
-./x test tests/coverage # same as above
+./x test coverage # すべてのカバレッジモードでtests/coverageのすべてを実行
+./x test tests/coverage # 上記と同じ
 
-./x test tests/coverage/if.rs # runs the specified test in all coverage modes
+./x test tests/coverage/if.rs # すべてのカバレッジモードで指定されたテストを実行
 
-./x test coverage-map # runs all of tests/coverage in "coverage-map" mode only
-./x test coverage-run # runs all of tests/coverage in "coverage-run" mode only
+./x test coverage-map # 「coverage-map」モードのみでtests/coverageのすべてを実行
+./x test coverage-run # 「coverage-run」モードのみでtests/coverageのすべてを実行
 
-./x test coverage-map -- tests/coverage/if.rs # runs the specified test in "coverage-map" mode only
+./x test coverage-map -- tests/coverage/if.rs # 「coverage-map」モードのみで指定されたテストを実行
 ```
 
-If a particular test should not be run in one of the coverage test modes for
-some reason, use the `//@ ignore-coverage-map` or `//@ ignore-coverage-run`
-directives.
+何らかの理由で特定のテストがカバレッジテストモードの1つで実行されるべきでない場合は、`//@ ignore-coverage-map`または`//@ ignore-coverage-run`ディレクティブを使用します。
 
-#### `coverage-map` suite
+#### `coverage-map`スイート
 
-In `coverage-map` mode, these tests verify the mappings between source code
-regions and coverage counters that are emitted by LLVM. They compile the test
-with `--emit=llvm-ir`, then use a custom tool ([`src/tools/coverage-dump`]) to
-extract and pretty-print the coverage mappings embedded in the IR. These tests
-don't require the profiler runtime, so they run in PR CI jobs and are easy to
-run/bless locally.
+`coverage-map`モードでは、これらのテストはソースコード領域とLLVMによって出力されるカバレッジカウンタ間のマッピングを検証します。`--emit=llvm-ir`でテストをコンパイルし、カスタムツール（[`src/tools/coverage-dump`]）を使用してIRに埋め込まれたカバレッジマッピングを抽出してプリティプリントします。これらのテストはプロファイラランタイムを必要としないため、PR CIジョブで実行され、ローカルで実行/blessが簡単です。
 
-These coverage map tests can be sensitive to changes in MIR lowering or MIR
-optimizations, producing mappings that are different but produce identical
-coverage reports.
+これらのカバレッジマップテストは、MIR低下やMIR最適化の変更に敏感で、異なるが同一のカバレッジレポートを生成するマッピングを生成する可能性があります。
 
-As a rule of thumb, any PR that doesn't change coverage-specific code should
-**feel free to re-bless** the `coverage-map` tests as necessary, without
-worrying about the actual changes, as long as the `coverage-run` tests still
-pass.
+経験則として、カバレッジ固有のコードを変更しないPRは、`coverage-run`テストが引き続き合格する限り、必要に応じて`coverage-map`テストを**自由に再bless**できます。実際の変更を心配する必要はありません。
 
-#### `coverage-run` suite
+#### `coverage-run`スイート
 
-In `coverage-run` mode, these tests perform an end-to-end test of coverage
-reporting. They compile a test program with coverage instrumentation, run that
-program to produce raw coverage data, and then use LLVM tools to process that
-data into a human-readable code coverage report.
+`coverage-run`モードでは、これらのテストはカバレッジレポートのエンドツーエンドテストを実行します。カバレッジ計装でテストプログラムをコンパイルし、そのプログラムを実行して生カバレッジデータを生成し、LLVMツールを使用してそのデータを人間が読めるコードカバレッジレポートに処理します。
 
-Instrumented binaries need to be linked against the LLVM profiler runtime, so
-`coverage-run` tests are **automatically skipped** unless the profiler runtime
-is enabled in `bootstrap.toml`:
+計装されたバイナリはLLVMプロファイラランタイムに対してリンクされる必要があるため、`coverage-run`テストは、プロファイラランタイムが`bootstrap.toml`で有効になっていない場合、**自動的にスキップ**されます：
 
 ```toml
 # bootstrap.toml
@@ -544,72 +401,53 @@ is enabled in `bootstrap.toml`:
 profiler = true
 ```
 
-This also means that they typically don't run in PR CI jobs, though they do run
-as part of the full set of CI jobs used for merging.
+これは、通常PR CIジョブでは実行されませんが、マージに使用される完全なCIジョブセットの一部として実行されることも意味します。
 
-#### `coverage-run-rustdoc` suite
+#### `coverage-run-rustdoc`スイート
 
-The tests in [`tests/coverage-run-rustdoc`] also run instrumented doctests and
-include them in the coverage report. This avoids having to build rustdoc when
-only running the main `coverage` suite.
+[`tests/coverage-run-rustdoc`]のテストも、計装されたdoctestsを実行し、カバレッジレポートに含めます。これにより、メインの`coverage`スイートのみを実行する際にrustdocをビルドする必要がなくなります。
 
 [`tests/coverage`]: https://github.com/rust-lang/rust/tree/HEAD/tests/coverage
 [`src/tools/coverage-dump`]: https://github.com/rust-lang/rust/tree/HEAD/src/tools/coverage-dump
 [`tests/coverage-run-rustdoc`]: https://github.com/rust-lang/rust/tree/HEAD/tests/coverage-run-rustdoc
 
-### Crash tests
+### クラッシュテスト
 
-[`tests/crashes`] serve as a collection of tests that are expected to cause the
-compiler to ICE, panic or crash in some other way, so that accidental fixes are
-tracked. Formerly, this was done at <https://github.com/rust-lang/glacier> but
-doing it inside the rust-lang/rust testsuite is more convenient.
+[`tests/crashes`]は、コンパイラがICE、パニック、またはその他の方法でクラッシュすることが期待されるテストのコレクションとして機能し、偶発的な修正が追跡されます。以前は、これは<https://github.com/rust-lang/glacier>で行われていましたが、rust-lang/rustテストスイート内で行う方が便利です。
 
-It is imperative that a test in the suite causes rustc to ICE, panic, or
-crash in some other way. A test will "pass" if rustc exits with an exit status
-other than 1 or 0.
+スイート内のテストは、rustcをICE、パニック、またはその他の方法でクラッシュさせることが不可欠です。テストは、rustcが1または0以外の終了ステータスで終了すると「合格」します。
 
-If you want to see verbose stdout/stderr, you need to set
-`COMPILETEST_VERBOSE_CRASHES=1`, e.g.
+詳細なstdout/stderrを表示したい場合は、`COMPILETEST_VERBOSE_CRASHES=1`を設定する必要があります。例：
 
 ```bash
 $ COMPILETEST_VERBOSE_CRASHES=1 ./x test tests/crashes/999999.rs --stage 1
 ```
 
-Anyone can add ["untracked" crashes] from the issue tracker. It's strongly
-recommended to include test cases from several issues in a single PR.
-When you do so, each issue number should be noted in the file name (`12345.rs`
-should suffice) and also inside the file by means of a `//@ known-bug: #12345`
-directive. Please [label][labeling] the relevant issues with `S-bug-has-test`
-once your PR is merged.
+誰でもissue trackerから["untracked" crashes]を追加できます。複数のissueからのテストケースを1つのPRに含めることを強くお勧めします。
+その際、各issue番号をファイル名（`12345.rs`で十分です）とファイル内に`//@ known-bug: #12345`ディレクティブで記載する必要があります。PRがマージされたら、関連するissueに`S-bug-has-test`で[ラベル付け][labeling]してください。
 
-If you happen to fix one of the crashes, please move it to a fitting
-subdirectory in `tests/ui` and give it a meaningful name. Please add a doc
-comment at the top of the file explaining why this test exists, even better if
-you can briefly explain how the example causes rustc to crash previously and
-what was done to prevent rustc to ICE / panic / crash.
+クラッシュの1つを修正した場合は、それを`tests/ui`の適切なサブディレクトリに移動し、意味のある名前を付けてください。ファイルの先頭に、なぜこのテストが存在するのかを説明するドキュメントコメントを追加してください。できれば、例がrustcを以前にクラッシュさせた方法と、rustcがICE/パニック/クラッシュするのを防ぐために何が行われたかを簡単に説明すると良いでしょう。
 
-Adding
+以下を追加すると
 
 ```text
 Fixes #NNNNN
 Fixes #MMMMM
 ```
 
-to the description of your pull request will ensure the corresponding tickets be closed
-automatically upon merge.
+プルリクエストの説明に追加すると、マージ時に対応するチケットが自動的にクローズされます。
 
-Make sure that your fix actually fixes the root cause of the issue and not just
-a subset first. The issue numbers can be found in the file name or the `//@
-known-bug` directive inside the test file.
+修正が実際にissueの根本原因を修正し、単なるサブセットではないことを最初に確認してください。issue番号は、ファイル名またはテストファイル内の`//@
+known-bug`ディレクティブで見つけることができます。
 
 [`tests/crashes`]: https://github.com/rust-lang/rust/tree/HEAD/tests/crashes
 ["untracked" crashes]: https://github.com/rust-lang/rust/issues?q=is%3Aissue+state%3Aopen+label%3AI-ICE%2CI-crash+label%3AT-compiler+label%3AS-has-mcve+-label%3AS-bug-has-test
 [labeling]: https://forge.rust-lang.org/release/issue-triaging.html#applying-and-removing-labels
 
-## Building auxiliary crates
+## 補助crateのビルド
 
-It is common that some tests require additional auxiliary crates to be compiled.
-There are multiple [directives](directives.md) to assist with that:
+一部のテストでは、追加の補助crateをコンパイルする必要があることがよくあります。
+それを支援する複数の[directives](directives.md)があります：
 
 - `aux-build`
 - `aux-crate`
@@ -617,61 +455,40 @@ There are multiple [directives](directives.md) to assist with that:
 - `aux-codegen-backend`
 - `proc-macro`
 
-`aux-build` will build a separate crate from the named source file. The source
-file should be in a directory called `auxiliary` beside the test file.
+`aux-build`は、指定されたソースファイルから別のcrateをビルドします。ソースファイルは、テストファイルの隣の`auxiliary`というディレクトリにある必要があります。
 
 ```rust,ignore
 //@ aux-build: my-helper.rs
 
 extern crate my_helper;
-// ... You can use my_helper.
+// ... my_helperを使用できます。
 ```
 
-The aux crate will be built as a dylib if possible (unless on a platform that
-does not support them, or the `no-prefer-dynamic` header is specified in the aux
-file). The `-L` flag is used to find the extern crates.
+auxクレートは、可能な場合dylibとしてビルドされます（プラットフォームがdylibをサポートしていない場合、またはauxファイルで`no-prefer-dynamic`ヘッダが指定されている場合を除く）。`-L`フラグは、extern crateを見つけるために使用されます。
 
-`aux-crate` is very similar to `aux-build`. However, it uses the `--extern` flag
-to link to the extern crate to make the crate be available as an extern prelude.
-That allows you to specify the additional syntax of the `--extern` flag, such as
-renaming a dependency. For example, `//@ aux-crate:foo=bar.rs` will compile
-`auxiliary/bar.rs` and make it available under then name `foo` within the test.
-This is similar to how Cargo does dependency renaming.
+`aux-crate`は`aux-build`に非常に似ています。ただし、`--extern`フラグを使用してextern crateにリンクし、crateをextern preludeとして使用できるようにします。
+これにより、依存関係の名前変更など、`--extern`フラグの追加構文を指定できます。例えば、`//@ aux-crate:foo=bar.rs`は`auxiliary/bar.rs`をコンパイルし、テスト内で`foo`という名前で使用できるようにします。
+これは、Cargoが依存関係の名前変更を行う方法に似ています。
 
-`aux-bin` is similar to `aux-build` but will build a binary instead of a
-library. The binary will be available in `auxiliary/bin` relative to the working
-directory of the test.
+`aux-bin`は`aux-build`に似ていますが、ライブラリではなくバイナリをビルドします。バイナリは、テストの作業ディレクトリに対して相対的な`auxiliary/bin`で利用できます。
 
-`aux-codegen-backend` is similar to `aux-build`, but will then pass the compiled
-dylib to `-Zcodegen-backend` when building the main file. This will only work
-for tests in `tests/ui-fulldeps`, since it requires the use of compiler crates.
+`aux-codegen-backend`は`aux-build`に似ていますが、コンパイルされたdylibをメインファイルのビルド時に`-Zcodegen-backend`に渡します。これは、コンパイラクレートの使用を必要とするため、`tests/ui-fulldeps`のテストでのみ機能します。
 
-### Auxiliary proc-macro
+### 補助proc-macro
 
-If you want a proc-macro dependency, then you can use the `proc-macro`
-directive. This directive behaves just like `aux-build`, i.e. that you should
-place the proc-macro test auxiliary file under a `auxiliary` folder under the
-same parent folder as the main test file. However, it also has four additional
-preset behavior compared to `aux-build` for the proc-macro test auxiliary:
+proc-macro依存関係が必要な場合は、`proc-macro`ディレクティブを使用できます。このディレクティブは`aux-build`と同じように動作します。つまり、proc-macroテスト補助ファイルを、メインテストファイルと同じ親フォルダの下の`auxiliary`フォルダに配置する必要があります。ただし、proc-macroテスト補助用に`aux-build`と比較して4つの追加のプリセット動作があります：
 
-1. The aux test file is built with `--crate-type=proc-macro`.
-2. The aux test file is built without `-C prefer-dynamic`, i.e. it will not try
-   to produce a dylib for the aux crate.
-3. The aux crate is made available to the test file via extern prelude with
-   `--extern <aux_crate_name>`. Note that since UI tests default to edition
-   2015, you still need to specify `extern <aux_crate_name>` unless the main
-   test file is using an edition that is 2018 or newer if you want to use the
-   aux crate name in a `use` import.
-4. The `proc_macro` crate is made available as an extern prelude module. Same
-   edition 2015 vs newer edition distinction for `extern proc_macro;` applies.
+1. auxテストファイルは`--crate-type=proc-macro`でビルドされます。
+2. auxテストファイルは`-C prefer-dynamic`なしでビルドされます。つまり、aux crateのdylibを生成しようとしません。
+3. aux crateは`--extern <aux_crate_name>`を介してextern preludeを通じてテストファイルで使用できるようになります。UIテストはデフォルトでエディション2015であるため、auxクレート名を`use`インポートで使用したい場合は、メインテストファイルがエディション2018以降を使用していない限り、`extern <aux_crate_name>`を指定する必要があることに注意してください。
+4. `proc_macro` crateがextern preludeモジュールとして使用可能になります。`extern proc_macro;`についても、エディション2015と新しいエディションの区別が同じように適用されます。
 
-For example, you might have a test `tests/ui/cat/meow.rs` and proc-macro
-auxiliary `tests/ui/cat/auxiliary/whiskers.rs`:
+例えば、テスト`tests/ui/cat/meow.rs`とproc-macro補助`tests/ui/cat/auxiliary/whiskers.rs`がある場合：
 
 ```text
 tests/ui/cat/
-    meow.rs                 # main test file
-    auxiliary/whiskers.rs   # auxiliary
+    meow.rs                 # メインテストファイル
+    auxiliary/whiskers.rs   # 補助
 ```
 
 ```rs
@@ -679,7 +496,7 @@ tests/ui/cat/
 
 //@ proc-macro: whiskers.rs
 
-extern crate whiskers; // needed as ui test defaults to edition 2015
+extern crate whiskers; // uiテストはデフォルトでエディション2015であるため必要
 
 fn main() {
   whiskers::identity!();
@@ -698,30 +515,23 @@ pub fn identity(ts: TokenStream) -> TokenStream {
 }
 ```
 
-> **Note**: The `proc-macro` header currently does not work with the
-> `build-aux-doc` header for rustdoc tests. In that case, you will need to use
-> the `aux-build` header, and use `#![crate_type="proc_macro"]`, and `//@
-> force-host` and `//@ no-prefer-dynamic` headers in the proc-macro.
+> **注**：`proc-macro`ヘッダは現在、rustdocテストの`build-aux-doc`ヘッダと一緒に機能しません。その場合は、`aux-build`ヘッダを使用し、`#![crate_type="proc_macro"]`、および`//@
+> force-host`と`//@ no-prefer-dynamic`ヘッダをproc-macroで使用する必要があります。
 
-## Revisions
+## リビジョン
 
-Revisions allow a single test file to be used for multiple tests. This is done
-by adding a special directive at the top of the file:
+リビジョンを使用すると、1つのテストファイルを複数のテストに使用できます。これは、ファイルの先頭に特別なディレクティブを追加することで行われます：
 
 ```rust,ignore
 //@ revisions: foo bar baz
 ```
 
-This will result in the test being compiled (and tested) three times, once with
-`--cfg foo`, once with `--cfg bar`, and once with `--cfg baz`. You can therefore
-use `#[cfg(foo)]` etc within the test to tweak each of these results.
+これにより、テストが3回コンパイル（およびテスト）されます。1回は`--cfg foo`、1回は`--cfg bar`、1回は`--cfg baz`です。したがって、テスト内で`#[cfg(foo)]`などを使用して、これらの結果をそれぞれ調整できます。
 
-You can also customize directives and expected error messages to a particular
-revision. To do this, add `[revision-name]` after the `//@` for directives, and
-after `//` for UI error annotations, like so:
+ディレクティブと期待されるエラーメッセージを特定のリビジョンにカスタマイズすることもできます。これを行うには、ディレクティブの場合は`//@`の後に、UIエラー注釈の場合は`//`の後に`[revision-name]`を追加します：
 
 ```rust,ignore
-// A flag to pass in only for cfg `foo`:
+// cfg `foo`でのみ渡すフラグ：
 //@[foo]compile-flags: -Z verbose-internals
 
 #[cfg(foo)]
@@ -730,11 +540,9 @@ fn test_foo() {
 }
 ```
 
-Multiple revisions can be specified in a comma-separated list, such as
-`//[foo,bar,baz]~^`.
+複数のリビジョンをカンマ区切りリストで指定できます。例：`//[foo,bar,baz]~^`。
 
-In test suites that use the LLVM [FileCheck] tool, the current revision name is
-also registered as an additional prefix for FileCheck directives:
+LLVM [FileCheck]ツールを使用するテストスイートでは、現在のリビジョン名がFileCheckディレクティブの追加プレフィックスとしても登録されます：
 
 ```rust,ignore
 //@ revisions: NORMAL COVERAGE
@@ -748,69 +556,49 @@ also registered as an additional prefix for FileCheck directives:
 fn main() {}
 ```
 
-Note that not all directives have meaning when customized to a revision. For
-example, the `ignore-test` directives (and all "ignore" directives) currently
-only apply to the test as a whole, not to particular revisions. The only
-directives that are intended to really work when customized to a revision are
-error patterns and compiler flags.
+すべてのディレクティブがリビジョンにカスタマイズされたときに意味を持つわけではないことに注意してください。例えば、`ignore-test`ディレクティブ（およびすべての「ignore」ディレクティブ）は現在、特定のリビジョンではなく、テスト全体にのみ適用されます。リビジョンにカスタマイズされたときに実際に機能することが意図されている唯一のディレクティブは、エラーパターンとコンパイラフラグです。
 
 <!-- date-check jul 2023 -->
-The following test suites support revisions:
+次のテストスイートがリビジョンをサポートしています：
 
 - ui
 - assembly
 - codegen
 - coverage
 - debuginfo
-- rustdoc UI tests
-- incremental (these are special in that they inherently cannot be run in
-  parallel)
+- rustdoc UIテスト
+- incremental（これらは本質的に並列実行できないため特殊です）
 
-### Ignoring unused revision names
+### 未使用のリビジョン名の無視
 
-Normally, revision names mentioned in other directives and error annotations
-must correspond to an actual revision declared in a `revisions` directive. This is
-enforced by an `./x test tidy` check.
+通常、他のディレクティブやエラー注釈で言及されているリビジョン名は、`revisions`ディレクティブで宣言された実際のリビジョンに対応している必要があります。これは`./x test tidy`チェックによって強制されます。
 
-If a revision name needs to be temporarily removed from the revision list for
-some reason, the above check can be suppressed by adding the revision name to an
-`//@ unused-revision-names:` header instead.
+何らかの理由でリビジョン名をリビジョンリストから一時的に削除する必要がある場合、上記のチェックを抑制するには、代わりにリビジョン名を`//@ unused-revision-names:`ヘッダに追加します。
 
-Specifying an unused name of `*` (i.e. `//@ unused-revision-names: *`) will
-permit any unused revision name to be mentioned.
+未使用の名前として`*`を指定する（つまり、`//@ unused-revision-names: *`）と、任意の未使用のリビジョン名を言及できるようになります。
 
-## Compare modes
+## 比較モード
 
-Compiletest can be run in different modes, called _compare modes_, which can be
-used to compare the behavior of all tests with different compiler flags enabled.
-This can help highlight what differences might appear with certain flags, and
-check for any problems that might arise.
+Compiletestは、_比較モード_と呼ばれる異なるモードで実行でき、異なるコンパイラフラグを有効にしてすべてのテストの動作を比較するために使用できます。
+これにより、特定のフラグでどのような違いが現れるかを強調し、発生する可能性のある問題をチェックできます。
 
-To run the tests in a different mode, you need to pass the `--compare-mode` CLI
-flag:
+テストを別のモードで実行するには、`--compare-mode` CLIフラグを渡す必要があります：
 
 ```bash
 ./x test tests/ui --compare-mode=chalk
 ```
 
-The possible compare modes are:
+可能な比較モードは次のとおりです：
 
-- `polonius` — Runs with Polonius with `-Zpolonius`.
-- `chalk` — Runs with Chalk with `-Zchalk`.
-- `split-dwarf` — Runs with unpacked split-DWARF with
-  `-Csplit-debuginfo=unpacked`.
-- `split-dwarf-single` — Runs with packed split-DWARF with
-  `-Csplit-debuginfo=packed`.
+- `polonius` — `-Zpolonius`でPoloniusを実行します。
+- `chalk` — `-Zchalk`でChalkを実行します。
+- `split-dwarf` — `-Csplit-debuginfo=unpacked`で展開されたsplit-DWARFを実行します。
+- `split-dwarf-single` — `-Csplit-debuginfo=packed`でパックされたsplit-DWARFを実行します。
 
-See [UI compare modes](ui.md#compare-modes) for more information about how UI
-tests support different output for different modes.
+UIテストが異なるモードに対して異なる出力をどのようにサポートするかについては、[UI compare modes](ui.md#compare-modes)を参照してください。
 
-In CI, compare modes are only used in one Linux builder, and only with the
-following settings:
+CIでは、比較モードは1つのLinuxビルダーでのみ使用され、次の設定でのみ使用されます：
 
-- `tests/debuginfo`: Uses `split-dwarf` mode. This helps ensure that none of the
-  debuginfo tests are affected when enabling split-DWARF.
+- `tests/debuginfo`：`split-dwarf`モードを使用します。これにより、split-DWARFを有効にしてもデバッグ情報テストが影響を受けないことを確認できます。
 
-Note that compare modes are separate to [revisions](#revisions). All revisions
-are tested when running `./x test tests/ui`, however compare-modes must be
-manually run individually via the `--compare-mode` flag.
+比較モードは[リビジョン](#revisions)とは別であることに注意してください。すべてのリビジョンは`./x test tests/ui`を実行するとテストされますが、比較モードは`--compare-mode`フラグを介して個別に手動で実行する必要があります。

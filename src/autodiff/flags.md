@@ -1,45 +1,45 @@
-# Supported `RUSTFLAGS`
+# サポートされている`RUSTFLAGS`
 
-To support you while debugging or profiling, we have added support for an experimental `-Z autodiff` rustc flag (which can be passed to cargo via `RUSTFLAGS`), which allow changing the behaviour of Enzyme, without recompiling rustc. We currently support the following values for `autodiff`.
+デバッグやプロファイリングをサポートするために、実験的な`-Z autodiff` rustcフラグ（`RUSTFLAGS`経由でcargoに渡すことができます）のサポートを追加しました。これにより、rustcを再コンパイルせずにEnzymeの動作を変更できます。現在、`autodiff`には次の値をサポートしています。
 
-### Debug Flags
+### デバッグフラグ
 
 ```text
-PrintTA // Print TypeAnalysis information
-PrintTAFn // Print TypeAnalysis information for a specific function
-PrintAA // Print ActivityAnalysis information
-Print // Print differentiated functions while they are being generated and optimized
-PrintPerf // Print AD related Performance warnings
-PrintModBefore // Print the whole LLVM-IR module directly before running AD
-PrintModAfter // Print the whole LLVM-IR module after running AD, before optimizations
-PrintModFinal // Print the whole LLVM-IR module after running optimizations and AD
-LooseTypes // Risk incorrect derivatives instead of aborting when missing Type Info 
+PrintTA // TypeAnalysis情報を出力
+PrintTAFn // 特定の関数のTypeAnalysis情報を出力
+PrintAA // ActivityAnalysis情報を出力
+Print // 微分された関数の生成と最適化中に出力
+PrintPerf // AD関連のパフォーマンス警告を出力
+PrintModBefore // AD実行の直前にLLVM-IRモジュール全体を出力
+PrintModAfter // AD実行後、最適化前にLLVM-IRモジュール全体を出力
+PrintModFinal // 最適化とAD実行後にLLVM-IRモジュール全体を出力
+LooseTypes // 型情報が不足している場合、中止する代わりに不正確な導関数のリスクを負う
 ```
 
 <div class="warning">
 
-`LooseTypes` is often helpful to get rid of Enzyme errors stating `Can not deduce type of <X>` and to be able to run some code. But please keep in mind that this flag absolutely has the chance to cause incorrect gradients. Even worse, the gradients might be correct for certain input values, but not for others. So please create issues about such bugs and only use this flag temporarily while you wait for your bug to be fixed.
+`LooseTypes`は、`Can not deduce type of <X>`というEnzymeエラーを解消し、一部のコードを実行できるようにするのに役立つことがよくあります。しかし、このフラグは絶対に不正確な勾配を引き起こす可能性があることに留意してください。さらに悪いことに、勾配は特定の入力値に対しては正しいかもしれませんが、他の値に対しては正しくないかもしれません。そのため、このようなバグに関するissueを作成し、バグが修正されるまでの間だけこのフラグを一時的に使用してください。
 
 </div>
 
-### Benchmark flags
+### ベンチマークフラグ
 
-For performance experiments and benchmarking we also support
+パフォーマンス実験とベンチマークのために、以下もサポートしています：
 
 ```text
-NoPostopt // We won't optimize the LLVM-IR Module after AD
-RuntimeActivity // Enables the runtime activity feature from Enzyme 
-Inline // Instructs Enzyme to maximize inlining as far as possible, beyond LLVM's default
+NoPostopt // AD後にLLVM-IRモジュールを最適化しない
+RuntimeActivity // Enzymeのランタイムアクティビティ機能を有効にする
+Inline // LLVMのデフォルトを超えて、可能な限りインライン化を最大化するようEnzymeに指示
 ```
 
-You can combine multiple `autodiff` values using a comma as separator:
+複数の`autodiff`値をカンマで区切って組み合わせることができます：
 
 ```bash
 RUSTFLAGS="-Z autodiff=Enable,LooseTypes,PrintPerf" cargo +enzyme build
 ```
 
-Using `-Zautodiff=Enable` will allow using autodiff and update your normal rustc compilation pipeline:
+`-Zautodiff=Enable`を使用すると、autodiffを使用でき、通常のrustcコンパイルパイプラインが更新されます：
 
-1. Run your selected compilation pipeline. If you selected a release build, we will disable vectorization and loop unrolling.
-2. Differentiate your functions.
-3. Run your selected compilation pipeline again on the whole module. This time we do not disable vectorization or loop unrolling.
+1. 選択したコンパイルパイプラインを実行します。リリースビルドを選択した場合、ベクトル化とループ展開を無効にします。
+2. 関数を微分します。
+3. モジュール全体で選択したコンパイルパイプラインを再度実行します。今回はベクトル化とループ展開を無効にしません。

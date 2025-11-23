@@ -1,83 +1,75 @@
-# Canonicalization
+# 正規化
 
-Canonicalization is the process of *isolating* a value from its context and is necessary
-for global caching of goals which include inference variables.
+正規化（Canonicalization）は、値をそのコンテキストから*分離する*プロセスであり、推論変数を含むゴールのグローバルキャッシングに必要です。
 
-The idea is that given the goals `u32: Trait<?x>` and `u32: Trait<?y>`, where `?x` and `?y`
-are two different currently unconstrained inference variables, we should get the same result
-for both goals. We can therefore prove *the canonical query* `exists<T> u32: Trait<T>` once
-and reuse the result.
+考え方は、`u32: Trait<?x>`と`u32: Trait<?y>`というゴールが与えられた場合、ここで`?x`と`?y`は
+2つの異なる現在制約されていない推論変数であり、両方のゴールで同じ結果を得るべきです。したがって、*正規ゴール*`exists<T> u32: Trait<T>`を一度証明し、
+結果を再利用できます。
 
-Let's first go over the way canonical queries work and then dive into the specifics of
-how canonicalization works.
+まず、正規クエリの動作方法を説明してから、正規化の仕組みの詳細に入ります。
 
-## A walkthrough of canonical queries
+## 正規クエリのウォークスルー
 
-To make this a bit easier, let's use the trait goal `u32: Trait<?x>` as an example with the
-assumption that the only relevant impl is `impl<T> Trait<Vec<T>> for u32`.
+これを少し簡単にするために、トレイトゴール`u32: Trait<?x>`を例として使用し、関連するimplが`impl<T> Trait<Vec<T>> for u32`のみであるという仮定を置きます。
 
-### Canonicalizing the input
+### 入力の正規化
 
-We start by *canonicalizing* the goal, replacing inference variables with existential and
-placeholders with universal bound variables. This would result in the *canonical goal*
-`exists<T> u32: Trait<T>`.
+推論変数を存在境界変数で、プレースホルダを普遍境界変数で置き換えることによって、ゴールを*正規化*することから始めます。これにより、*正規ゴール*
+`exists<T> u32: Trait<T>`が得られます。
 
-We remember the original values of all bound variables in the original context. Here this would
-map `T` back to `?x`. These original values are used later on when dealing with the query
-response.
+すべての境界変数の元の値を元のコンテキストで記憶します。ここでは、
+`T`を`?x`にマップします。これらの元の値は、後でクエリレスポンスを処理する際に使用されます。
 
-We now call the canonical query with the canonical goal.
+次に、正規ゴールで正規クエリを呼び出します。
 
-### Instantiating the canonical goal inside of the query
+### クエリ内での正規ゴールのインスタンス化
 
-To actually try to prove the canonical goal we start by instantiating the bound variables with
-inference variables and placeholders again.
+正規ゴールを実際に証明しようとするために、境界変数を
+推論変数とプレースホルダで再びインスタンス化することから始めます。
 
-This happens inside of the query in a completely separate `InferCtxt`. Inside of the query we
-now have a goal `u32: Trait<?0>`. We also remember which value we've used to instantiate the bound
-variables in the canonical goal, which maps `T` to `?0`.
+これは、完全に別の`InferCtxt`でクエリ内で行われます。クエリ内では、
+ゴール`u32: Trait<?0>`があります。また、正規ゴールの境界変数をインスタンス化するために使用した値も記憶します。これは`T`を`?0`にマップします。
 
-We now compute the goal `u32: Trait<?0>` and figure out that this holds, but we've constrained
-`?0` to `Vec<?1>`. We finally convert this result to something useful to the caller.
+次にゴール`u32: Trait<?0>`を計算し、これが成り立つことがわかりますが、
+`?0`を`Vec<?1>`に制約しました。最後に、この結果を呼び出し側にとって有用なものに変換します。
 
-### Canonicalizing the query response
+### クエリレスポンスの正規化
 
-We have to return to the caller both whether the goal holds, and the inference constraints
-from inside of the query.
+ゴールが成り立つかどうかと、クエリ内からの推論制約の両方を
+呼び出し側に返す必要があります。
 
-To return the inference results to the caller we canonicalize the mapping from bound variables
-to the instantiated values in the query. This means that the query response is `Certainty::Yes`
-and a mapping from `T` to `exists<U> Vec<U>`.
+推論結果を呼び出し側に返すために、境界変数から
+クエリ内でインスタンス化された値へのマッピングを正規化します。これは、クエリレスポンスが`Certainty::Yes`と
+`T`から`exists<U> Vec<U>`へのマッピングであることを意味します。
 
-### Instantiating the query response
+### クエリレスポンスのインスタンス化
 
-The caller now has to apply the constraints returned by the query. For this they first
-instantiate the bound variables of the canonical response with inference variables and
-placeholders again, so the mapping in the response is now from `T` to `Vec<?z>`.
+呼び出し側は、クエリによって返された制約を適用する必要があります。このために、まず
+正規レスポンスの境界変数を推論変数と
+プレースホルダで再びインスタンス化するため、レスポンス内のマッピングは`T`から`Vec<?z>`になります。
 
-It now equates the original value of `T` (`?x`) with the value for `T` in the
-response (`Vec<?z>`), which correctly constrains `?x` to `Vec<?z>`.
+次に、`T`の元の値（`?x`）とレスポンス内の`T`の値（`Vec<?z>`）を等しくし、
+これにより`?x`を`Vec<?z>`に正しく制約します。
 
 ## `ExternalConstraints`
 
-Computing a trait goal may not only constrain inference variables, it can also add region
-obligations, e.g. given a goal `(): AOutlivesB<'a, 'b>` we would like to return the fact that
-`'a: 'b` has to hold.
+トレイトゴールを計算すると、推論変数を制約するだけでなく、領域
+義務も追加される可能性があります。たとえば、ゴール`(): AOutlivesB<'a, 'b>`が与えられた場合、
+`'a: 'b`が成り立つ必要があるという事実を返したいと思います。
 
-This is done by not only returning the mapping from bound variables to the instantiated values
-from the query but also extracting additional `ExternalConstraints` from the `InferCtxt` context
-while building the response.
+これは、クエリから境界変数からインスタンス化された値へのマッピングを返すだけでなく、
+レスポンスを構築する際に`InferCtxt`コンテキストから追加の`ExternalConstraints`を抽出することによって行われます。
 
-## How exactly does canonicalization work
+## 正規化は正確にどのように機能するか
 
-TODO: link to code once the PR lands and elaborate
+TODO: PRがランディングしたらコードにリンクし、詳しく説明する
 
-- types and consts: infer to existentially bound var, placeholder to universally bound var,
-    considering universes
-- generic parameters in the input get treated as placeholders in the root universe
-- all regions in the input get all mapped to existentially bound vars and we "uniquify" them.
-    `&'a (): Trait<'a>` gets canonicalized to `exists<'0, '1> &'0 (): Trait<'1>`. We do not care
-    about their universes and simply put all regions into the highest universe of the input.
-- in the output everything in a universe of the caller gets put into the root universe and only
-    gets its correct universe when we unify the var values with the orig values of the caller
-- we do not uniquify regions in the response and don't canonicalize `'static`
+- 型と定数：推論を存在境界変数に、プレースホルダを普遍境界変数に、
+    ユニバースを考慮して
+- 入力のジェネリックパラメータはルートユニバースのプレースホルダとして扱われます
+- 入力のすべての領域はすべて存在境界変数にマッピングされ、「一意化」します。
+    `&'a (): Trait<'a>`は`exists<'0, '1> &'0 (): Trait<'1>`に正規化されます。
+    それらのユニバースは気にせず、すべての領域を入力の最高のユニバースに入れます。
+- 出力では、呼び出し側のユニバースにあるものはすべてルートユニバースに入れられ、
+    呼び出し側の元の値と変数値を統一するときにのみ正しいユニバースを取得します
+- レスポンスでは領域を一意化せず、`'static`を正規化しません

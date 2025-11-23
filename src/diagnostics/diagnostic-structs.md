@@ -1,23 +1,21 @@
-# Diagnostic and subdiagnostic structs
-rustc has three diagnostic traits that can be used to create diagnostics:
-`Diagnostic`, `LintDiagnostic`, and `Subdiagnostic`.
+# 診断およびサブ診断構造体
+rustcには、診断を作成するために使用できる3つの診断トレイトがあります：
+`Diagnostic`、`LintDiagnostic`、および`Subdiagnostic`。
 
-For simple diagnostics,
-derived impls can be used, e.g. `#[derive(Diagnostic)]`. They are only suitable for simple diagnostics that
-don't require much logic in deciding whether or not to add additional
-subdiagnostics.
+シンプルな診断の場合、派生実装を使用できます。例えば、`#[derive(Diagnostic)]`。
+これらは、追加のサブ診断を追加するかどうかを決定するために多くのロジックを必要としない
+シンプルな診断にのみ適しています。
 
-In cases where diagnostics require more complex or dynamic behavior, such as conditionally adding subdiagnostics,
-customizing the rendering logic, or selecting messages at runtime, you will need to manually implement
-the corresponding trait (`Diagnostic`, `LintDiagnostic`, or `Subdiagnostic`).
-This approach provides greater flexibility and is recommended for diagnostics that go beyond simple, static structures.
+診断がより複雑または動的な動作を必要とする場合、例えば条件付きでサブ診断を追加する、
+レンダリングロジックをカスタマイズする、または実行時にメッセージを選択する場合、
+対応するトレイト（`Diagnostic`、`LintDiagnostic`、または`Subdiagnostic`）を手動で実装する必要があります。
+このアプローチは、より大きな柔軟性を提供し、シンプルで静的な構造を超える診断に推奨されます。
 
-Diagnostic can be translated into different languages and each has a slug that uniquely identifies the diagnostic.
+診断は異なる言語に翻訳でき、各診断には診断を一意に識別するスラッグがあります。
 
-## `#[derive(Diagnostic)]` and `#[derive(LintDiagnostic)]`
+## `#[derive(Diagnostic)]`および`#[derive(LintDiagnostic)]`
 
-Consider the [definition][defn] of the "field already declared" diagnostic
-shown below:
+以下に示す「フィールド already declared」診断の[定義][defn]を考えてみましょう：
 
 ```rust,ignore
 #[derive(Diagnostic)]
@@ -32,25 +30,24 @@ pub struct FieldAlreadyDeclared {
 }
 ```
 
-`Diagnostic` can only be derived on structs and enums. 
-Attributes that are placed on the type for structs are placed on each 
-variants for enums (or vice versa). Each `Diagnostic` has to have one
-attribute, `#[diag(...)]`, applied to the struct or each enum variant.
+`Diagnostic`は構造体と列挙型にのみ派生できます。
+構造体に配置される属性は、列挙型の各バリアントに配置されます
+（またはその逆）。各`Diagnostic`には、
+構造体または各列挙型バリアントに適用される`#[diag(...)]`属性が1つ必要です。
 
-If an error has an error code (e.g. "E0624"), then that can be specified using
-the `code` sub-attribute. Specifying a `code` isn't mandatory, but if you are
-porting a diagnostic that uses `Diag` to use `Diagnostic`
-then you should keep the code if there was one.
+エラーにエラーコード（例：「E0624」）がある場合、それは`code`サブ属性を使用して
+指定できます。`code`の指定は必須ではありませんが、
+`Diag`を使用する診断を`Diagnostic`を使用するように移植する場合、
+コードがあった場合は保持する必要があります。
 
-`#[diag(..)]` must provide a slug as the first positional argument (a path to an
-item in `rustc_errors::fluent::*`). A slug uniquely identifies the diagnostic
-and is also how the compiler knows what error message to emit (in the default
-locale of the compiler, or in the locale requested by the user). See
-[translation documentation](./translation.md) to learn more about how
-translatable error messages are written and how slug items are generated.
+`#[diag(..)]`は、最初の位置引数としてスラッグ（`rustc_errors::fluent::*`内のアイテムへのパス）を
+提供する必要があります。スラッグは診断を一意に識別し、
+コンパイラがどのエラーメッセージを出力するかを知る方法でもあります（コンパイラのデフォルトロケール、
+またはユーザーが要求したロケールで）。翻訳可能なエラーメッセージの書き方とスラッグアイテムの
+生成方法の詳細については、[translation documentation](./translation.md)を参照してください。
 
-In our example, the Fluent message for the "field already declared" diagnostic
-looks like this:
+この例では、「フィールド already declared」診断のFluentメッセージは
+次のようになります：
 
 ```fluent
 hir_analysis_field_already_declared =
@@ -59,62 +56,56 @@ hir_analysis_field_already_declared =
     .previous_decl_label = `{$field_name}` first declared here
 ```
 
-`hir_analysis_field_already_declared` is the slug from our example and is followed
-by the diagnostic message.
+`hir_analysis_field_already_declared`は例のスラッグであり、
+診断メッセージが続きます。
 
-Every field of the `Diagnostic` which does not have an annotation is
-available in Fluent messages as a variable, like `field_name` in the example
-above. Fields can be annotated `#[skip_arg]` if this is undesired.
+アノテーションのない`Diagnostic`のすべてのフィールドは、
+Fluentメッセージで変数として利用できます。例えば、上記の例の`field_name`のように。
+これが望ましくない場合、フィールドに`#[skip_arg]`のアノテーションを付けることができます。
 
-Using the `#[primary_span]` attribute on a field (that has type `Span`)
-indicates the primary span of the diagnostic which will have the main message
-of the diagnostic.
+フィールドに`#[primary_span]`属性を使用すると（型が`Span`の場合）、
+診断のプライマリスパンを示し、診断のメインメッセージが表示されます。
 
-Diagnostics are more than just their primary message, they often include
-labels, notes, help messages and suggestions, all of which can also be
-specified on a `Diagnostic`.
+診断は、プライマリメッセージだけでなく、多くの場合、
+ラベル、ノート、ヘルプメッセージ、提案を含みます。これらはすべて
+`Diagnostic`で指定できます。
 
-`#[label]`, `#[help]`, `#[warning]` and `#[note]` can all be applied to fields which have the
-type `Span`. Applying any of these attributes will create the corresponding
-subdiagnostic with that `Span`. These attributes will look for their
-diagnostic message in a Fluent attribute attached to the primary Fluent
-message. In our example, `#[label]` will look for
-`hir_analysis_field_already_declared.label` (which has the message "field already
-declared"). If there is more than one subdiagnostic of the same type, then
-these attributes can also take a value that is the attribute name to look for
-(e.g. `previous_decl_label` in our example).
+`#[label]`、`#[help]`、`#[warning]`、`#[note]`はすべて、型が`Span`のフィールドに適用できます。
+これらの属性のいずれかを適用すると、その`Span`で対応する
+サブ診断が作成されます。これらの属性は、プライマリFluentメッセージに添付された
+Fluent属性で診断メッセージを探します。この例では、`#[label]`は
+`hir_analysis_field_already_declared.label`を探します（メッセージは「field already declared」です）。
+同じタイプのサブ診断が複数ある場合、これらの属性は、
+探す属性名である値を取ることもできます（例えば、この例の`previous_decl_label`）。
 
-Other types have special behavior when used in a `Diagnostic` derive:
+他の型は、`Diagnostic`派生で使用されるときに特別な動作を持ちます：
 
-- Any attribute applied to an `Option<T>` will only emit a
-  subdiagnostic if the option is `Some(..)`.
-- Any attribute applied to a `Vec<T>` will be repeated for each element of the
-  vector.
+- `Option<T>`に適用された属性は、オプションが`Some(..)`の場合にのみ
+  サブ診断を出力します。
+- `Vec<T>`に適用された属性は、ベクトルの各要素に対して繰り返されます。
 
-`#[help]`, `#[warning]` and `#[note]` can also be applied to the struct itself, in which case
-they work exactly like when applied to fields except the subdiagnostic won't
-have a `Span`. These attributes can also be applied to fields of type `()` for
-the same effect, which when combined with the `Option` type can be used to
-represent optional `#[note]`/`#[help]`/`#[warning]` subdiagnostics.
+`#[help]`、`#[warning]`、`#[note]`は構造体自体にも適用でき、
+その場合、フィールドに適用されたときと同じように機能しますが、
+サブ診断には`Span`がありません。これらの属性は、`()`型のフィールドにも適用でき、
+同じ効果があります。`Option`型と組み合わせると、
+オプションの`#[note]`/`#[help]`/`#[warning]`サブ診断を表すために使用できます。
 
-Suggestions can be emitted using one of four field attributes:
+提案は、次の4つのフィールド属性のいずれかを使用して出力できます：
 
 - `#[suggestion(slug, code = "...", applicability = "...")]`
 - `#[suggestion_hidden(slug, code = "...", applicability = "...")]`
 - `#[suggestion_short(slug, code = "...", applicability = "...")]`
 - `#[suggestion_verbose(slug, code = "...", applicability = "...")]`
 
-Suggestions must be applied on either a `Span` field or a `(Span,
-MachineApplicability)` field. Similarly to other field attributes, the slug
-specifies the Fluent attribute with the message and defaults to the equivalent
-of `.suggestion`. `code` specifies the code that should be suggested as a
-replacement and is a format string (e.g. `{field_name}` would be replaced by
-the value of the `field_name` field of the struct), not a Fluent identifier.
-`applicability` can be used to specify the applicability in the attribute, it
-cannot be used when the field's type contains an `Applicability`.
+提案は、`Span`フィールドまたは`(Span, MachineApplicability)`フィールドに
+適用する必要があります。他のフィールド属性と同様に、slugは
+メッセージを含むFluent属性を指定し、デフォルトで`.suggestion`に相当します。
+`code`は、置換として提案されるべきコードを指定し、
+フォーマット文字列です（例：`{field_name}`は構造体の`field_name`フィールドの値に置き換えられます）。
+Fluent識別子ではありません。`applicability`は、属性で適用可能性を指定するために使用できます。
+フィールドの型に`Applicability`が含まれている場合は使用できません。
 
-In the end, the `Diagnostic` derive will generate an implementation of
-`Diagnostic` that looks like the following:
+最終的に、`Diagnostic`派生は、次のような`Diagnostic`の実装を生成します：
 
 ```rust,ignore
 impl<'a, G: EmissionGuarantee> Diagnostic<'a> for FieldAlreadyDeclared {
@@ -134,9 +125,9 @@ impl<'a, G: EmissionGuarantee> Diagnostic<'a> for FieldAlreadyDeclared {
 }
 ```
 
-Now that we've defined our diagnostic, how do we [use it][use]? It's quite
-straightforward, just create an instance of the struct and pass it to
-`emit_err` (or `emit_warning`):
+診断を定義したので、それを[使用する][use]方法は？非常に
+簡単です。構造体のインスタンスを作成して、
+`emit_err`（または`emit_warning`）に渡すだけです：
 
 ```rust,ignore
 tcx.dcx().emit_err(FieldAlreadyDeclared {
@@ -146,91 +137,84 @@ tcx.dcx().emit_err(FieldAlreadyDeclared {
 });
 ```
 
-### Reference for `#[derive(Diagnostic)]` and `#[derive(LintDiagnostic)]`
-`#[derive(Diagnostic)]` and `#[derive(LintDiagnostic)]` support the
-following attributes:
+### `#[derive(Diagnostic)]`および`#[derive(LintDiagnostic)]`のリファレンス
+`#[derive(Diagnostic)]`および`#[derive(LintDiagnostic)]`は
+次の属性をサポートします：
 
 - `#[diag(slug, code = "...")]`
-  - _Applied to struct or enum variant._
-  - _Mandatory_
-  - Defines the text and error code to be associated with the diagnostic.
-  - Slug (_Mandatory_)
-    - Uniquely identifies the diagnostic and corresponds to its Fluent message,
-      mandatory.
-    - A path to an item in `rustc_errors::fluent`, e.g.
+  - _構造体または列挙型バリアントに適用されます。_
+  - _必須_
+  - 診断に関連付けるテキストとエラーコードを定義します。
+  - Slug（_必須_）
+    - 診断を一意に識別し、そのFluentメッセージに対応します。
+      必須。
+    - `rustc_errors::fluent`内のアイテムへのパス。例えば、
       `rustc_errors::fluent::hir_analysis_field_already_declared`
-      (`rustc_errors::fluent` is implicit in the attribute, so just
-      `hir_analysis_field_already_declared`).
-    - See [translation documentation](./translation.md).
-  - `code = "..."` (_Optional_)
-    - Specifies the error code.
-- `#[note]` or `#[note(slug)]` (_Optional_)
-  - _Applied to struct or struct fields of type `Span`, `Option<()>` or `()`._
-  - Adds a note subdiagnostic.
-  - Value is a path to an item in `rustc_errors::fluent` for the note's
-    message.
-    - Defaults to equivalent of `.note`.
-  - If applied to a `Span` field, creates a spanned note.
-- `#[help]` or `#[help(slug)]` (_Optional_)
-  - _Applied to struct or struct fields of type `Span`, `Option<()>` or `()`._
-  - Adds a help subdiagnostic.
-  - Value is a path to an item in `rustc_errors::fluent` for the note's
-    message.
-    - Defaults to equivalent of `.help`.
-  - If applied to a `Span` field, creates a spanned help.
-- `#[label]` or `#[label(slug)]` (_Optional_)
-  - _Applied to `Span` fields._
-  - Adds a label subdiagnostic.
-  - Value is a path to an item in `rustc_errors::fluent` for the note's
-    message.
-    - Defaults to equivalent of `.label`.
-- `#[warning]` or `#[warning(slug)]` (_Optional_)
-  - _Applied to struct or struct fields of type `Span`, `Option<()>` or `()`._
-  - Adds a warning subdiagnostic.
-  - Value is a path to an item in `rustc_errors::fluent` for the note's
-    message.
-    - Defaults to equivalent of `.warn`.
+      （属性では`rustc_errors::fluent`は暗黙的なので、
+      `hir_analysis_field_already_declared`だけで十分です）。
+    - [translation documentation](./translation.md)を参照してください。
+  - `code = "..."`（_オプション_）
+    - エラーコードを指定します。
+- `#[note]`または`#[note(slug)]`（_オプション_）
+  - _構造体または`Span`、`Option<()>`、`()`型の構造体フィールドに適用されます。_
+  - ノートサブ診断を追加します。
+  - 値は、ノートのメッセージのための`rustc_errors::fluent`内のアイテムへのパスです。
+    - デフォルトで`.note`に相当します。
+  - `Span`フィールドに適用される場合、スパン付きノートを作成します。
+- `#[help]`または`#[help(slug)]`（_オプション_）
+  - _構造体または`Span`、`Option<()>`、`()`型の構造体フィールドに適用されます。_
+  - ヘルプサブ診断を追加します。
+  - 値は、ノートのメッセージのための`rustc_errors::fluent`内のアイテムへのパスです。
+    - デフォルトで`.help`に相当します。
+  - `Span`フィールドに適用される場合、スパン付きヘルプを作成します。
+- `#[label]`または`#[label(slug)]`（_オプション_）
+  - _`Span`フィールドに適用されます。_
+  - ラベルサブ診断を追加します。
+  - 値は、ノートのメッセージのための`rustc_errors::fluent`内のアイテムへのパスです。
+    - デフォルトで`.label`に相当します。
+- `#[warning]`または`#[warning(slug)]`（_オプション_）
+  - _構造体または`Span`、`Option<()>`、`()`型の構造体フィールドに適用されます。_
+  - 警告サブ診断を追加します。
+  - 値は、ノートのメッセージのための`rustc_errors::fluent`内のアイテムへのパスです。
+    - デフォルトで`.warn`に相当します。
 - `#[suggestion{,_hidden,_short,_verbose}(slug, code = "...", applicability = "...")]`
-  (_Optional_)
-  - _Applied to `(Span, MachineApplicability)` or `Span` fields._
-  - Adds a suggestion subdiagnostic.
-  - Slug (_Mandatory_)
-    - A path to an item in `rustc_errors::fluent`, e.g.
+  （_オプション_）
+  - _`(Span, MachineApplicability)`または`Span`フィールドに適用されます。_
+  - 提案サブ診断を追加します。
+  - Slug（_必須_）
+    - `rustc_errors::fluent`内のアイテムへのパス。例えば、
       `rustc_errors::fluent::hir_analysis_field_already_declared`
-      (`rustc_errors::fluent` is implicit in the attribute, so just
-      `hir_analysis_field_already_declared`). Fluent attributes for all messages
-      exist as top-level items in that module (so `hir_analysis_message.attr` is just
-      `attr`).
-    - See [translation documentation](./translation.md).
-    - Defaults to `rustc_errors::fluent::_subdiag::suggestion` (or
-    - `.suggestion` in Fluent).
-  - `code = "..."`/`code("...", ...)` (_Mandatory_)
-    - One or multiple format strings indicating the code to be suggested as a
-      replacement. Multiple values signify multiple possible replacements.
-  - `applicability = "..."` (_Optional_)
-    - String which must be one of `machine-applicable`, `maybe-incorrect`,
-      `has-placeholders` or `unspecified`.
+      （属性では`rustc_errors::fluent`は暗黙的なので、
+      `hir_analysis_field_already_declared`だけで十分です）。すべてのメッセージの
+      Fluent属性は、そのモジュールのトップレベルアイテムとして存在します（したがって、
+      `hir_analysis_message.attr`は単に`attr`です）。
+    - [translation documentation](./translation.md)を参照してください。
+    - デフォルトで`rustc_errors::fluent::_subdiag::suggestion`（または
+    - Fluentでは`.suggestion`）。
+  - `code = "..."`/`code("...", ...)`（_必須_）
+    - 置換として提案されるコードを示す1つまたは複数のフォーマット文字列。
+      複数の値は、複数の可能な置換を意味します。
+  - `applicability = "..."`（_オプション_）
+    - `machine-applicable`、`maybe-incorrect`、
+      `has-placeholders`、または`unspecified`のいずれかである必要がある文字列。
 - `#[subdiagnostic]`
-  - _Applied to a type that implements `Subdiagnostic` (from
-    `#[derive(Subdiagnostic)]`)._
-  - Adds the subdiagnostic represented by the subdiagnostic struct.
-- `#[primary_span]` (_Optional_)
-  - _Applied to `Span` fields on `Subdiagnostic`s. Not used for `LintDiagnostic`s._
-  - Indicates the primary span of the diagnostic.
-- `#[skip_arg]` (_Optional_)
-  - _Applied to any field._
-  - Prevents the field from being provided as a diagnostic argument.
+  - _`Subdiagnostic`を実装する型に適用されます（`#[derive(Subdiagnostic)]`から）。_
+  - サブ診断構造体によって表されるサブ診断を追加します。
+- `#[primary_span]`（_オプション_）
+  - _`Subdiagnostic`の`Span`フィールドに適用されます。`LintDiagnostic`には使用されません。_
+  - 診断のプライマリスパンを示します。
+- `#[skip_arg]`（_オプション_）
+  - _任意のフィールドに適用されます。_
+  - フィールドが診断引数として提供されるのを防ぎます。
 
 ## `#[derive(Subdiagnostic)]`
-It is common in the compiler to write a function that conditionally adds a
-specific subdiagnostic to an error if it is applicable. Oftentimes these
-subdiagnostics could be represented using a diagnostic struct even if the
-overall diagnostic could not. In this circumstance, the `Subdiagnostic`
-derive can be used to represent a partial diagnostic (e.g a note, label, help or
-suggestion) as a struct.
+コンパイラでは、適用可能な場合に特定のサブ診断をエラーに条件付きで追加する
+関数を書くことが一般的です。多くの場合、これらのサブ診断は、
+全体的な診断ができなくても、診断構造体を使用して表すことができます。
+この状況では、`Subdiagnostic`派生を使用して、部分的な診断（例：ノート、ラベル、ヘルプ、
+または提案）を構造体として表すことができます。
 
-Consider the [definition][subdiag_defn] of the "expected return type" label
-shown below:
+以下に示す「expected return type」ラベルの[定義][subdiag_defn]を考えてみましょう：
 
 ```rust
 #[derive(Subdiagnostic)]
@@ -249,26 +233,25 @@ pub enum ExpectedReturnTypeLabel<'tcx> {
 }
 ```
 
-Like `Diagnostic`, `Subdiagnostic` can be derived for structs or
-enums. Attributes that are placed on the type for structs are placed on each
-variants for enums (or vice versa). Each `Subdiagnostic` should have one
-attribute applied to the struct or each variant, one of:
+`Diagnostic`と同様に、`Subdiagnostic`は構造体または列挙型に派生できます。
+構造体に配置される属性は、列挙型の各バリアントに配置されます
+（またはその逆）。各`Subdiagnostic`には、
+構造体または各バリアントに適用される次のいずれかの属性が必要です：
 
-- `#[label(..)]` for defining a label
-- `#[note(..)]` for defining a note
-- `#[help(..)]` for defining a help
-- `#[warning(..)]` for defining a warning
-- `#[suggestion{,_hidden,_short,_verbose}(..)]` for defining a suggestion
+- `#[label(..)]`ラベルを定義するため
+- `#[note(..)]`ノートを定義するため
+- `#[help(..)]`ヘルプを定義するため
+- `#[warning(..)]`警告を定義するため
+- `#[suggestion{,_hidden,_short,_verbose}(..)]`提案を定義するため
 
-All of the above must provide a slug as the first positional argument (a path
-to an item in `rustc_errors::fluent::*`). A slug uniquely identifies the
-diagnostic and is also how the compiler knows what error message to emit (in
-the default locale of the compiler, or in the locale requested by the user).
-See [translation documentation](./translation.md) to learn more about how
-translatable error messages are written and how slug items are generated.
+上記のすべては、最初の位置引数としてスラッグ（`rustc_errors::fluent::*`内のアイテムへのパス）を
+提供する必要があります。スラッグは診断を一意に識別し、
+コンパイラがどのエラーメッセージを出力するかを知る方法でもあります（コンパイラのデフォルトロケール、
+またはユーザーが要求したロケールで）。翻訳可能なエラーメッセージの書き方とスラッグアイテムの
+生成方法の詳細については、[translation documentation](./translation.md)を参照してください。
 
-In our example, the Fluent message for the "expected return type" label
-looks like this:
+この例では、「expected return type」ラベルのFluentメッセージは
+次のようになります：
 
 ```fluent
 hir_analysis_expected_default_return_type = expected `()` because of default return type
@@ -276,41 +259,40 @@ hir_analysis_expected_default_return_type = expected `()` because of default ret
 hir_analysis_expected_return_type = expected `{$expected}` because of return type
 ```
 
-Using the `#[primary_span]` attribute on a field (with type `Span`) will denote
-the primary span of the subdiagnostic. A primary span is only necessary for a
-label or suggestion, which can not be spanless.
+フィールドに`#[primary_span]`属性を使用すると（型が`Span`の場合）、
+サブ診断のプライマリスパンを示します。プライマリスパンは、
+ラベルまたは提案に必要であり、スパンレスにはできません。
 
-Every field of the type/variant which does not have an annotation is available
-in Fluent messages as a variable. Fields can be annotated `#[skip_arg]` if this
-is undesired.
+アノテーションのない型/バリアントのすべてのフィールドは、
+Fluentメッセージで変数として利用できます。これが望ましくない場合、
+フィールドに`#[skip_arg]`のアノテーションを付けることができます。
 
-Like `Diagnostic`, `Subdiagnostic` supports `Option<T>` and
-`Vec<T>` fields.
+`Diagnostic`と同様に、`Subdiagnostic`は`Option<T>`および
+`Vec<T>`フィールドをサポートします。
 
-Suggestions can be emitted using one of four attributes on the type/variant:
+提案は、型/バリアントで次の4つの属性のいずれかを使用して出力できます：
 
 - `#[suggestion(..., code = "...", applicability = "...")]`
 - `#[suggestion_hidden(..., code = "...", applicability = "...")]`
 - `#[suggestion_short(..., code = "...", applicability = "...")]`
 - `#[suggestion_verbose(..., code = "...", applicability = "...")]`
 
-Suggestions require `#[primary_span]` be set on a field and can have the
-following sub-attributes:
+提案には、フィールドに`#[primary_span]`を設定する必要があり、
+次のサブ属性を持つことができます：
 
-- The first positional argument specifies the path to a item in
-  `rustc_errors::fluent` corresponding to the Fluent attribute with the message
-  and defaults to the equivalent of `.suggestion`.
-- `code` specifies the code that should be suggested as a replacement and is a
-  format string (e.g. `{field_name}` would be replaced by the value of the
-  `field_name` field of the struct), not a Fluent identifier.
-- `applicability` can be used to specify the applicability in the attribute, it
-  cannot be used when the field's type contains an `Applicability`.
+- 最初の位置引数は、メッセージを含むFluent属性に対応する
+  `rustc_errors::fluent`内のアイテムへのパスを指定し、
+  デフォルトで`.suggestion`に相当します。
+- `code`は、置換として提案されるべきコードを指定し、
+  フォーマット文字列です（例：`{field_name}`は構造体の`field_name`フィールドの値に置き換えられます）。
+  Fluent識別子ではありません。
+- `applicability`は、属性で適用可能性を指定するために使用できます。
+  フィールドの型に`Applicability`が含まれている場合は使用できません。
 
-Applicabilities can also be specified as a field (of type `Applicability`)
-using the `#[applicability]` attribute.
+適用可能性は、`#[applicability]`属性を使用して
+（`Applicability`型の）フィールドとして指定することもできます。
 
-In the end, the `Subdiagnostic` derive will generate an implementation
-of `Subdiagnostic` that looks like the following:
+最終的に、`Subdiagnostic`派生は、次のような`Subdiagnostic`の実装を生成します：
 
 ```rust
 impl<'tcx> Subdiagnostic for ExpectedReturnTypeLabel<'tcx> {
@@ -329,100 +311,97 @@ impl<'tcx> Subdiagnostic for ExpectedReturnTypeLabel<'tcx> {
 }
 ```
 
-Once defined, a subdiagnostic can be used by passing it to the `subdiagnostic`
-function ([example][subdiag_use_1] and [example][subdiag_use_2]) on a
-diagnostic or by assigning it to a `#[subdiagnostic]`-annotated field of a
-diagnostic struct.
+定義されると、サブ診断は、診断の`subdiagnostic`関数に渡すか
+（[例][subdiag_use_1]と[例][subdiag_use_2]）、
+診断構造体の`#[subdiagnostic]`アノテーション付きフィールドに割り当てることで使用できます。
 
-### Argument sharing and isolation
+### 引数の共有と分離
 
-Subdiagnostics add their own arguments (i.e., certain fields in their structure) to the `Diag` structure before rendering the information.
-`Diag` structure also stores the arguments from the main diagnostic, so the subdiagnostic can also use the arguments from the main diagnostic.
+サブ診断は、情報をレンダリングする前に、独自の引数（つまり、構造体内の特定のフィールド）を`Diag`構造体に追加します。
+`Diag`構造体はメイン診断からの引数も保存するため、サブ診断はメイン診断からの引数も使用できます。
 
-However, when a subdiagnostic is added to a main diagnostic by implementing `#[derive(Subdiagnostic)]`,
-the following rules, introduced in [rust-lang/rust#142724](https://github.com/rust-lang/rust/pull/142724)
-apply to the handling of arguments (i.e., variables used in Fluent messages):
+ただし、`#[derive(Subdiagnostic)]`を実装してサブ診断をメイン診断に追加する場合、
+[rust-lang/rust#142724](https://github.com/rust-lang/rust/pull/142724)で導入された次のルールが
+引数（つまり、Fluentメッセージで使用される変数）の処理に適用されます：
 
-**Argument isolation between sub diagnostics**:
-Arguments set by a subdiagnostic are only available during the rendering of that subdiagnostic.
-After the subdiagnostic is rendered, all arguments it introduced are restored from the main diagnostic.
-This ensures that multiple subdiagnostics do not pollute each other's argument scope.
-For example, when using a `Vec<Subdiag>`, it iteratively adds the same argument over and over again.
+**サブ診断間の引数の分離**：
+サブ診断によって設定された引数は、そのサブ診断のレンダリング中にのみ利用可能です。
+サブ診断がレンダリングされた後、導入されたすべての引数はメイン診断から復元されます。
+これにより、複数のサブ診断が互いの引数スコープを汚染しないことが保証されます。
+例えば、`Vec<Subdiag>`を使用する場合、同じ引数を繰り返し追加します。
 
-**Same argument override between sub and main diagnostics**:
-If a subdiagnostic sets a argument with the same name as a arguments already in the main diagnostic,
-it will report an error at runtime unless both have exactly the same value.
-It has two benefits:
-- preserves the flexibility that arguments in the main diagnostic are allowed to appear in the attributes of the subdiagnostic.
-For example, There is an attribute `#[suggestion(code = "{new_vis}")]` in the subdiagnostic, but `new_vis` is the field in the main diagnostic struct.
-- prevents accidental overwriting or deletion of arguments required by the main diagnostic or other subdiagnostics.
+**サブとメイン診断間の同じ引数のオーバーライド**：
+サブ診断がメイン診断に既に存在する引数と同じ名前の引数を設定する場合、
+両方がまったく同じ値でない限り、実行時にエラーを報告します。
+これには2つの利点があります：
+- メイン診断の引数がサブ診断の属性に表示される柔軟性を保持します。
+例えば、サブ診断に`#[suggestion(code = "{new_vis}")]`属性がありますが、`new_vis`はメイン診断構造体のフィールドです。
+- メイン診断または他のサブ診断に必要な引数の誤った上書きまたは削除を防ぎます。
 
-These rules guarantee that arguments injected by subdiagnostics are strictly scoped to their own rendering.
-The main diagnostic's arguments remain unaffected by subdiagnostic logic, even in the presence of name collisions.
-Additionally, subdiagnostics can access arguments from the main diagnostic with the same name when needed.
+これらのルールは、サブ診断によって注入された引数が、名前の衝突が存在する場合でも、独自のレンダリングに厳密にスコープされることを保証します。
+メイン診断の引数は、サブ診断ロジックの影響を受けません。
+さらに、サブ診断は、必要に応じて同じ名前のメイン診断からの引数にアクセスできます。
 
-### Reference for `#[derive(Subdiagnostic)]`
-`#[derive(Subdiagnostic)]` supports the following attributes:
+### `#[derive(Subdiagnostic)]`のリファレンス
+`#[derive(Subdiagnostic)]`は次の属性をサポートします：
 
-- `#[label(slug)]`, `#[help(slug)]`, `#[warning(slug)]` or `#[note(slug)]`
-  - _Applied to struct or enum variant. Mutually exclusive with struct/enum variant attributes._
-  - _Mandatory_
-  - Defines the type to be representing a label, help or note.
-  - Slug (_Mandatory_)
-    - Uniquely identifies the diagnostic and corresponds to its Fluent message,
-      mandatory.
-    - A path to an item in `rustc_errors::fluent`, e.g.
+- `#[label(slug)]`、`#[help(slug)]`、`#[warning(slug)]`、または`#[note(slug)]`
+  - _構造体または列挙型バリアントに適用されます。構造体/列挙型バリアント属性と相互排他的です。_
+  - _必須_
+  - 型をラベル、ヘルプ、またはノートを表すものとして定義します。
+  - Slug（_必須_）
+    - 診断を一意に識別し、そのFluentメッセージに対応します。
+      必須。
+    - `rustc_errors::fluent`内のアイテムへのパス。例えば、
       `rustc_errors::fluent::hir_analysis_field_already_declared`
-      (`rustc_errors::fluent` is implicit in the attribute, so just
-      `hir_analysis_field_already_declared`).
-    - See [translation documentation](./translation.md).
+      （属性では`rustc_errors::fluent`は暗黙的なので、
+      `hir_analysis_field_already_declared`だけで十分です）。
+    - [translation documentation](./translation.md)を参照してください。
 - `#[suggestion{,_hidden,_short,_verbose}(slug, code = "...", applicability = "...")]`
-  - _Applied to struct or enum variant. Mutually exclusive with struct/enum variant attributes._
-  - _Mandatory_
-  - Defines the type to be representing a suggestion.
-  - Slug (_Mandatory_)
-    - A path to an item in `rustc_errors::fluent`, e.g.
+  - _構造体または列挙型バリアントに適用されます。構造体/列挙型バリアント属性と相互排他的です。_
+  - _必須_
+  - 型を提案を表すものとして定義します。
+  - Slug（_必須_）
+    - `rustc_errors::fluent`内のアイテムへのパス。例えば、
       `rustc_errors::fluent::hir_analysis_field_already_declared`
-      (`rustc_errors::fluent` is implicit in the attribute, so just
-      `hir_analysis::field_already_declared`). Fluent attributes for all messages
-      exist as top-level items in that module (so `hir_analysis_message.attr` is just
-      `hir_analysis::attr`).
-    - See [translation documentation](./translation.md).
-    - Defaults to `rustc_errors::fluent::_subdiag::suggestion` (or
-    - `.suggestion` in Fluent).
-  - `code = "..."`/`code("...", ...)` (_Mandatory_)
-    - One or multiple format strings indicating the code to be suggested as a
-      replacement. Multiple values signify multiple possible replacements.
-  - `applicability = "..."` (_Optional_)
-    - _Mutually exclusive with `#[applicability]` on a field._
-    - Value is the applicability of the suggestion.
-    - String which must be one of:
+      （属性では`rustc_errors::fluent`は暗黙的なので、
+      `hir_analysis::field_already_declared`だけで十分です）。すべてのメッセージの
+      Fluent属性は、そのモジュールのトップレベルアイテムとして存在します（したがって、
+      `hir_analysis_message.attr`は単に`hir_analysis::attr`です）。
+    - [translation documentation](./translation.md)を参照してください。
+    - デフォルトで`rustc_errors::fluent::_subdiag::suggestion`（または
+    - Fluentでは`.suggestion`）。
+  - `code = "..."`/`code("...", ...)`（_必須_）
+    - 置換として提案されるコードを示す1つまたは複数のフォーマット文字列。
+      複数の値は、複数の可能な置換を意味します。
+  - `applicability = "..."`（_オプション_）
+    - _フィールドの`#[applicability]`と相互排他的です。_
+    - 値は提案の適用可能性です。
+    - 次のいずれかである必要がある文字列：
       - `machine-applicable`
       - `maybe-incorrect`
       - `has-placeholders`
       - `unspecified`
 - `#[multipart_suggestion{,_hidden,_short,_verbose}(slug, applicability = "...")]`
-  - _Applied to struct or enum variant. Mutually exclusive with struct/enum variant attributes._
-  - _Mandatory_
-  - Defines the type to be representing a multipart suggestion.
-  - Slug (_Mandatory_): see `#[suggestion]`
-  - `applicability = "..."` (_Optional_): see `#[suggestion]`
-- `#[primary_span]` (_Mandatory_ for labels and suggestions; _optional_ otherwise; not applicable
-to multipart suggestions)
-  - _Applied to `Span` fields._
-  - Indicates the primary span of the subdiagnostic.
-- `#[suggestion_part(code = "...")]` (_Mandatory_; only applicable to multipart suggestions)
-  - _Applied to `Span` fields._
-  - Indicates the span to be one part of the multipart suggestion.
-  - `code = "..."` (_Mandatory_)
-    - Value is a format string indicating the code to be suggested as a
-      replacement.
-- `#[applicability]` (_Optional_; only applicable to (simple and multipart) suggestions)
-  - _Applied to `Applicability` fields._
-  - Indicates the applicability of the suggestion.
-- `#[skip_arg]` (_Optional_)
-  - _Applied to any field._
-  - Prevents the field from being provided as a diagnostic argument.
+  - _構造体または列挙型バリアントに適用されます。構造体/列挙型バリアント属性と相互排他的です。_
+  - _必須_
+  - 型をマルチパート提案を表すものとして定義します。
+  - Slug（_必須_）：`#[suggestion]`を参照
+  - `applicability = "..."`（_オプション_）：`#[suggestion]`を参照
+- `#[primary_span]`（ラベルと提案には_必須_；それ以外は_オプション_；マルチパート提案には適用不可）
+  - _`Span`フィールドに適用されます。_
+  - サブ診断のプライマリスパンを示します。
+- `#[suggestion_part(code = "...")]`（_必須_；マルチパート提案にのみ適用可能）
+  - _`Span`フィールドに適用されます。_
+  - スパンをマルチパート提案の一部として示します。
+  - `code = "..."`（_必須_）
+    - 値は、置換として提案されるコードを示すフォーマット文字列です。
+- `#[applicability]`（_オプション_；（シンプルおよびマルチパート）提案にのみ適用可能）
+  - _`Applicability`フィールドに適用されます。_
+  - 提案の適用可能性を示します。
+- `#[skip_arg]`（_オプション_）
+  - _任意のフィールドに適用されます。_
+  - フィールドが診断引数として提供されるのを防ぎます。
 
 [defn]: https://github.com/rust-lang/rust/blob/6201eabde85db854c1ebb57624be5ec699246b50/compiler/rustc_hir_analysis/src/errors.rs#L68-L77
 [use]: https://github.com/rust-lang/rust/blob/f1112099eba41abadb6f921df7edba70affe92c5/compiler/rustc_hir_analysis/src/collect.rs#L823-L827

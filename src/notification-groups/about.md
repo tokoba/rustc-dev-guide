@@ -1,24 +1,17 @@
-# Notification groups
+# 通知グループ
 
-The **notification groups** are an easy way to help out with rustc in a
-"piece-meal" fashion, without committing to a larger project.
-Notification groups are **[easy to join](#join)** (just submit a PR!)
-and joining does not entail any particular commitment.
+**通知グループ**は、大規模なプロジェクトにコミットすることなく、「少しずつ」の形でrustcに貢献するための簡単な方法です。
+通知グループは**[参加が簡単](#join)**で（PRを提出するだけ！）、参加しても特定のコミットメントは必要ありません。
 
-Once you [join a notification group](#join), you will be added to
-a list that receives pings on github whenever a new issue is found
-that fits the notification group's criteria. If you are interested, you
-can then [claim the issue] and start working on it.
+[通知グループに参加](#join)すると、通知グループの基準に適合する新しい問題がGitHub上で見つかるたびに、pingを受け取るリストに追加されます。興味があれば、その問題を[クレームして][claim the issue]作業を開始できます。
 
-Of course, you don't have to wait for new issues to be tagged! If you
-prefer, you can use the Github label for a notification group to
-search for existing issues that haven't been claimed yet.
+もちろん、新しい問題がタグ付けされるのを待つ必要はありません！お好みであれば、通知グループのGitHubラベルを使用して、まだクレームされていない既存の問題を検索できます。
 
 [claim the issue]: https://forge.rust-lang.org/triagebot/issue-assignment.html
 
-## List of notification groups
+## 通知グループの一覧
 
-Here's the list of the notification groups:
+通知グループの一覧は以下の通りです：
 - [Apple](./apple.md)
 - [ARM](./arm.md)
 - [Emscripten](./emscripten.md)
@@ -28,51 +21,39 @@ Here's the list of the notification groups:
 - [Windows](./windows.md)
 - [Rust for Linux](./rust-for-linux.md)
 
-## What issues are a good fit for notification groups?
+## どのような問題が通知グループに適していますか？
 
-Notification groups tend to get pinged on **isolated** bugs,
-particularly those of **middle priority**:
+通知グループは、特に**中程度の優先度**の**独立した**バグについてpingを受けます：
 
-- By **isolated**, we mean that we do not expect large-scale refactoring
-  to be required to fix the bug.
-- By **middle priority**, we mean that we'd like to see the bug fixed,
-  but it's not such a burning problem that we are dropping everything
-  else to fix it. The danger with such bugs, of course, is that they
-  can accumulate over time, and the role of the notification group is
-  to try and stop that from happening!
+- **独立した**とは、バグを修正するために大規模なリファクタリングが必要ないことを意味します。
+- **中程度の優先度**とは、バグを修正したいと思っているものの、他のすべてを中止してまで修正するほど緊急な問題ではないことを意味します。もちろん、このようなバグの危険性は時間とともに蓄積される可能性があり、通知グループの役割はそれを防ぐことです！
 
 <a id="join"></a>
 
-## Joining a notification group
+## 通知グループへの参加
 
-To join a notification group, you just have to open a PR adding your
-Github username to the appropriate file in the Rust team repository.
-See the "example PRs" below to get a precise idea and to identify the
-file to edit.
+通知グループに参加するには、RustチームリポジトリのappropriateなファイルにGitHubユーザー名を追加するPRを開くだけです。
+正確な手順を知り、編集するファイルを特定するには、以下の「PRの例」を参照してください。
 
-Also, if you are not already a member of a Rust team then -- in addition
-to adding your name to the file -- you have to checkout the repository and
-run the following command:
+また、まだRustチームのメンバーでない場合は、ファイルに名前を追加するだけでなく、リポジトリをチェックアウトして次のコマンドを実行する必要があります：
 
 ```bash
 cargo run add-person $your_user_name
 ```
 
-Example PRs:
+PRの例：
 
-* [Example of adding yourself to the Apple group.](https://github.com/rust-lang/team/pull/1434)
-* [Example of adding yourself to the ARM group.](https://github.com/rust-lang/team/pull/358)
-* [Example of adding yourself to the Emscripten group.](https://github.com/rust-lang/team/pull/1579)
-* [Example of adding yourself to the RISC-V group.](https://github.com/rust-lang/team/pull/394)
-* [Example of adding yourself to the WASI group.](https://github.com/rust-lang/team/pull/1580)
-* [Example of adding yourself to the WebAssembly group.](https://github.com/rust-lang/team/pull/1581)
-* [Example of adding yourself to the Windows group.](https://github.com/rust-lang/team/pull/348)
+* [Appleグループに自分を追加する例。](https://github.com/rust-lang/team/pull/1434)
+* [ARMグループに自分を追加する例。](https://github.com/rust-lang/team/pull/358)
+* [Emscriptenグループに自分を追加する例。](https://github.com/rust-lang/team/pull/1579)
+* [RISC-Vグループに自分を追加する例。](https://github.com/rust-lang/team/pull/394)
+* [WASIグループに自分を追加する例。](https://github.com/rust-lang/team/pull/1580)
+* [WebAssemblyグループに自分を追加する例。](https://github.com/rust-lang/team/pull/1581)
+* [Windowsグループに自分を追加する例。](https://github.com/rust-lang/team/pull/348)
 
-## Tagging an issue for a notification group
+## 通知グループの問題にタグを付ける
 
-To tag an issue as appropriate for a notification group, you give
-[rustbot] a [`ping`] command with the name of the notification
-group. For example:
+通知グループに適した問題としてタグを付けるには、通知グループの名前を指定して[rustbot]に[`ping`]コマンドを発行します。例えば：
 
 ```text
 @rustbot ping apple
@@ -84,9 +65,7 @@ group. For example:
 @rustbot ping windows
 ```
 
-To make some commands shorter and easier to remember, there are aliases,
-defined in the [`triagebot.toml`] file. For example, all of these commands
-are equivalent and will ping the Apple group:
+いくつかのコマンドをより短く覚えやすくするために、[`triagebot.toml`]ファイルで定義されているエイリアスがあります。例えば、以下のコマンドはすべて同等で、Appleグループにpingします：
 
 ```text
 @rustbot ping apple
@@ -94,13 +73,10 @@ are equivalent and will ping the Apple group:
 @rustbot ping ios
 ```
 
-Keep in mind that these aliases are meant to make humans' life easier.
-They might be subject to change. If you need to ensure that a command
-will always be valid, prefer the full invocations over the aliases.
+これらのエイリアスは人間の生活を楽にするためのものであることに留意してください。
+変更される可能性があります。コマンドが常に有効であることを確認する必要がある場合は、エイリアスよりも完全な呼び出しを優先してください。
 
-**Note though that this should only be done by compiler team members
-or contributors, and is typically done as part of compiler team
-triage.**
+**ただし、これはコンパイラチームのメンバーまたは貢献者のみが行うべきで、通常はコンパイラチームのトリアージの一環として行われます。**
 
 [rustbot]: https://github.com/rust-lang/triagebot/
 [`ping`]: https://forge.rust-lang.org/triagebot/pinging.html

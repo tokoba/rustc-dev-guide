@@ -1,78 +1,40 @@
-# Code generation
+# コード生成
 
-Code generation (or "codegen") is the part of the compiler
-that actually generates an executable binary.
-Usually, rustc uses LLVM for code generation,
-but there is also support for [Cranelift] and [GCC].
-The key is that rustc doesn't implement codegen itself.
-It's worth noting, though, that in the Rust source code,
-many parts of the backend have `codegen` in their names
-(there are no hard boundaries).
+コード生成（または「コードジェネレーション」）は、実際に実行可能なバイナリを生成するコンパイラの部分です。通常、rustcはコード生成にLLVMを使用しますが、[Cranelift]と[GCC]のサポートもあります。重要なのは、rustcがコードジェネレーションを自分で実装していないということです。ただし、Rustのソースコードでは、バックエンドの多くの部分に `codegen` という名前が付いていることは注目に値します（明確な境界はありません）。
 
 [Cranelift]: https://github.com/bytecodealliance/wasmtime/tree/main/cranelift
 [GCC]: https://github.com/rust-lang/rustc_codegen_gcc
 
-> NOTE: If you are looking for hints on how to debug code generation bugs,
-> please see [this section of the debugging chapter][debugging].
+> 注：コード生成のバグをデバッグする方法のヒントをお探しの場合は、[デバッグの章のこのセクション][debugging]を参照してください。
 
 [debugging]: ./debugging.md
 
-## What is LLVM?
+## LLVMとは何か？
 
-[LLVM](https://llvm.org) is "a collection of modular and reusable compiler and
-toolchain technologies". In particular, the LLVM project contains a pluggable
-compiler backend (also called "LLVM"), which is used by many compiler projects,
-including the `clang` C compiler and our beloved `rustc`.
+[LLVM](https://llvm.org)は「モジュール式で再利用可能なコンパイラおよびツールチェーン技術のコレクション」です。特に、LLVMプロジェクトには、多くのコンパイラプロジェクトで使用されているプラグ可能なコンパイラバックエンド（「LLVM」とも呼ばれる）が含まれています。これには、`clang` Cコンパイラと私たちの愛する `rustc` が含まれます。
 
-LLVM takes input in the form of LLVM IR. It is basically assembly code with
-additional low-level types and annotations added. These annotations are helpful
-for doing optimizations on the LLVM IR and outputted machine code. The end
-result of all this is (at long last) something executable (e.g. an ELF object,
-an EXE, or wasm).
+LLVMは、LLVM IRの形式で入力を受け取ります。これは基本的に、追加の低レベル型と注釈が追加されたアセンブリコードです。これらの注釈は、LLVM IRと出力される機械語の最適化を行うのに役立ちます。このすべての最終結果は、（ついに）実行可能なもの（例：ELFオブジェクト、EXE、またはwasm）です。
 
-There are a few benefits to using LLVM:
+LLVMを使用することにはいくつかの利点があります：
 
-- We don't have to write a whole compiler backend. This reduces implementation
-  and maintenance burden.
-- We benefit from the large suite of advanced optimizations that the LLVM
-  project has been collecting.
-- We can automatically compile Rust to any of the platforms for which LLVM has
-  support. For example, as soon as LLVM added support for wasm, voila! rustc,
-  clang, and a bunch of other languages were able to compile to wasm! (Well,
-  there was some extra stuff to be done, but we were 90% there anyway).
-- We and other compiler projects benefit from each other. For example, when the
-  [Spectre and Meltdown security vulnerabilities][spectre] were discovered,
-  only LLVM needed to be patched.
+- コンパイラバックエンド全体を書く必要がありません。これにより、実装と保守の負担が軽減されます。
+- LLVMプロジェクトが収集してきた高度な最適化の大規模なスイートから恩恵を受けることができます。
+- LLVMがサポートする任意のプラットフォームにRustを自動的にコンパイルできます。例えば、LLVMがwasmのサポートを追加するとすぐに、いきなり！rustc、clang、その他の多くの言語がwasmにコンパイルできるようになりました！（まあ、他にもやるべきことがありましたが、とにかく90%まで達成していました）。
+- 私たちと他のコンパイラプロジェクトがお互いに恩恵を受けます。例えば、[SpectreとMeltdownのセキュリティ脆弱性][spectre]が発見されたとき、パッチが必要だったのはLLVMだけでした。
 
 [spectre]: https://meltdownattack.com/
 
-## Running LLVM, linking, and metadata generation
+## LLVMの実行、リンク、メタデータ生成
 
-Once LLVM IR for all of the functions and statics, etc is built, it is time to
-start running LLVM and its optimization passes. LLVM IR is grouped into
-"modules". Multiple "modules" can be codegened at the same time to aid in
-multi-core utilization. These "modules" are what we refer to as _codegen
-units_. These units were established way back during monomorphization
-collection phase.
+すべての関数やスタティックなどのLLVM IRが構築されると、LLVMとその最適化パスを実行する時間です。LLVM IRは「モジュール」にグループ化されます。複数の「モジュール」を同時にコード生成して、マルチコアの利用を支援できます。これらの「モジュール」は、私たちが _コードジェネレーション単位_ と呼ぶものです。これらの単位は、モノモーフィゼーションコレクションフェーズの最初の段階で確立されました。
 
-Once LLVM produces objects from these modules, these objects are passed to the
-linker along with, optionally, the metadata object and an archive or an
-executable is produced.
+LLVMがこれらのモジュールからオブジェクトを生成すると、これらのオブジェクトは、オプションでメタデータオブジェクトとともにリンカに渡され、アーカイブまたは実行可能ファイルが生成されます。
 
-It is not necessarily the codegen phase described above that runs the
-optimizations. With certain kinds of LTO, the optimization might happen at the
-linking time instead. It is also possible for some optimizations to happen
-before objects are passed on to the linker and some to happen during the
-linking.
+最適化を実行するのは、必ずしも上記のコードジェネレーションフェーズとは限りません。特定の種類のLTOでは、最適化はリンク時に行われる可能性があります。オブジェクトがリンカに渡される前にいくつかの最適化が行われ、リンク中にいくつか行われることも可能です。
 
-This all happens towards the very end of compilation. The code for this can be
-found in [`rustc_codegen_ssa::back`][ssaback] and
-[`rustc_codegen_llvm::back`][llvmback]. Sadly, this piece of code is not
-really well-separated into LLVM-dependent code; the [`rustc_codegen_ssa`][ssa]
-contains a fair amount of code specific to the LLVM backend.
+これはすべて、コンパイルの非常に最後に行われます。このコードは [`rustc_codegen_ssa::back`][ssaback] と [`rustc_codegen_llvm::back`][llvmback] にあります。残念ながら、このコード部分はLLVM依存のコードにあまりよく分離されていません。[`rustc_codegen_ssa`][ssa] には、LLVMバックエンドに固有のコードがかなり含まれています。
 
-Once these components are done with their work you end up with a number of
-files in your filesystem corresponding to the outputs you have requested.
+これらのコンポーネントが作業を完了すると、要求した出力に対応する多数のファイルがファイルシステムに生成されます。
 
 [ssa]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/index.html
 [ssaback]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/back/index.html

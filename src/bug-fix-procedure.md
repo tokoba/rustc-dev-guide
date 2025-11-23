@@ -1,104 +1,94 @@
-# Procedures for breaking changes
+# 破壊的変更の手順
 
-This page defines the best practices procedure for making bug fixes or soundness
-corrections in the compiler that can cause existing code to stop compiling. This
-text is based on
-[RFC 1589](https://github.com/rust-lang/rfcs/blob/master/text/1589-rustc-bug-fix-procedure.md).
+このページでは、コンパイラでバグ修正や健全性の修正を行う際に、既存のコードがコンパイルされなくなる可能性がある場合のベストプラクティス手順を定義します。このテキストは
+[RFC 1589](https://github.com/rust-lang/rfcs/blob/master/text/1589-rustc-bug-fix-procedure.md) に基づいています。
 
-# Motivation
+# 動機
 
 [motivation]: #motivation
 
-From time to time, we encounter the need to make a bug fix, soundness
-correction, or other change in the compiler which will cause existing code to
-stop compiling. When this happens, it is important that we handle the change in
-a way that gives users of Rust a smooth transition. What we want to avoid is
-that existing programs suddenly stop compiling with opaque error messages: we
-would prefer to have a gradual period of warnings, with clear guidance as to
-what the problem is, how to fix it, and why the change was made. This RFC
-describes the procedure that we have been developing for handling breaking
-changes that aims to achieve that kind of smooth transition.
+時々、既存のコードがコンパイルされなくなるような、バグ修正、健全性の修正、
+またはコンパイラでのその他の変更を行う必要に遭遇します。これが起こった場合、
+Rust のユーザーにスムーズな移行を提供する方法で変更を処理することが重要です。避けたいのは、
+既存のプログラムが不明瞭なエラーメッセージで突然コンパイルされなくなることです。むしろ、
+問題が何か、それをどのように修正するか、なぜ変更が行われたかについて明確なガイダンスを含む、
+段階的な警告期間を設けることが望ましいです。この RFC は、
+そのようなスムーズな移行を達成することを目的とした、破壊的変更を処理するために開発してきた手順を説明しています。
 
-One of the key points of this policy is that (a) warnings should be issued
-initially rather than hard errors if at all possible and (b) every change that
-causes existing code to stop compiling will have an associated tracking issue.
-This issue provides a point to collect feedback on the results of that change.
-Sometimes changes have unexpectedly large consequences or there may be a way to
-avoid the change that was not considered. In those cases, we may decide to
-change course and roll back the change, or find another solution (if warnings
-are being used, this is particularly easy to do).
+このポリシーの重要なポイントの 1 つは、(a) 可能な限り、最初はハードエラーではなく警告を発行すべきであること、
+(b) 既存のコードがコンパイルされなくなるすべての変更には、関連する追跡課題があることです。
+この課題は、その変更の結果に関するフィードバックを収集するためのポイントを提供します。
+変更には予想外に大きな影響があったり、考慮されなかった変更を避ける方法があったりする場合があります。そのような場合、
+方針を変更して変更をロールバックするか、別の解決策を見つけることを決定する可能性があります（警告が
+使用されている場合、これは特に簡単に行えます）。
 
-### What qualifies as a bug fix?
+### バグ修正とは何か？
 
-Note that this RFC does not try to define when a breaking change is permitted.
-That is already covered under [RFC 1122][]. This document assumes that the
-change being made is in accordance with those policies. Here is a summary of the
-conditions from RFC 1122:
+この RFC は、破壊的変更が許可される時期を定義しようとはしていないことに注意してください。
+それはすでに [RFC 1122][] でカバーされています。このドキュメントは、
+変更がそれらのポリシーに従って行われることを前提としています。RFC 1122 からの条件の要約は次のとおりです：
 
-- **Soundness changes:** Fixes to holes uncovered in the type system.
-- **Compiler bugs:** Places where the compiler is not implementing the specified
-  semantics found in an RFC or lang-team decision.
-- **Underspecified language semantics:** Clarifications to grey areas where the
-  compiler behaves inconsistently and no formal behavior had been previously
-  decided.
+- **健全性の変更：** 型システムで発見された穴の修正。
+- **コンパイラのバグ：** コンパイラが RFC または lang-team の決定で見つかった指定された
+  セマンティクスを実装していない場所。
+- **未指定の言語セマンティクス：** コンパイラが一貫性なく動作し、正式な動作が
+  以前に決定されていなかったグレーゾーンの明確化。
 
-Please see [the RFC][rfc 1122] for full details!
+詳細については[RFC][rfc 1122] をご覧ください！
 
-# Detailed design
+# 詳細設計
 
 [design]: #detailed-design
 
-The procedure for making a breaking change is as follows (each of these steps is
-described in more detail below):
+破壊的変更を行うための手順は次のとおりです（これらの各ステップについては以下で詳しく説明します）：
 
-1. Do a **crater run** to assess the impact of the change.
-2. Make a **special tracking issue** dedicated to the change.
-3. Do not report an error right away. Instead, **issue forwards-compatibility
-   lint warnings**.
-   - Sometimes this is not straightforward. See the text below for suggestions
-     on different techniques we have employed in the past.
-   - For cases where warnings are infeasible:
-     - Report errors, but make every effort to give a targeted error message
-       that directs users to the tracking issue
-     - Submit PRs to all known affected crates that fix the issue
-       - or, at minimum, alert the owners of those crates to the problem and
-         direct them to the tracking issue
-4. Once the change has been in the wild for at least one cycle, we can
-   **stabilize the change**, converting those warnings into errors.
+1. **crater 実行**を行い、変更の影響を評価する。
+2. 変更専用の**特別な追跡課題**を作成する。
+3. すぐにエラーを報告しないでください。代わりに、**将来の互換性
+   lint 警告を発行**してください。
+   - これが簡単でない場合があります。以下のテキストで、過去に使用してきた
+     さまざまなテクニックの提案を参照してください。
+   - 警告が実行不可能な場合：
+     - エラーを報告しますが、ユーザーを追跡課題に誘導する的を絞った
+       エラーメッセージを提供するようあらゆる努力をしてください
+     - 問題を修正するすべての既知の影響を受けるクレートに PR を送信してください
+       - または、少なくとも、それらのクレートの所有者に問題を警告し、
+         追跡課題に誘導してください
+4. 変更が少なくとも 1 サイクル野生に出てから、
+   **変更を安定化**し、それらの警告をエラーに変換できます。
 
-Finally, for changes to `rustc_ast` that will affect plugins, the general policy
-is to batch these changes. That is discussed below in more detail.
+最後に、プラグインに影響する `rustc_ast` への変更については、一般的なポリシーは
+これらの変更をバッチ処理することです。これについては以下で詳しく説明します。
 
-### Tracking issue
+### 追跡課題
 
-Every breaking change should be accompanied by a **dedicated tracking issue**
-for that change. The main text of this issue should describe the change being
-made, with a focus on what users must do to fix their code. The issue should be
-approachable and practical; it may make sense to direct users to an RFC or some
-other issue for the full details. The issue also serves as a place where users
-can comment with questions or other concerns.
+すべての破壊的変更には、その変更専用の**専用追跡課題**を添付する必要があります。この課題の主要なテキストは、
+行われている変更について説明し、ユーザーがコードを修正するために何をする必要があるかに焦点を当てる必要があります。課題は
+アプローチ可能で実用的であるべきです。完全な詳細については、ユーザーを RFC または他の
+課題に誘導することが理にかなっている場合があります。課題は、ユーザーが
+質問やその他の懸念をコメントできる場所としても機能します。
 
-A template for these breaking-change tracking issues can be found
-[here][template]. An example of how such an issue should look can be [found
-here][breaking-change-issue].
+これらの破壊的変更追跡課題のテンプレートは
+[ここ][template] にあります。そのような課題がどのように見えるべきかの例は[ここ
+で見つけることができます][breaking-change-issue]。
 
 [template]: https://github.com/rust-lang/rust/issues/new?template=tracking_issue_future.md
 
-### Issuing future compatibility warnings
+### 将来の互換性警告の発行
 
-The best way to handle a breaking change is to begin by issuing
-future-compatibility warnings. These are a special category of lint warning.
-Adding a new future-compatibility warning can be done as follows.
+破壊的変更を処理する最良の方法は、将来の互換性警告を発行することから始めることです。
+これらは特別なカテゴリの lint 警告です。
+新しい将来の互換性警告を追加するには、次のように行います。
 
 ```rust
-// 1. Define the lint in `compiler/rustc_middle/src/lint/builtin.rs`:
+// 1. `compiler/rustc_middle/src/lint/builtin.rs` で lint を定義します：
 declare_lint! {
     pub YOUR_ERROR_HERE,
     Warn,
     "illegal use of foo bar baz"
 }
 
-// 2. Add to the list of HardwiredLints in the same file:
+// 2. 同じファイルの HardwiredLints リストに追加します：
 impl LintPass for HardwiredLints {
     fn get_lints(&self) -> LintArray {
         lint_array!(
@@ -108,16 +98,16 @@ impl LintPass for HardwiredLints {
     }
 }
 
-// 3. Register the lint in `compiler/rustc_lint/src/lib.rs`:
+// 3. `compiler/rustc_lint/src/lib.rs` で lint を登録します：
 store.register_future_incompatible(sess, vec![
     ...,
     FutureIncompatibleInfo {
         id: LintId::of(YOUR_ERROR_HERE),
-        reference: "issue #1234", // your tracking issue here!
+        reference: "issue #1234", // ここにあなたの追跡課題！
     },
 ]);
 
-// 4. Report the lint:
+// 4. lint を報告します：
 tcx.lint_node(
     lint::builtin::YOUR_ERROR_HERE,
     path_id,
@@ -125,115 +115,104 @@ tcx.lint_node(
     format!("some helper message here"));
 ```
 
-#### Helpful techniques
+#### 役立つテクニック
 
-It can often be challenging to filter out new warnings from older, pre-existing
-errors. One technique that has been used in the past is to run the older code
-unchanged and collect the errors it would have reported. You can then issue
-warnings for any errors you would give which do not appear in that original set.
-Another option is to abort compilation after the original code completes if
-errors are reported: then you know that your new code will only execute when
-there were no errors before.
+古い既存のエラーから新しい警告をフィルタリングすることは、しばしば困難です。過去に使用されてきた
+1 つのテクニックは、古いコードを変更せずに実行し、それが報告したであろうエラーを収集することです。その後、
+元のセットに表示されないエラーに対して警告を発行できます。
+別のオプションは、エラーが報告された場合、元のコードが完了した後にコンパイルを中止することです：その後、
+以前にエラーがなかった場合にのみ新しいコードが実行されることがわかります。
 
-#### Crater and crates.io
+#### Crater と crates.io
 
-[Crater] is a bot that will compile all crates.io crates and many
-public github repos with the compiler with your changes. A report will then be
-generated with crates that ceased to compile with or began to compile with your
-changes. Crater runs can take a few days to complete.
+[Crater] は、あなたの変更でコンパイラを使用してすべての crates.io クレートと多くの
+公開 github リポジトリをコンパイルするボットです。その後、あなたの変更で
+コンパイルされなくなったクレートまたはコンパイルされ始めたクレートのレポートが生成されます。Crater の実行には
+完了するまで数日かかる場合があります。
 
 [Crater]: ./tests/crater.md
 
-We should always do a crater run to assess impact. It is polite and considerate
-to at least notify the authors of affected crates the breaking change. If we can
-submit PRs to fix the problem, so much the better.
+影響を評価するために、常に crater 実行を行う必要があります。少なくとも
+影響を受けるクレートの作成者に破壊的変更を通知することは礼儀正しく思慮深いことです。問題を修正する PR を
+送信できれば、なお良いです。
 
-#### Is it ever acceptable to go directly to issuing errors?
+#### 直接エラーを発行することは許容されますか？
 
-Changes that are believed to have negligible impact can go directly to issuing
-an error. One rule of thumb would be to check against `crates.io`: if fewer than
-10 **total** affected projects are found (**not** root errors), we can move
-straight to an error. In such cases, we should still make the "breaking change"
-page as before, and we should ensure that the error directs users to this page.
-In other words, everything should be the same except that users are getting an
-error, and not a warning. Moreover, we should submit PRs to the affected
-projects (ideally before the PR implementing the change lands in rustc).
+影響が無視できると考えられる変更は、直接エラーを発行することができます。
+1 つの経験則は、`crates.io` に対してチェックすることです：**合計**で 10 未満の影響を受ける
+プロジェクトが見つかった場合（ルートエラー**ではない**）、直接エラーに移行できます。そのような場合でも、
+以前と同じように「破壊的変更」ページを作成する必要があり、エラーがユーザーをこのページに誘導することを
+確認する必要があります。言い換えれば、ユーザーが警告ではなくエラーを受け取ることを除いて、
+すべて同じである必要があります。さらに、影響を受ける
+プロジェクトに PR を送信する必要があります（理想的には、変更を実装する PR が rustc にランドする前に）。
 
-If the impact is not believed to be negligible (e.g., more than 10 crates are
-affected), then warnings are required (unless the compiler team agrees to grant
-a special exemption in some particular case). If implementing warnings is not
-feasible, then we should make an aggressive strategy of migrating crates before
-we land the change so as to lower the number of affected crates. Here are some
-techniques for approaching this scenario:
+影響が無視できないと考えられる場合（例：10 以上のクレートが
+影響を受ける）、警告が必要です（コンパイラチームが
+特定のケースで特別な免除を許可することに同意しない限り）。警告の実装が
+実行不可能な場合、変更をランドする前にクレートを移行する積極的な戦略を立てて、
+影響を受けるクレートの数を減らす必要があります。このシナリオにアプローチするためのいくつかの
+テクニックは次のとおりです：
 
-1. Issue warnings for subparts of the problem, and reserve the new errors for
-   the smallest set of cases you can.
-2. Try to give a very precise error message that suggests how to fix the problem
-   and directs users to the tracking issue.
-3. It may also make sense to layer the fix:
-   - First, add warnings where possible and let those land before proceeding to
-     issue errors.
-   - Work with authors of affected crates to ensure that corrected versions are
-     available _before_ the fix lands, so that downstream users can use them.
+1. 問題の一部に対して警告を発行し、新しいエラーをできるだけ小さなケースのセットに予約します。
+2. 問題を修正する方法を提案し、
+   ユーザーを追跡課題に誘導する非常に正確なエラーメッセージを提供するようにしてください。
+3. 修正をレイヤー化することも理にかなっている場合があります：
+   - まず、可能な限り警告を追加し、エラーを発行する前にそれらをランドさせます。
+   - 影響を受けるクレートの作成者と協力して、修正がランドする_前_に修正されたバージョンが
+     利用可能であることを確認し、ダウンストリームユーザーがそれらを使用できるようにします。
 
-### Stabilization
+### 安定化
 
-After a change is made, we will **stabilize** the change using the same process
-that we use for unstable features:
+変更が行われた後、不安定な機能に使用するのと同じプロセスを使用して
+変更を**安定化**します：
 
-- After a new release is made, we will go through the outstanding tracking
-  issues corresponding to breaking changes and nominate some of them for **final
-  comment period** (FCP).
-- The FCP for such issues lasts for one cycle. In the final week or two of the
-  cycle, we will review comments and make a final determination:
+- 新しいリリースが行われた後、破壊的変更に対応する未解決の追跡
+  課題を調べて、その中のいくつかを**最終コメント期間**（FCP）にノミネートします。
+- そのような課題の FCP は 1 サイクル続きます。サイクルの最後の 1 週間または 2 週間で、
+  コメントをレビューして最終決定を下します：
 
-  - Convert to error: the change should be made into a hard error.
-  - Revert: we should remove the warning and continue to allow the older code to
-    compile.
-  - Defer: can't decide yet, wait longer, or try other strategies.
+  - エラーに変換：変更はハードエラーにする必要があります。
+  - 元に戻す：警告を削除し、古いコードのコンパイルを続行する必要があります。
+  - 延期：まだ決定できません、もっと待つか、他の戦略を試してください。
 
-Ideally, breaking changes should have landed on the **stable branch** of the
-compiler before they are finalized.
+理想的には、破壊的変更は最終化される前に
+コンパイラの**stable ブランチ**にランドしている必要があります。
 
 <a id="guide"></a>
 
-### Removing a lint
+### lint の削除
 
-Once we have decided to make a "future warning" into a hard error, we need a PR
-that removes the custom lint. As an example, here are the steps required to
-remove the `overlapping_inherent_impls` compatibility lint. First, convert the
-name of the lint to uppercase (`OVERLAPPING_INHERENT_IMPLS`) ripgrep through the
-source for that string. We will basically by converting each place where this
-lint name is mentioned (in the compiler, we use the upper-case name, and a macro
-automatically generates the lower-case string; so searching for
-`overlapping_inherent_impls` would not find much).
+「将来の警告」をハードエラーにすることを決定したら、カスタム lint を削除する PR が必要です。例として、
+`overlapping_inherent_impls` 互換性 lint を削除するために必要な手順を示します。まず、lint の
+名前を大文字（`OVERLAPPING_INHERENT_IMPLS`）に変換し、その文字列でソースを ripgrep します。基本的に、この
+lint 名が言及されている各場所を変換します（コンパイラでは、大文字の名前を使用し、マクロが
+自動的に小文字の文字列を生成します。したがって、
+`overlapping_inherent_impls` を検索してもあまり見つかりません）。
 
-> NOTE: these exact files don't exist anymore, but the procedure is still the same.
+> 注：これらの正確なファイルはもう存在しませんが、手順は同じです。
 
-#### Remove the lint.
+#### lint を削除します。
 
-The first reference you will likely find is the lint definition [in
-`rustc_session/src/lint/builtin.rs` that resembles this][defsource]:
+最初に見つかるであろう参照は、[次のような
+`rustc_session/src/lint/builtin.rs` の lint 定義][defsource]です：
 
 [defsource]: https://github.com/rust-lang/rust/blob/085d71c3efe453863739c1fb68fd9bd1beff214f/src/librustc/lint/builtin.rs#L171-L175
 
 ```rust
 declare_lint! {
     pub OVERLAPPING_INHERENT_IMPLS,
-    Deny, // this may also say Warning
+    Deny, // これは Warning とも言うかもしれません
     "two overlapping inherent impls define an item with the same name were erroneously allowed"
 }
 ```
 
-This `declare_lint!` macro creates the relevant data structures. Remove it. You
-will also find that there is a mention of `OVERLAPPING_INHERENT_IMPLS` later in
-the file as [part of a `lint_array!`][lintarraysource]; remove it too.
+この `declare_lint!` マクロは関連するデータ構造を作成します。これを削除してください。また、
+ファイルの後半に [`lint_array!` の一部として][lintarraysource]`OVERLAPPING_INHERENT_IMPLS` への言及があることがわかります。これも削除してください。
 
 [lintarraysource]: https://github.com/rust-lang/rust/blob/085d71c3efe453863739c1fb68fd9bd1beff214f/src/librustc/lint/builtin.rs#L252-L290
 
-Next, you see [a reference to `OVERLAPPING_INHERENT_IMPLS` in
-`rustc_lint/src/lib.rs`][futuresource]. This is defining the lint as a "future
-compatibility lint":
+次に、[`rustc_lint/src/lib.rs` の `OVERLAPPING_INHERENT_IMPLS` への参照][futuresource]が表示されます。これは lint を「将来の
+互換性 lint」として定義しています：
 
 ```rust
 FutureIncompatibleInfo {
@@ -242,25 +221,25 @@ FutureIncompatibleInfo {
 },
 ```
 
-Remove this too.
+これも削除してください。
 
-#### Add the lint to the list of removed lints.
+#### 削除された lint のリストに lint を追加します。
 
-In `compiler/rustc_lint/src/lib.rs` there is a list of "renamed and removed lints".
-You can add this lint to the list:
+`compiler/rustc_lint/src/lib.rs` には「名前変更および削除された lint」のリストがあります。
+この lint をリストに追加できます：
 
 ```rust
 store.register_removed("overlapping_inherent_impls", "converted into hard error, see #36889");
 ```
 
-where `#36889` is the tracking issue for your lint.
+ここで `#36889` はあなたの lint の追跡課題です。
 
-#### Update the places that issue the lint
+#### lint を発行する場所を更新します
 
-Finally, the last class of references you will see are the places that actually
-**trigger** the lint itself (i.e., what causes the warnings to appear). These
-you do not want to delete. Instead, you want to convert them into errors. In
-this case, the [`add_lint` call][addlintsource] looks like this:
+最後に、参照の最後のクラスは、実際に
+lint 自体を**トリガー**する場所（つまり、警告が表示される原因）です。これらは
+削除したくありません。代わりに、それらをエラーに変換したいと思います。
+この場合、[`add_lint` 呼び出し][addlintsource]は次のようになります：
 
 ```rust
 self.tcx.sess.add_lint(lint::builtin::OVERLAPPING_INHERENT_IMPLS,
@@ -269,36 +248,33 @@ self.tcx.sess.add_lint(lint::builtin::OVERLAPPING_INHERENT_IMPLS,
                        msg);
 ```
 
-We want to convert this into an error. In some cases, there may be an
-existing error for this scenario. In others, we will need to allocate a
-fresh diagnostic code.  [Instructions for allocating a fresh diagnostic
-code can be found here.](./diagnostics/error-codes.md) You may want
-to mention in the extended description that the compiler behavior
-changed on this point, and include a reference to the tracking issue for
-the change.
+これをエラーに変換したいと思います。場合によっては、このシナリオに対して
+既存のエラーがある場合があります。他の場合、新しい診断コードを
+割り当てる必要があります。[新しい診断コードを割り当てるための手順はここで見つけることができます。](./diagnostics/error-codes.md) 拡張説明で
+コンパイラの動作がこの点で変更されたことを言及し、
+変更の追跡課題への参照を含めることをお勧めします。
 
-Let's say that we've adopted `E0592` as our code. Then we can change the
-`add_lint()` call above to something like:
+コードとして `E0592` を採用したとしましょう。その後、上記の
+`add_lint()` 呼び出しを次のように変更できます：
 
 ```rust
 struct_span_code_err!(self.dcx(), self.tcx.span_of_impl(item1).unwrap(), E0592, msg)
     .emit();
 ```
 
-#### Update tests
+#### テストを更新します
 
-Finally, run the test suite. These should be some tests that used to reference
-the `overlapping_inherent_impls` lint, those will need to be updated. In
-general, if the test used to have `#[deny(overlapping_inherent_impls)]`, that
-can just be removed.
+最後に、テストスイートを実行します。以前は `overlapping_inherent_impls` lint を参照していたいくつかのテストがあるはずです。それらを更新する必要があります。
+一般的に、テストに `#[deny(overlapping_inherent_impls)]` があった場合、
+それを削除できます。
 
 ```
 ./x test
 ```
 
-#### All done!
+#### 完了！
 
-Open a PR. =)
+PR を開いてください。=)
 
 [addlintsource]: https://github.com/rust-lang/rust/blob/085d71c3efe453863739c1fb68fd9bd1beff214f/src/librustc_typeck/coherence/inherent.rs#L300-L303
 [futuresource]: https://github.com/rust-lang/rust/blob/085d71c3efe453863739c1fb68fd9bd1beff214f/src/librustc_lint/lib.rs#L202-L205

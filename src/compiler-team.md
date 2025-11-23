@@ -1,136 +1,85 @@
-# About the compiler team
+# コンパイラチームについて
 
 > NOTE:
-> There exists much detail about the team [on Forge], making most of the following obsolete.
+> チームに関する詳細は[on Forge]に存在しており、以下のほとんどを時代遅れにしています。
 
-rustc is maintained by the [Rust compiler team][team]. The people who belong to
-this team collectively work to track regressions and implement new features.
-Members of the Rust compiler team are people who have made significant
-contributions to rustc and its design.
+rustcは[Rust compiler team][team]によってメンテナンスされています。このチームに属する人々は、リグレッションを追跡し、新機能を実装するために協力しています。
+Rustコンパイラチームのメンバーは、rustcとその設計に重要な貢献をした人々です。
 
 [on Forge]: https://forge.rust-lang.org/compiler
 [team]: https://www.rust-lang.org/governance/teams/compiler
 
-## Discussion
+## ディスカッション
 
-Currently the compiler team chats in Zulip:
+現在、コンパイラチームはZulipでチャットしています:
 
-- Team chat occurs in the [`t-compiler`][zulip-t-compiler] stream on the Zulip instance
-- There are also a number of other associated Zulip channels,
-  such as [`t-compiler/help`][zulip-help], where people can ask for help
-  with rustc development, or [`t-compiler/meetings`][zulip-meetings],
-  where the team holds their weekly triage and steering meetings.
+- チームチャットはZulipインスタンスの[`t-compiler`][zulip-t-compiler]ストリームで行われます
+- 他にもいくつかの関連するZulipチャンネルがあります。
+  例えば、[`t-compiler/help`][zulip-help]では、人々がrustc開発について助けを求めることができます。[`t-compiler/meetings`][zulip-meetings]では、チームが週次のトリアージとステアリングミーティングを開催します。
 
-## Reviewers
+## レビュアー
 
-If you're interested in figuring out who can answer questions about a
-particular part of the compiler, or you'd just like to know who works on what,
-check out [triagebot.toml's assign section][map].
-It contains a listing of the various parts of the compiler and a list of people
-who are reviewers of each part.
+コンパイラの特定の部分について誰が質問に答えられるかを知りたい場合、または誰が何に取り組んでいるかを知りたい場合は、[triagebot.toml's assign section][map]をチェックしてください。
+これには、コンパイラのさまざまな部分のリストと、各部分のレビュアーのリストが含まれています。
 
 [map]: https://github.com/rust-lang/rust/blob/HEAD/triagebot.toml
 
-## Rust compiler meeting
+## Rustコンパイラミーティング
 
-The compiler team has a weekly meeting where we do triage and try to
-generally stay on top of new bugs, regressions, and discuss important
-things in general.
-They are held on [Zulip][zulip-meetings]. It works roughly as follows:
+コンパイラチームは週次ミーティングを開催し、トリアージを行い、一般的に新しいバグやリグレッションを把握し、重要なことを議論しています。
+これらは[Zulip][zulip-meetings]で開催されます。大まかには次のように進行します:
 
-- **Announcements, MCPs/FCPs, and WG-check-ins:** We share some
-  announcements with the rest of the team about important things we want
-  everyone to be aware of. We also share the status of MCPs and FCPs and we
-  use the opportunity to have a couple of WGs giving us an update about
-  their work.
-- **Check for beta and stable nominations:** These are nominations of things to
-  backport to beta and stable respectively.
-  We then look for new cases where the compiler broke previously working
-  code in the wild. Regressions are important issues to fix, so it's
-  likely that they are tagged as P-critical or P-high; the major
-  exception would be bug fixes (though even there we often [aim to give
-  warnings first][procedure]).
-- **Review P-critical and P-high bugs:** P-critical and P-high bugs are
-  those that are sufficiently important for us to actively track
-  progress. P-critical and P-high bugs should ideally always have an
-  assignee.
-- **Check `S-waiting-on-t-compiler` and `I-compiler-nominated` issues:** These are issues where
-  feedback from the team is desired.
-- **Look over the performance triage report:** We check for PRs that made the
-    performance worse and try to decide if it's worth reverting the performance regression or if
-    the regression can be addressed in a future PR.
+- **アナウンス、MCP/FCP、およびWGチェックイン:** 重要なことについて、チームの他のメンバーに気づいてほしいことをいくつか共有します。また、MCPとFCPのステータスを共有し、この機会を利用していくつかのWGから作業の最新情報を得ます。
+- **ベータおよび安定版のノミネーションを確認:** これらは、それぞれベータおよび安定版へバックポートするもののノミネーションです。
+  その後、コンパイラが以前に動作していたコードを壊した新しいケースを探します。リグレッションは修正すべき重要な問題であるため、P-criticalまたはP-highとタグ付けされる可能性が高いです。主な例外はバグ修正です(ただし、そこでも最初に[警告を出すこと][procedure]を目指すことがよくあります)。
+- **P-criticalおよびP-highバグのレビュー:** P-criticalおよびP-highバグは、進捗を積極的に追跡するのに十分重要なものです。P-criticalおよびP-highバグには、理想的には常に担当者がいるべきです。
+- **`S-waiting-on-t-compiler`および`I-compiler-nominated`の問題を確認:** これらは、チームからのフィードバックが求められている問題です。
+- **パフォーマンストリアージレポートを確認:** パフォーマンスを悪化させたPRを確認し、パフォーマンスのリグレッションを元に戻す価値があるか、または将来のPRでリグレッションに対処できるかを決定しようとします。
 
-The meeting currently takes place on Thursdays at 10am Boston time
-(UTC-4 typically, but daylight savings time sometimes makes things
-complicated).
+ミーティングは現在、木曜日の午前10時(ボストン時間、通常UTC-4、ただし夏時間により複雑になることがあります)に開催されています。
 
 [procedure]: ./bug-fix-procedure.md
 [zulip-t-compiler]: https://rust-lang.zulipchat.com/#narrow/stream/131828-t-compiler
 [zulip-help]: https://rust-lang.zulipchat.com/#narrow/stream/182449-t-compiler.2Fhelp
 [zulip-meetings]: https://rust-lang.zulipchat.com/#narrow/stream/238009-t-compiler.2Fmeetings
 
-## Team membership
+## チームメンバーシップ
 
-Membership in the Rust team is typically offered when someone has been
-making significant contributions to the compiler for some
-time. Membership is both a recognition but also an obligation:
-compiler team members are generally expected to help with upkeep as
-well as doing reviews and other work.
+Rustチームのメンバーシップは、通常、誰かがコンパイラに長期間にわたって重要な貢献をしている場合に提供されます。メンバーシップは認識であると同時に義務でもあります:
+コンパイラチームのメンバーは、一般的に、レビューやその他の作業を行うだけでなく、保守を支援することが期待されています。
 
-If you are interested in becoming a compiler team member, the first
-thing to do is to start fixing some bugs, or get involved in a working
-group. One good way to find bugs is to look for
-[open issues tagged with E-easy](https://github.com/rust-lang/rust/issues?q=is%3Aopen+is%3Aissue+label%3AE-easy)
-or
-[E-mentor](https://github.com/rust-lang/rust/issues?q=is%3Aopen+is%3Aissue+label%3AE-mentor).
+コンパイラチームのメンバーになることに興味がある場合、最初にすべきことは、バグを修正したり、ワーキンググループに参加したりすることです。バグを見つける良い方法の1つは、
+[open issues tagged with E-easy](https://github.com/rust-lang/rust/issues?q=is%3Aopen+is%3Aissue+label%3AE-easy)または
+[E-mentor](https://github.com/rust-lang/rust/issues?q=is%3Aopen+is%3Aissue+label%3AE-mentor)を探すことです。
 
-You can also dig through the graveyard of PRs that were
-[closed due to inactivity](https://github.com/rust-lang/rust/pulls?q=is%3Apr+label%3AS-inactive),
-some of them may contain work that is still useful - refer to the
-associated issues, if any - and only needs some finishing touches
-for which the original author didn't have time.
+また、[closed due to inactivity](https://github.com/rust-lang/rust/pulls?q=is%3Apr+label%3AS-inactive)のPRの墓場を掘り下げることもできます。
+その中のいくつかには、まだ有用な作業が含まれている可能性があります - 関連する問題があればそれを参照してください - そして、元の著者が時間がなかった仕上げのタッチだけが必要かもしれません。
 
-### r+ rights
+### r+権限
 
-Once you have made a number of individual PRs to rustc, we will often
-offer r+ privileges. This means that you have the right to instruct
-"bors" (the robot that manages which PRs get landed into rustc) to
-merge a PR
-([here are some instructions for how to talk to bors][homu-guide]).
+rustcに個々のPRをいくつか作成すると、r+権限が提供されることがよくあります。これは、「bors」(rustcにどのPRをランドさせるかを管理するロボット)にPRをマージするよう指示する権利があることを意味します
+([borsと話す方法についてのいくつかの説明はこちら][homu-guide])。
 
 [homu-guide]: https://bors.rust-lang.org/
 
-The guidelines for reviewers are as follows:
+レビュアーのガイドラインは次のとおりです:
 
-- You are always welcome to review any PR, regardless of who it is
-  assigned to.  However, do not r+ PRs unless:
-  - You are confident in that part of the code.
-  - You are confident that nobody else wants to review it first.
-    - For example, sometimes people will express a desire to review a
-      PR before it lands, perhaps because it touches a particularly
-      sensitive part of the code.
-- Always be polite when reviewing: you are a representative of the
-  Rust project, so it is expected that you will go above and beyond
-  when it comes to the [Code of Conduct].
+- 誰に割り当てられているかに関係なく、いつでもPRをレビューすることを歓迎します。ただし、次の場合を除き、PRをr+しないでください:
+  - コードのその部分に自信がある。
+  - 他の誰もそれを最初にレビューしたくないと確信している。
+    - 例えば、コードの特に敏感な部分に触れているため、ランド前にレビューしたいという希望を表明する人がいることがあります。
+- レビュー時には常に礼儀正しくしてください: あなたはRustプロジェクトの代表者であるため、[Code of Conduct]に関しては通常以上に努力することが期待されています。
 
 [Code of Conduct]: https://www.rust-lang.org/policies/code-of-conduct
 
-### Reviewer rotation
+### レビュアーローテーション
 
-Once you have r+ rights, you can also be added to the [reviewer rotation].
-[triagebot] is the bot that [automatically assigns] incoming PRs to reviewers.
-If you are added, you will be randomly selected to review
-PRs. If you find you are assigned a PR that you don't feel comfortable
-reviewing, you can also leave a comment like `r? @so-and-so` to assign
-to someone else — if you don't know who to request, just write `r?
-@nikomatsakis for reassignment` and @nikomatsakis will pick someone
-for you.
+r+権限を取得したら、[reviewer rotation]に追加されることもできます。
+[triagebot]は、受信PRをレビュアーに[automatically assigns]するボットです。
+追加された場合、PRをレビューするためにランダムに選択されます。レビューするのに不安を感じるPRが割り当てられた場合は、`r? @so-and-so`のようなコメントを残して他の誰かに割り当てることもできます - 誰にリクエストすればよいかわからない場合は、`r? @nikomatsakis for reassignment`と書くだけで、@nikomatsakisが誰かを選択します。
 
 [reviewer rotation]: https://github.com/rust-lang/rust/blob/36285c5de8915ecc00d91ae0baa79a87ed5858d5/triagebot.toml#L528-L577
 [triagebot]: https://github.com/rust-lang/triagebot/
 [automatically assigns]: https://forge.rust-lang.org/triagebot/pr-assignment.html
 
-Getting on the reviewer rotation is much appreciated as it lowers the
-review burden for all of us! However, if you don't have time to give
-people timely feedback on their PRs, it may be better that you don't
-get on the list.
+レビュアーローテーションに参加することは、私たち全員のレビュー負担を軽減するため、非常に感謝されています!ただし、人々のPRにタイムリーなフィードバックを提供する時間がない場合は、リストに載らない方が良いかもしれません。

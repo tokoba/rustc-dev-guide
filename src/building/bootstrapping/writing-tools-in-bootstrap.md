@@ -1,34 +1,19 @@
-# Writing tools in Bootstrap
+# ブートストラップでツールを書く
 
-There are three types of tools you can write in bootstrap:
+ブートストラップで書くことができるツールには3つのタイプがあります：
 
 - **`Mode::ToolBootstrap`**
 
-  Use this for tools that don’t need anything from the in-tree compiler and can run with the stage0 `rustc`.
-  The output is placed in the "bootstrap-tools" directory.
-  This mode is for general-purpose tools built entirely with the stage0 compiler,
-  including target libraries, and it only works for stage 0.
+  これは、インツリーコンパイラから何も必要とせず、stage0 `rustc` で実行できるツールに使用します。出力は「bootstrap-tools」ディレクトリに配置されます。このモードは、ターゲットライブラリを含む stage0 コンパイラで完全にビルドされた汎用ツール用で、ステージ 0 でのみ機能します。
 
 - **`Mode::ToolStd`**
 
-  Use this for tools that rely on the locally built std.
-  The output goes into the "stageN-tools" directory.
-  This mode is rarely used, mainly for `compiletest` which requires `libtest`.
+  これは、ローカルでビルドされた std に依存するツールに使用します。出力は「stageN-tools」ディレクトリに入ります。このモードはめったに使用されず、主に `libtest` を必要とする `compiletest` に使用されます。
 
 - **`Mode::ToolRustcPrivate`**
 
-  Use this for tools that use the `rustc_private` mechanism,
-  and thus depend on the locally built `rustc` and its rlib artifacts.
-  This is more complex than the other modes,
-  because the tool must be built with the same compiler used for `rustc`,
-  and placed in the "stageN-tools" directory.
-  When you choose `Mode::ToolRustcPrivate`,
-  `ToolBuild` implementation takes care of this automatically.
-  If you need to use the builder’s compiler for something specific,
-  you can get it from `ToolBuildResult`, which is returned by the tool's [`Step`].
+  これは、`rustc_private` メカニズムを使用し、したがってローカルでビルドされた `rustc` とその rlib アーティファクトに依存するツールに使用します。これは他のモードよりも複雑です。なぜなら、ツールは `rustc` に使用されるのと同じコンパイラでビルドされ、「stageN-tools」ディレクトリに配置される必要があるからです。`Mode::ToolRustcPrivate` を選択すると、`ToolBuild` 実装が自動的にこれを処理します。何か特定のことにビルダーのコンパイラを使用する必要がある場合は、ツールの [`Step`] から返される `ToolBuildResult` から取得できます。
 
-Regardless of the tool type,
-you must return `ToolBuildResult` from the tool’s [`Step`] implementation,
-and use `ToolBuild` inside it.
+ツールのタイプに関係なく、ツールの [`Step`] 実装から `ToolBuildResult` を返す必要があり、その中で `ToolBuild` を使用します。
 
 [`Step`]: https://doc.rust-lang.org/nightly/nightly-rustc/bootstrap/core/builder/trait.Step.html

@@ -1,50 +1,31 @@
-# The THIR
+# THIR
 
-The THIR ("Typed High-Level Intermediate Representation"), previously called HAIR for
-"High-Level Abstract IR", is another IR used by rustc that is generated after
-[type checking]. It is (as of <!-- date-check --> January 2024) used for
-[MIR construction], [exhaustiveness checking], and [unsafety checking].
+THIR（「Typed High-Level Intermediate Representation」）は、以前は「High-Level Abstract IR」の意味でHAIRと呼ばれていましたが、[型チェック]の後に生成される別のIRです。<!-- date-check --> 2024年1月現在、[MIR構築]、[網羅性チェック]、[unsafe性チェック]に使用されています。
 
-[type checking]: ./type-checking.md
-[MIR construction]: ./mir/construction.md
-[exhaustiveness checking]: ./pat-exhaustive-checking.md
-[unsafety checking]: ./unsafety-checking.md
+[型チェック]: ./type-checking.md
+[MIR構築]: ./mir/construction.md
+[網羅性チェック]: ./pat-exhaustive-checking.md
+[unsafe性チェック]: ./unsafety-checking.md
 
-As the name might suggest, the THIR is a lowered version of the [HIR] where all
-the types have been filled in, which is possible after type checking has completed.
-But it has some other interesting features that distinguish it from the HIR:
+名前が示すように、THIRは、型チェックが完了した後にすべての型が入力された[HIR]の低レベルバージョンです。しかし、HIRと区別するいくつかの興味深い機能があります：
 
-- Like the MIR, the THIR only represents bodies, i.e. "executable code"; this includes
-  function bodies, but also `const` initializers, for example. Specifically, all [body owners] have
-  THIR created. Consequently, the THIR has no representation for items like `struct`s or `trait`s.
+- MIRと同様に、THIRは「実行可能なコード」である本体のみを表します。これには、関数本体だけでなく、たとえば`const`初期化子も含まれます。具体的には、すべての[本体所有者]がTHIRを作成します。その結果、THIRには`struct`や`trait`などのアイテムの表現がありません。
 
-- Each body of THIR is only stored temporarily and is dropped as soon as it's no longer
-  needed, as opposed to being stored until the end of the compilation process (which
-  is what is done with the HIR).
+- 各THIRの本体は一時的にのみ保存され、不要になるとすぐに削除されます。コンパイルプロセスの終わりまで保存される（HIRで行われることです）のとは対照的です。
 
-- Besides making the types of all nodes available, the THIR also has additional
-  desugaring compared to the HIR. For example, automatic references and dereferences
-  are made explicit, and method calls and overloaded operators are converted into
-  plain function calls. Destruction scopes are also made explicit.
+- すべてのノードの型を利用可能にすることに加えて、THIRにはHIRと比較して追加の脱糖が含まれています。たとえば、自動参照と逆参照が明示的になり、メソッド呼び出しとオーバーロードされた演算子がプレーンな関数呼び出しに変換されます。破棄スコープも明示的になります。
 
-- Statements, expressions, and match arms are stored separately. For example, statements in the
-  `stmts` array reference expressions by their index (represented as a [`ExprId`]) in the `exprs`
-  array.
+- 文、式、マッチアームは別々に保存されます。たとえば、`stmts`配列内の文は、[`ExprId`]として表される`exprs`配列内の式のインデックスで式を参照します。
 
 [HIR]: ./hir.md
 [`ExprId`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/thir/struct.ExprId.html
-[body owners]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/hir/enum.BodyOwnerKind.html
+[本体所有者]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/hir/enum.BodyOwnerKind.html
 
-The THIR lives in [`rustc_mir_build::thir`][thir-docs]. To construct a [`thir::Expr`],
-you can use the [`thir_body`] function, passing in the memory arena where the THIR
-will be allocated. Dropping this arena will result in the THIR being destroyed,
-which is useful to keep peak memory in check. Having a THIR representation of
-all bodies of a crate in memory at the same time would be very heavy.
+THIRは[`rustc_mir_build::thir`][thir-docs]に存在します。[`thir::Expr`]を構築するには、THIRが割り当てられるメモリアリーナを渡して[`thir_body`]関数を使用できます。このアリーナをドロップすると、THIRが破棄され、ピークメモリを抑えるのに役立ちます。クレートのすべての本体のTHIR表現をメモリに同時に持つことは非常に重いでしょう。
 
-You can get a debug representation of the THIR by passing the `-Zunpretty=thir-tree` flag
-to `rustc`.
+`-Zunpretty=thir-tree`フラグを`rustc`に渡すことで、THIRのデバッグ表現を取得できます。
 
-To demonstrate, let's use the following example:
+デモンストレーションのために、次の例を使用しましょう：
 
 ```rust
 fn main() {
@@ -52,14 +33,14 @@ fn main() {
 }
 ```
 
-Here is how that gets represented in THIR (as of <!-- date-check --> Aug 2022):
+<!-- date-check --> 2022年8月現在、THIRでの表現方法は次のとおりです：
 
 ```rust,no_run
 Thir {
-    // no match arms
+    // マッチアームなし
     arms: [],
     exprs: [
-        // expression 0, a literal with a value of 1
+        // 式0、値1のリテラル
         Expr {
             ty: i32,
             temp_lifetime: Some(
@@ -77,7 +58,7 @@ Thir {
                 neg: false,
             },
         },
-        // expression 1, scope surrounding literal 1
+        // 式1、リテラル1を囲むスコープ
         Expr {
             ty: i32,
             temp_lifetime: Some(
@@ -85,7 +66,7 @@ Thir {
             ),
             span: oneplustwo.rs:2:13: 2:14 (#0),
             kind: Scope {
-                // reference to expression 0 above
+                // 上記の式0への参照
                 region_scope: Node(3),
                 lint_level: Explicit(
                     HirId {
@@ -96,7 +77,7 @@ Thir {
                 value: e0,
             },
         },
-        // expression 2, literal 2
+        // 式2、リテラル2
         Expr {
             ty: i32,
             temp_lifetime: Some(
@@ -114,7 +95,7 @@ Thir {
                 neg: false,
             },
         },
-        // expression 3, scope surrounding literal 2
+        // 式3、リテラル2を囲むスコープ
         Expr {
             ty: i32,
             temp_lifetime: Some(
@@ -129,11 +110,11 @@ Thir {
                         local_id: 4,
                     },
                 ),
-                // reference to expression 2 above
+                // 上記の式2への参照
                 value: e2,
             },
         },
-        // expression 4, represents 1 + 2
+        // 式4、1 + 2を表す
         Expr {
             ty: i32,
             temp_lifetime: Some(
@@ -142,12 +123,12 @@ Thir {
             span: oneplustwo.rs:2:13: 2:18 (#0),
             kind: Binary {
                 op: Add,
-                // references to scopes surrounding literals above
+                // 上記のリテラルを囲むスコープへの参照
                 lhs: e1,
                 rhs: e3,
             },
         },
-        // expression 5, scope surrounding expression 4
+        // 式5、式4を囲むスコープ
         Expr {
             ty: i32,
             temp_lifetime: Some(
@@ -165,7 +146,7 @@ Thir {
                 value: e4,
             },
         },
-        // expression 6, block around statement
+        // 式6、文の周りのブロック
         Expr {
             ty: (),
             temp_lifetime: Some(
@@ -178,7 +159,7 @@ Thir {
                     region_scope: Node(8),
                     opt_destruction_scope: None,
                     span: oneplustwo.rs:1:11: 3:2 (#0),
-                    // reference to statement 0 below
+                    // 以下の文0への参照
                     stmts: [
                         s0,
                     ],
@@ -187,7 +168,7 @@ Thir {
                 },
             },
         },
-        // expression 7, scope around block in expression 6
+        // 式7、式6のブロック周りのスコープ
         Expr {
             ty: (),
             temp_lifetime: Some(
@@ -205,7 +186,7 @@ Thir {
                 value: e6,
             },
         },
-        // destruction scope around expression 7
+        // 式7周りの破棄スコープ
         Expr {
             ty: (),
             temp_lifetime: Some(
@@ -220,7 +201,7 @@ Thir {
         },
     ],
     stmts: [
-        // let statement
+        // let文
         Stmt {
             kind: Let {
                 remainder_scope: Remainder { block: 8, first_statement_index: 0},

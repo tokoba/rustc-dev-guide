@@ -1,115 +1,108 @@
-# Canonicalization
+# 正準化
 
-> **NOTE**: FIXME: The content of this chapter has some overlap with
-> [Next-gen trait solving Canonicalization chapter](../solve/canonicalization.html).
-> It is suggested to reorganize these contents in the future.
+> **注意**: FIXME: この章の内容は
+> [次世代トレイト解決の正準化章](../solve/canonicalization.html)と
+> 重複する部分があります。将来的にこれらの内容を再編成することが推奨されます。
 
-Canonicalization is the process of **isolating** an inference value
-from its context. It is a key part of implementing
-[canonical queries][cq], and you may wish to read the parent chapter
-to get more context.
+正準化は、推論値をそのコンテキストから**分離**するプロセスです。
+これは[正準クエリ][cq]を実装する上で重要な部分であり、
+より多くのコンテキストを得るために親章を読むことをお勧めします。
 
-Canonicalization is really based on a very simple concept: every
-[inference variable](../type-inference.html#vars) is always in one of
-two states: either it is **unbound**, in which case we don't know yet
-what type it is, or it is **bound**, in which case we do. So to
-isolate some data-structure T that contains types/regions from its
-environment, we just walk down and find the unbound variables that
-appear in T; those variables get replaced with "canonical variables",
-starting from zero and numbered in a fixed order (left to right, for
-the most part, but really it doesn't matter as long as it is
-consistent).
+正準化は、実際には非常にシンプルな概念に基づいています：すべての
+[推論変数](../type-inference.html#vars)は常に2つの状態の
+いずれかにあります：**未束縛**の場合、それがどの型であるかまだ
+わからない、または**束縛**の場合、わかっています。したがって、
+型/領域を含むデータ構造 T をその環境から分離するには、
+T に現れる未束縛変数を見つけて歩いていくだけです。
+これらの変数は「正準変数」に置き換えられ、ゼロから始まり、
+固定された順序で番号が付けられます（ほとんどの場合左から右ですが、
+一貫している限り実際には重要ではありません）。
 
 [cq]: ./canonical-queries.html
 
-So, for example, if we have the type `X = (?T, ?U)`, where `?T` and
-`?U` are distinct, unbound inference variables, then the canonical
-form of `X` would be `(?0, ?1)`, where `?0` and `?1` represent these
-**canonical placeholders**. Note that the type `Y = (?U, ?T)` also
-canonicalizes to `(?0, ?1)`. But the type `Z = (?T, ?T)` would
-canonicalize to `(?0, ?0)` (as would `(?U, ?U)`). In other words, the
-exact identity of the inference variables is not important – unless
-they are repeated.
+したがって、例えば、型 `X = (?T, ?U)` があり、`?T` と `?U` が
+異なる未束縛の推論変数である場合、`X` の正準形は `(?0, ?1)` になります。
+ここで `?0` と `?1` はこれらの**正準プレースホルダー**を表します。
+型 `Y = (?U, ?T)` も `(?0, ?1)` に正準化されることに注意してください。
+しかし、型 `Z = (?T, ?T)` は `(?0, ?0)` に正準化されます（`(?U, ?U)` も同様）。
+言い換えれば、推論変数の正確な識別は重要ではありません -
+それらが繰り返されていない限り。
 
-We use this to improve caching as well as to detect cycles and other
-things during trait resolution. Roughly speaking, the idea is that if
-two trait queries have the same canonical form, then they will get
-the same answer. That answer will be expressed in terms of the
-canonical variables (`?0`, `?1`), which we can then map back to the
-original variables (`?T`, `?U`).
+これを使用して、キャッシングを改善し、トレイト解決中にサイクルや
+その他のことを検出します。大まかに言えば、アイデアは、2つのトレイト
+クエリが同じ正準形を持つ場合、同じ答えを得るということです。
+その答えは正準変数（`?0`、`?1`）の観点で表現され、それを元の
+変数（`?T`、`?U`）にマッピングし直すことができます。
 
-## Canonicalizing the query
+## クエリの正準化
 
-To see how it works, imagine that we are asking to solve the following
-trait query: `?A: Foo<'static, ?B>`, where `?A` and `?B` are unbound.
-This query contains two unbound variables, but it also contains the
-lifetime `'static`. The trait system generally ignores all lifetimes
-and treats them equally, so when canonicalizing, we will *also*
-replace any [free lifetime](../appendix/background.html#free-vs-bound) with a
-canonical variable (Note that `'static` is actually a _free_ lifetime
-variable here. We are not considering it in the typing context of the whole
-program but only in the context of this trait reference. Mathematically, we
-are not quantifying over the whole program, but only this obligation).
-Therefore, we get the following result:
+どのように機能するかを見るために、次のトレイトクエリを解決しようと
+しているとします：`?A: Foo<'static, ?B>`、ここで `?A` と `?B` は未束縛です。
+このクエリには2つの未束縛変数が含まれていますが、ライフタイム `'static` も
+含まれています。トレイトシステムは一般的にすべてのライフタイムを無視し、
+同等に扱うため、正準化するときに、任意の[自由ライフタイム](../appendix/background.html#free-vs-bound)も
+正準変数に置き換えます（`'static` は実際にはここでは_自由_ライフタイム
+変数であることに注意してください。プログラム全体の型付けコンテキストで
+考えているのではなく、このトレイト参照のコンテキストでのみ考えています。
+数学的には、プログラム全体に対して量化しているのではなく、
+この義務に対してのみ量化しています）。
+したがって、次の結果が得られます：
 
 ```text
 ?0: Foo<'?1, ?2>
 ```
 
-Sometimes we write this differently, like so:
+これを次のように別の方法で書くこともあります：
 
 ```text
 for<T,L,T> { ?0: Foo<'?1, ?2> }
 ```
 
-This `for<>` gives some information about each of the canonical
-variables within.  In this case, each `T` indicates a type variable,
-so `?0` and `?2` are types; the `L` indicates a lifetime variable, so
-`?1` is a lifetime. The `canonicalize` method *also* gives back a
-`CanonicalVarValues` array OV with the "original values" for each
-canonicalized variable:
+この `for<>` は、各正準変数に関する情報を提供します。この場合、各 `T` は
+型変数を示すため、`?0` と `?2` は型です。`L` はライフタイム変数を示すため、
+`?1` はライフタイムです。`canonicalize` メソッドは、各正準化された変数の
+「元の値」を持つ `CanonicalVarValues` 配列 OV も返します：
 
 ```text
 [?A, 'static, ?B]
 ```
 
-We'll need this vector OV later, when we process the query response.
+このベクトル OV は後でクエリレスポンスを処理するときに必要になります。
 
-## Executing the query
+## クエリの実行
 
-Once we've constructed the canonical query, we can try to solve it.
-To do so, we will wind up creating a fresh inference context and
-**instantiating** the canonical query in that context. The idea is that
-we create a substitution S from the canonical form containing a fresh
-inference variable (of suitable kind) for each canonical variable.
-So, for our example query:
+正準クエリを構築したら、それを解決しようとすることができます。
+そのためには、新しい推論コンテキストを作成し、そのコンテキストで
+正準クエリを**インスタンス化**することになります。アイデアは、
+各正準変数に対して（適切な種類の）新しい推論変数を含む
+正準形からの置換 S を作成することです。
+したがって、例のクエリの場合：
 
 ```text
 for<T,L,T> { ?0: Foo<'?1, ?2> }
 ```
 
-the substitution S might be:
+置換 S は次のようになるかもしれません：
 
 ```text
 S = [?A, '?B, ?C]
 ```
 
-We can then replace the bound canonical variables (`?0`, etc) with
-these inference variables, yielding the following fully instantiated
-query:
+次に、束縛された正準変数（`?0` など）をこれらの推論変数に置き換えて、
+次の完全にインスタンス化されたクエリを得ることができます：
 
 ```text
 ?A: Foo<'?B, ?C>
 ```
 
-Remember that substitution S though! We're going to need it later.
+ただし、置換 S を覚えておいてください！後で必要になります。
 
-OK, now that we have a fresh inference context and an instantiated
-query, we can go ahead and try to solve it. The trait solver itself is
-explained in more detail in [another section](../solve/the-solver.md), but
-suffice to say that it will compute a [certainty value][cqqr] (`Proven` or
-`Ambiguous`) and have side-effects on the inference variables we've
-created. For example, if there were only one impl of `Foo`, like so:
+さて、新しい推論コンテキストとインスタンス化されたクエリができたので、
+それを解決しようとすることができます。トレイトソルバー自体は
+[別のセクション](../solve/the-solver.md)で詳しく説明されていますが、
+[確実性値][cqqr]（`Proven` または `Ambiguous`）を計算し、
+作成した推論変数に副作用を与えると言えば十分です。例えば、
+次のような `Foo` の impl が1つだけあった場合：
 
 [cqqr]: ./canonical-queries.html#query-response
 
@@ -119,64 +112,61 @@ where X: 'a
 { ... }
 ```
 
-then we might wind up with a certainty value of `Proven`, as well as
-creating fresh inference variables `'?D` and `?E` (to represent the
-parameters on the impl) and unifying as follows:
+確実性値 `Proven` になり、また新しい推論変数 `'?D` と `?E`（impl の
+パラメータを表すため）を作成し、次のように単一化することになるかもしれません：
 
 - `'?B = '?D`
 - `?A = Vec<?E>`
 - `?C = ?E`
 
-We would also accumulate the region constraint `?E: '?D`, due to the
-where clause.
+また、where 句により、領域制約 `?E: '?D` を蓄積します。
 
-In order to create our final query result, we have to "lift" these
-values out of the query's inference context and into something that
-can be reapplied in our original inference context. We do that by
-**re-applying canonicalization**, but to the **query result**.
+最終的なクエリ結果を作成するには、これらの値をクエリの推論コンテキストから
+「持ち上げて」、元の推論コンテキストで再適用できるものにする必要があります。
+これは、**正準化を再適用**することによって行いますが、**クエリ結果**に対して
+行います。
 
-## Canonicalizing the query result
+## クエリ結果の正準化
 
-As discussed in [the parent section][cqqr], most trait queries wind up
-with a result that brings together a "certainty value" `certainty`, a
-result substitution `var_values`, and some region constraints. To
-create this, we wind up re-using the substitution S that we created
-when first instantiating our query. To refresh your memory, we had a query
+[親セクション][cqqr]で説明したように、ほとんどのトレイトクエリは、
+「確実性値」`certainty`、結果置換 `var_values`、および
+いくつかの領域制約をまとめた結果になります。これを作成するために、
+クエリを最初にインスタンス化したときに作成した置換 S を再利用することになります。
+記憶を新たにするために、次のクエリがありました
 
 ```text
 for<T,L,T> { ?0: Foo<'?1, ?2> }
 ```
 
-for which we made a substutition S:
+これに対して置換 S を作成しました：
 
 ```text
 S = [?A, '?B, ?C]
 ```
 
-We then did some work which unified some of those variables with other things.
-If we "refresh" S with the latest results, we get:
+次に、それらの変数の一部を他のものと単一化する作業を行いました。
+S を最新の結果で「リフレッシュ」すると、次のようになります：
 
 ```text
 S = [Vec<?E>, '?D, ?E]
 ```
 
-These are precisely the new values for the three input variables from
-our original query. Note though that they include some new variables
-(like `?E`). We can make those go away by canonicalizing again! We don't
-just canonicalize S, though, we canonicalize the whole query response QR:
+これらは、元のクエリの3つの入力変数の新しい値です。ただし、
+新しい変数（`?E` など）が含まれていることに注意してください。これらを
+再び正準化することで消すことができます！ただし、S だけを正準化するのではなく、
+クエリレスポンス QR 全体を正準化します：
 
 ```text
 QR = {
-    certainty: Proven,             // or whatever
-    var_values: [Vec<?E>, '?D, ?E] // this is S
-    region_constraints: [?E: '?D], // from the impl
-    value: (),                     // for our purposes, just (), but
-                                   // in some cases this might have
-                                   // a type or other info
+    certainty: Proven,             // または他の何か
+    var_values: [Vec<?E>, '?D, ?E] // これは S です
+    region_constraints: [?E: '?D], // impl から
+    value: (),                     // 我々の目的のために、単に () ですが、
+                                   // 場合によっては型や他の情報があるかもしれません
 }
 ```
 
-The result would be as follows:
+結果は次のようになります：
 
 ```text
 Canonical(QR) = for<T, L> {
@@ -187,32 +177,31 @@ Canonical(QR) = for<T, L> {
 }
 ```
 
-(One subtle point: when we canonicalize the query **result**, we do not
-use any special treatment for free lifetimes. Note that both
-references to `'?D`, for example, were converted into the same
-canonical variable (`?1`). This is in contrast to the original query,
-where we canonicalized every free lifetime into a fresh canonical
-variable.)
+（1つの微妙な点：クエリ**結果**を正準化するとき、自由ライフタイムに
+特別な扱いは使用しません。例えば、`'?D` への両方の参照が
+同じ正準変数（`?1`）に変換されたことに注意してください。これは、
+すべての自由ライフタイムを新しい正準変数に正準化した元のクエリとは
+対照的です。）
 
-Now, this result must be reapplied in each context where needed.
+今、この結果は必要な各コンテキストで再適用される必要があります。
 
-## Processing the canonicalized query result
+## 正準化されたクエリ結果の処理
 
-In the previous section we produced a canonical query result. We now have
-to apply that result in our original context. If you recall, way back in the
-beginning, we were trying to prove this query:
+前のセクションで、正準クエリ結果を生成しました。今、その結果を
+元のコンテキストで適用する必要があります。思い出してください、
+最初に、このクエリを証明しようとしていました：
 
 ```text
 ?A: Foo<'static, ?B>
 ```
 
-We canonicalized that into this:
+これを次のように正準化しました：
 
 ```text
 for<T,L,T> { ?0: Foo<'?1, ?2> }
 ```
 
-and now we got back a canonical response:
+そして、次の正準レスポンスを得ました：
 
 ```text
 for<T, L> {
@@ -223,38 +212,35 @@ for<T, L> {
 }
 ```
 
-We now want to apply that response to our context. Conceptually, how
-we do that is to (a) instantiate each of the canonical variables in
-the result with a fresh inference variable, (b) unify the values in
-the result with the original values, and then (c) record the region
-constraints for later. Doing step (a) would yield a result of
+今、このレスポンスをコンテキストに適用したいと考えています。概念的には、
+(a) 結果の各正準変数を新しい推論変数でインスタンス化し、
+(b) 結果の値を元の値と単一化し、次に (c) 領域制約を後で記録します。
+ステップ (a) を実行すると、次の結果が得られます
 
 ```text
 {
       certainty: Proven,
       var_values: [Vec<?C>, '?D, ?C]
-                       ^^   ^^^ fresh inference variables
+                       ^^   ^^^ 新しい推論変数
       region_constraints: [?C: '?D],
       value: (),
 }
 ```
 
-Step (b) would then unify:
+ステップ (b) は次のように単一化します：
 
 ```text
-?A with Vec<?C>
-'static with '?D
-?B with ?C
+?A を Vec<?C> と
+'static を '?D と
+?B を ?C と
 ```
 
-And finally the region constraint of `?C: 'static` would be recorded
-for later verification.
+そして最後に、`?C: 'static` の領域制約が後の検証のために記録されます。
 
-(What we *actually* do is a mildly optimized variant of that: Rather
-than eagerly instantiating all of the canonical values in the result
-with variables, we instead walk the vector of values, looking for
-cases where the value is just a canonical variable. In our example,
-`values[2]` is `?C`, so that means we can deduce that `?C := ?B` and
-`'?D := 'static`. This gives us a partial set of values. Anything for
-which we do not find a value, we create an inference variable.)
+（*実際に*行うことは、それの軽く最適化されたバリアントです：
+結果内のすべての正準値を変数で即座にインスタンス化するのではなく、
+値のベクトルを歩いて、値が単なる正準変数である場合を探します。
+この例では、`values[2]` は `?C` なので、`?C := ?B` および
+`'?D := 'static` であると推論できます。これにより、部分的な値のセットが得られます。
+値が見つからないものについては、推論変数を作成します。）
 

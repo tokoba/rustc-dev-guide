@@ -1,29 +1,29 @@
-# Remarks on perma unstable features
+# 永続的に不安定な機能に関する注意事項
 
 ## `rustc_private`
 
-### Overview
+### 概要
 
-The `rustc_private` feature allows external crates to use compiler internals.
+`rustc_private`機能により、外部クレートがコンパイラの内部を使用できるようになります。
 
-### Using `rustc-private` with Official Toolchains
+### 公式ツールチェーンでの`rustc-private`の使用
 
-When using the `rustc_private` feature with official Rust toolchains distributed via rustup, you need to install two additional components:
+rustupを介して配布される公式のRustツールチェーンで`rustc_private`機能を使用する場合、2つの追加コンポーネントをインストールする必要があります：
 
-1. **`rustc-dev`**: Provides compiler libraries
-2. **`llvm-tools`**: Provides LLVM libraries required for linking
+1. **`rustc-dev`**: コンパイラライブラリを提供します
+2. **`llvm-tools`**: リンクに必要なLLVMライブラリを提供します
 
-#### Installation Steps
+#### インストール手順
 
-Install both components using rustup:
+rustupを使用して両方のコンポーネントをインストールします：
 
 ```text
 rustup component add rustc-dev llvm-tools
 ```
 
-#### Common Error
+#### よくあるエラー
 
-Without the `llvm-tools` component, you'll encounter linking errors like:
+`llvm-tools`コンポーネントがないと、次のようなリンクエラーが発生します：
 
 ```text
 error: linking with `cc` failed: exit status: 1
@@ -31,24 +31,24 @@ error: linking with `cc` failed: exit status: 1
   = note: rust-lld: error: unable to find library -lLLVM-{version}
 ```
 
-### Using `rustc-private` with Custom Toolchains
+### カスタムツールチェーンでの`rustc-private`の使用
 
-For custom-built toolchains or environments not using rustup, additional configuration is typically required:
+カスタムビルドされたツールチェーンやrustupを使用していない環境では、通常、追加の設定が必要です：
 
-#### Requirements
+#### 要件
 
-- LLVM libraries must be available in your system's library search paths
-- The LLVM version must match the one used to build your Rust toolchain
+- LLVMライブラリがシステムのライブラリ検索パスで利用可能である必要があります
+- LLVMバージョンは、Rustツールチェーンのビルドに使用されたものと一致する必要があります
 
-#### Troubleshooting Steps
+#### トラブルシューティング手順
 
-1. **Check LLVM installation**: Verify LLVM is installed and accessible
-2. **Configure library paths**: You may need to set environment variables:
+1. **LLVMのインストールを確認**: LLVMがインストールされており、アクセス可能であることを確認します
+2. **ライブラリパスの設定**: 環境変数を設定する必要がある場合があります：
    ```text
    export LD_LIBRARY_PATH=/path/to/llvm/lib:$LD_LIBRARY_PATH
    ```
-3. **Check version compatibility**: Ensure your LLVM version is compatible with your Rust toolchain
+3. **バージョンの互換性を確認**: LLVMバージョンがRustツールチェーンと互換性があることを確認します
 
-### Additional Resources
+### 追加リソース
 
-- [GitHub Issue #137421](https://github.com/rust-lang/rust/issues/137421): Explains that `rustc_private` linker failures often occur because `llvm-tools` is not installed
+- [GitHub Issue #137421](https://github.com/rust-lang/rust/issues/137421): `rustc_private`のリンカー障害は、`llvm-tools`がインストールされていないために発生することが多いことを説明しています

@@ -1,28 +1,19 @@
-# Lowering MIR to a Codegen IR
+# MIRからコードジェネレーションIRへの低レベル化
 
-Now that we have a list of symbols to generate from the collector, we need to
-generate some sort of codegen IR. In this chapter, we will assume LLVM IR,
-since that's what rustc usually uses. The actual monomorphization is performed
-as we go, while we do the translation.
+コレクターから生成するシンボルのリストが得られたので、ある種のコードジェネレーションIRを生成する必要があります。この章では、rustcが通常使用するLLVM IRを想定します。実際のモノモーフィゼーションは、変換を行いながら実行されます。
 
-Recall that the backend is started by
-[`rustc_codegen_ssa::base::codegen_crate`][codegen1]. Eventually, this reaches
-[`rustc_codegen_ssa::mir::codegen_mir`][codegen2], which does the lowering from
-MIR to LLVM IR.
+バックエンドは [`rustc_codegen_ssa::base::codegen_crate`][codegen1] によって開始されることを思い出してください。最終的に、これは [`rustc_codegen_ssa::mir::codegen_mir`][codegen2] に到達し、MIRからLLVM IRへの低レベル化を行います。
 
 [codegen1]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/base/fn.codegen_crate.html
 [codegen2]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/mir/fn.codegen_mir.html
 
-The code is split into modules which handle particular MIR primitives:
+コードは、特定のMIRプリミティブを処理するモジュールに分割されています：
 
-- [`rustc_codegen_ssa::mir::block`][mirblk] will deal with translating
-  blocks and their terminators.  The most complicated and also the most
-  interesting thing this module does is generating code for function calls,
-  including the necessary unwinding handling IR.
-- [`rustc_codegen_ssa::mir::statement`][mirst] translates MIR statements.
-- [`rustc_codegen_ssa::mir::operand`][mirop] translates MIR operands.
-- [`rustc_codegen_ssa::mir::place`][mirpl] translates MIR place references.
-- [`rustc_codegen_ssa::mir::rvalue`][mirrv] translates MIR r-values.
+- [`rustc_codegen_ssa::mir::block`][mirblk] は、ブロックとそのターミネーターの変換を処理します。このモジュールが行う最も複雑で、また最も興味深いことは、必要なアンワインド処理IRを含む関数呼び出しのコードを生成することです。
+- [`rustc_codegen_ssa::mir::statement`][mirst] はMIRステートメントを変換します。
+- [`rustc_codegen_ssa::mir::operand`][mirop] はMIRオペランドを変換します。
+- [`rustc_codegen_ssa::mir::place`][mirpl] はMIRプレース参照を変換します。
+- [`rustc_codegen_ssa::mir::rvalue`][mirrv] はMIR右辺値を変換します。
 
 [mirblk]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/mir/block/index.html
 [mirst]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/mir/statement/index.html
@@ -30,28 +21,17 @@ The code is split into modules which handle particular MIR primitives:
 [mirpl]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/mir/place/index.html
 [mirrv]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/mir/rvalue/index.html
 
-Before a function is translated a number of simple and primitive analysis
-passes will run to help us generate simpler and more efficient LLVM IR. An
-example of such an analysis pass would be figuring out which variables are
-SSA-like, so that we can translate them to SSA directly rather than relying on
-LLVM's `mem2reg` for those variables. The analysis can be found in
-[`rustc_codegen_ssa::mir::analyze`][mirana].
+関数が変換される前に、より簡単で効率的なLLVM IRを生成するのに役立ついくつかの単純で基本的な分析パスが実行されます。そのような分析パスの例は、どの変数がSSAのようなものかを把握して、それらの変数のためにLLVMの `mem2reg` に依存するのではなく、直接SSAに変換できるようにすることです。この分析は [`rustc_codegen_ssa::mir::analyze`][mirana] にあります。
 
 [mirana]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/mir/analyze/index.html
 
-Usually a single MIR basic block will map to a LLVM basic block, with very few
-exceptions: intrinsic or function calls and less basic MIR statements like
-`assert` can result in multiple basic blocks. This is a perfect lede into the
-non-portable LLVM-specific part of the code generation. Intrinsic generation is
-fairly easy to understand as it involves very few abstraction levels in between
-and can be found in [`rustc_codegen_llvm::intrinsic`][llvmint].
+通常、単一のMIR基本ブロックはLLVM基本ブロックにマップされますが、非常に少数の例外があります：組み込み関数または関数呼び出しや、`assert` のようなあまり基本的でないMIRステートメントは、複数の基本ブロックになる可能性があります。これは、コード生成のポータブルでないLLVM固有の部分への完璧な導入です。組み込み関数の生成は、その間に非常に少ない抽象化レベルが関与し、[`rustc_codegen_llvm::intrinsic`][llvmint] で見つけることができるため、かなり理解しやすいです。
 
 [llvmint]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_llvm/intrinsic/index.html
 
-Everything else will use the [builder interface][builder]. This is the code that gets
-called in the [`rustc_codegen_ssa::mir::*`][ssamir] modules discussed above.
+他のすべては[ビルダーインターフェース][builder]を使用します。これは、上記で説明した [`rustc_codegen_ssa::mir::*`][ssamir] モジュールで呼び出されるコードです。
 
 [builder]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_llvm/builder/index.html
 [ssamir]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/mir/index.html
 
-> TODO: discuss how constants are generated
+> TODO: 定数がどのように生成されるかを議論する

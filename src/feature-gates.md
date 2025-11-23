@@ -1,84 +1,73 @@
-# Feature gates
+# フィーチャーゲート
 
-This chapter is intended to provide basic help for adding, removing, and
-modifying feature gates.
+この章は、フィーチャーゲートの追加、削除、変更のための基本的なヘルプを提供することを目的としています。
 
-Note that this is specific to *language* feature gates; *library* feature gates use [a different
-mechanism][libs-gate].
+これは*言語*フィーチャーゲートに固有のものであることに注意してください。*ライブラリ*フィーチャーゲートは[異なるメカニズム][libs-gate]を使用します。
 
 [libs-gate]: ./stability.md
 
-## Adding a feature gate
+## フィーチャーゲートの追加
 
-See ["Stability in code"][adding] in the "Implementing new features" section for instructions.
+手順については、「新機能の実装」セクションの["コードでの安定性"][adding]を参照してください。
 
 [adding]: ./implementing_new_features.md#stability-in-code
 
-## Removing a feature gate
+## フィーチャーゲートの削除
 
 [removing]: #removing-a-feature-gate
 
-To remove a feature gate, follow these steps:
+フィーチャーゲートを削除するには、次の手順に従います：
 
-1. Remove the feature gate declaration in `rustc_feature/src/unstable.rs`.
-   It will look like this:
+1. `rustc_feature/src/unstable.rs` のフィーチャーゲート宣言を削除します。次のようになります：
 
    ```rust,ignore
-   /// description of feature
+   /// フィーチャーの説明
    (unstable, $feature_name, "$version", Some($tracking_issue_number))
    ```
 
-2. Add a modified version of the feature gate declaration that you just
-   removed to `rustc_feature/src/removed.rs`:
+2. 削除したばかりのフィーチャーゲート宣言の変更版を `rustc_feature/src/removed.rs` に追加します：
 
    ```rust,ignore
-   /// description of feature
+   /// フィーチャーの説明
    (removed, $old_feature_name, "$version", Some($tracking_issue_number),
     Some("$why_it_was_removed"))
    ```
 
 
-## Renaming a feature gate
+## フィーチャーゲートの名前変更
 
 [renaming]: #renaming-a-feature-gate
 
-To rename a feature gate, follow these steps (the first two are the same steps
-to follow when [removing a feature gate][removing]):
+フィーチャーゲートの名前を変更するには、次の手順に従います（最初の2つは[フィーチャーゲートを削除する][removing]ときと同じ手順です）：
 
-1. Remove the old feature gate declaration in `rustc_feature/src/unstable.rs`.
-   It will look like this:
+1. `rustc_feature/src/unstable.rs` の古いフィーチャーゲート宣言を削除します。次のようになります：
 
    ```rust,ignore
-   /// description of feature
+   /// フィーチャーの説明
    (unstable, $old_feature_name, "$version", Some($tracking_issue_number))
    ```
 
-2. Add a modified version of the old feature gate declaration that you just
-   removed to `rustc_feature/src/removed.rs`:
+2. 削除したばかりの古いフィーチャーゲート宣言の変更版を `rustc_feature/src/removed.rs` に追加します：
 
    ```rust,ignore
-   /// description of feature
-   /// Renamed to `$new_feature_name`
+   /// フィーチャーの説明
+   /// `$new_feature_name` に名前変更
    (removed, $old_feature_name, "$version", Some($tracking_issue_number),
     Some("renamed to `$new_feature_name`"))
    ```
 
-3. Add a feature gate declaration with the new name to
-   `rustc_feature/src/unstable.rs`. It should look very similar to the old
-   declaration:
+3. 新しい名前のフィーチャーゲート宣言を `rustc_feature/src/unstable.rs` に追加します。古い宣言と非常に似ているはずです：
 
    ```rust,ignore
-   /// description of feature
+   /// フィーチャーの説明
    (unstable, $new_feature_name, "$version", Some($tracking_issue_number))
    ```
 
 
-## Stabilizing a feature
+## フィーチャーの安定化
 
-See ["Updating the feature-gate listing"] in the "Stabilizing Features" chapter
-for instructions. There are additional steps you will need to take beyond just
-updating the declaration!
+手順については、「フィーチャーの安定化」章の["フィーチャーゲートリストの更新"]を参照してください。宣言を更新するだけでなく、他にも必要な手順があります！
 
 
 ["Stability in code"]: ./implementing_new_features.md#stability-in-code
-["Updating the feature-gate listing"]: ./stabilization_guide.md#updating-the-feature-gate-listing
+["フィーチャーゲートリストの更新"]: ./stabilization_guide.md#updating-the-feature-gate-listing

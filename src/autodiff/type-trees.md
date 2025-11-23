@@ -1,171 +1,171 @@
-# TypeTrees for Autodiff
+# Autodiff用TypeTree
 
-## What are TypeTrees?
-Memory layout descriptors for Enzyme. Tell Enzyme exactly how types are structured in memory so it can compute derivatives efficiently.
+## TypeTreeとは？
+Enzymeのためのメモリレイアウト記述子です。Enzymeに型がメモリ内でどのように構造化されているかを正確に伝えることで、効率的に導関数を計算できるようにします。
 
-## Structure
+## 構造
 ```rust
 TypeTree(Vec<Type>)
 
 Type {
-    offset: isize,  // byte offset (-1 = everywhere)
-    size: usize,    // size in bytes
-    kind: Kind,     // Float, Integer, Pointer, etc.
-    child: TypeTree // nested structure
+    offset: isize,  // バイトオフセット (-1 = すべて)
+    size: usize,    // バイト単位のサイズ
+    kind: Kind,     // Float、Integer、Pointerなど
+    child: TypeTree // ネストされた構造
 }
 ```
 
-## Example: `fn compute(x: &f32, data: &[f32]) -> f32`
+## 例：`fn compute(x: &f32, data: &[f32]) -> f32`
 
-**Input 0: `x: &f32`**
+**入力0: `x: &f32`**
 ```rust
 TypeTree(vec![Type {
     offset: -1, size: 8, kind: Pointer,
     child: TypeTree(vec![Type {
-        offset: 0, size: 4, kind: Float,  // Single value: use offset 0
+        offset: 0, size: 4, kind: Float,  // 単一の値：オフセット0を使用
         child: TypeTree::new()
     }])
 }])
 ```
 
-**Input 1: `data: &[f32]`**
+**入力1: `data: &[f32]`**
 ```rust
 TypeTree(vec![Type {
     offset: -1, size: 8, kind: Pointer,
     child: TypeTree(vec![Type {
-        offset: -1, size: 4, kind: Float,  // -1 = all elements
+        offset: -1, size: 4, kind: Float,  // -1 = すべての要素
         child: TypeTree::new()
     }])
 }])
 ```
 
-**Output: `f32`**
+**出力: `f32`**
 ```rust
 TypeTree(vec![Type {
-    offset: 0, size: 4, kind: Float,  // Single scalar: use offset 0
+    offset: 0, size: 4, kind: Float,  // 単一のスカラー：オフセット0を使用
     child: TypeTree::new()
 }])
 ```
 
-## Why Needed?
-- Enzyme can't deduce complex type layouts from LLVM IR
-- Prevents slow memory pattern analysis
-- Enables correct derivative computation for nested structures
-- Tells Enzyme which bytes are differentiable vs metadata
+## なぜ必要なのか？
+- EnzymeはLLVM IRから複雑な型レイアウトを推測できない
+- 遅いメモリパターン解析を防ぐ
+- ネストされた構造に対する正しい導関数計算を可能にする
+- メタデータと微分可能なバイトをEnzymeに伝える
 
-## What Enzyme Does With This Information:
+## Enzymeがこの情報で何をするか：
 
-Without TypeTrees:
+TypeTreeなし：
 ```llvm
-; Enzyme sees generic LLVM IR:
+; Enzymeは汎用的なLLVM IRを見る：
 define float @distance(ptr %p1, ptr %p2) {
-; Has to guess what these pointers point to
-; Slow analysis of all memory operations
-; May miss optimization opportunities
+; これらのポインタが何を指しているかを推測しなければならない
+; すべてのメモリ操作の遅い解析
+; 最適化の機会を逃す可能性がある
 }
 ```
 
-With TypeTrees:
+TypeTreeあり：
 ```llvm
 define "enzyme_type"="{[-1]:Float@float}" float @distance(
-    ptr "enzyme_type"="{[-1]:Pointer, [-1,0]:Float@float}" %p1, 
+    ptr "enzyme_type"="{[-1]:Pointer, [-1,0]:Float@float}" %p1,
     ptr "enzyme_type"="{[-1]:Pointer, [-1,0]:Float@float}" %p2
 ) {
-; Enzyme knows exact type layout
-; Can generate efficient derivative code directly
+; Enzymeは正確な型レイアウトを知っている
+; 効率的な導関数コードを直接生成できる
 }
 ```
 
-# TypeTrees - Offset and -1 Explained
+# TypeTree - オフセットと-1の説明
 
-## Type Structure
+## Type構造
 
 ```rust
 Type {
-    offset: isize, // WHERE this type starts
-    size: usize,   // HOW BIG this type is
-    kind: Kind,    // WHAT KIND of data (Float, Int, Pointer)
-    child: TypeTree // WHAT'S INSIDE (for pointers/containers)
+    offset: isize, // この型がどこから始まるか
+    size: usize,   // この型の大きさ
+    kind: Kind,    // どんな種類のデータか (Float、Int、Pointer)
+    child: TypeTree // 内部に何があるか (ポインタ/コンテナの場合)
 }
 ```
 
-## Offset Values
+## オフセット値
 
-### Regular Offset (0, 4, 8, etc.)
-**Specific byte position within a structure**
+### 通常のオフセット (0, 4, 8, など)
+**構造体内の特定のバイト位置**
 
 ```rust
 struct Point {
-    x: f32, // offset 0, size 4
-    y: f32, // offset 4, size 4
-    id: i32, // offset 8, size 4
+    x: f32, // オフセット 0、サイズ 4
+    y: f32, // オフセット 4、サイズ 4
+    id: i32, // オフセット 8、サイズ 4
 }
 ```
 
-TypeTree for `&Point` (internal representation):
+`&Point`のTypeTree（内部表現）：
 ```rust
 TypeTree(vec![
-    Type { offset: 0, size: 4, kind: Float },   // x at byte 0
-    Type { offset: 4, size: 4, kind: Float },   // y at byte 4
-    Type { offset: 8, size: 4, kind: Integer }  // id at byte 8
+    Type { offset: 0, size: 4, kind: Float },   // バイト0にx
+    Type { offset: 4, size: 4, kind: Float },   // バイト4にy
+    Type { offset: 8, size: 4, kind: Integer }  // バイト8にid
 ])
 ```
 
-Generates LLVM
+生成されるLLVM：
 ```llvm
 "enzyme_type"="{[-1]:Pointer, [-1,0]:Float@float, [-1,4]:Float@float, [-1,8]:Integer, [-1,9]:Integer, [-1,10]:Integer, [-1,11]:Integer}"
 ```
 
-### Offset -1 (Special: "Everywhere")
-**Means "this pattern repeats for ALL elements"**
+### オフセット -1 (特別：「すべての場所」)
+**「このパターンがすべての要素で繰り返される」ことを意味する**
 
-#### Example 1: Direct Array `[f32; 100]` (no pointer indirection)
+#### 例1：直接配列 `[f32; 100]` (ポインタ間接参照なし)
 ```rust
 TypeTree(vec![Type {
-    offset: -1, // ALL positions
-    size: 4,    // each f32 is 4 bytes
-    kind: Float, // every element is float
+    offset: -1, // すべての位置
+    size: 4,    // 各f32は4バイト
+    kind: Float, // すべての要素がfloat
 }])
 ```
 
-Generates LLVM: `"enzyme_type"="{[-1]:Float@float}"`
+生成されるLLVM：`"enzyme_type"="{[-1]:Float@float}"`
 
-#### Example 1b: Array Reference `&[f32; 100]` (with pointer indirection)  
+#### 例1b：配列参照 `&[f32; 100]` (ポインタ間接参照あり)
 ```rust
 TypeTree(vec![Type {
     offset: -1, size: 8, kind: Pointer,
     child: TypeTree(vec![Type {
-        offset: -1, // ALL array elements
-        size: 4,    // each f32 is 4 bytes
-        kind: Float, // every element is float
+        offset: -1, // すべての配列要素
+        size: 4,    // 各f32は4バイト
+        kind: Float, // すべての要素がfloat
     }])
 }])
 ```
 
-Generates LLVM: `"enzyme_type"="{[-1]:Pointer, [-1,-1]:Float@float}"`
+生成されるLLVM：`"enzyme_type"="{[-1]:Pointer, [-1,-1]:Float@float}"`
 
-Instead of listing 100 separate Types with offsets `0,4,8,12...396`
+オフセット`0,4,8,12...396`を持つ100個の個別のTypeをリストする代わりに
 
-#### Example 2: Slice `&[i32]`
+#### 例2：スライス `&[i32]`
 ```rust
-// Pointer to slice data
+// スライスデータへのポインタ
 TypeTree(vec![Type {
     offset: -1, size: 8, kind: Pointer,
     child: TypeTree(vec![Type {
-        offset: -1, // ALL slice elements
-        size: 4,    // each i32 is 4 bytes
+        offset: -1, // すべてのスライス要素
+        size: 4,    // 各i32は4バイト
         kind: Integer
     }])
 }])
 ```
 
-Generates LLVM: `"enzyme_type"="{[-1]:Pointer, [-1,-1]:Integer}"`
+生成されるLLVM：`"enzyme_type"="{[-1]:Pointer, [-1,-1]:Integer}"`
 
-#### Example 3: Mixed Structure
+#### 例3：混合構造
 ```rust
 struct Container {
-    header: i64,        // offset 0
-    data: [f32; 1000],  // offset 8, but elements use -1
+    header: i64,        // オフセット 0
+    data: [f32; 1000],  // オフセット 8、ただし要素は-1を使用
 }
 ```
 
@@ -174,20 +174,20 @@ TypeTree(vec![
     Type { offset: 0, size: 8, kind: Integer }, // header
     Type { offset: 8, size: 4000, kind: Pointer,
         child: TypeTree(vec![Type {
-            offset: -1, size: 4, kind: Float // ALL array elements
+            offset: -1, size: 4, kind: Float // すべての配列要素
         }])
     }
 ])
 ```
 
-## Key Distinction: Single Values vs Arrays
+## 重要な区別：単一値 vs 配列
 
-**Single Values** use offset `0` for precision:
-- `&f32` has exactly one f32 value at offset 0
-- More precise than using -1 ("everywhere")  
-- Generates: `{[-1]:Pointer, [-1,0]:Float@float}`
+**単一値**は精度のためにオフセット`0`を使用：
+- `&f32`はオフセット0に正確に1つのf32値を持つ
+- -1（「すべての場所」）を使用するよりも正確
+- 生成：`{[-1]:Pointer, [-1,0]:Float@float}`
 
-**Arrays** use offset `-1` for efficiency:
-- `&[f32; 100]` has the same pattern repeated 100 times
-- Using -1 avoids listing 100 separate offsets
-- Generates: `{[-1]:Pointer, [-1,-1]:Float@float}`
+**配列**は効率性のためにオフセット`-1`を使用：
+- `&[f32; 100]`は同じパターンが100回繰り返される
+- -1を使用することで、100個の個別のオフセットをリストすることを回避
+- 生成：`{[-1]:Pointer, [-1,-1]:Float@float}`

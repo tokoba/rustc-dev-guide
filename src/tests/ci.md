@@ -1,190 +1,134 @@
-# Testing with CI
+# CIでのテスト
 
-The primary goal of our CI system is to ensure that the `main` branch of
-`rust-lang/rust` is always in a valid state by passing our test suite.
+CIシステムの主な目標は、`rust-lang/rust`の`main`ブランチがテストスイートに合格することで常に有効な状態にあることを保証することです。
 
-From a high-level point of view, when you open a pull request at
-`rust-lang/rust`, the following will happen:
+ハイレベルな視点から見ると、`rust-lang/rust`でプルリクエストを開くと、次のことが起こります：
 
-- A small [subset](#pull-request-builds) of tests and checks are run after each
-  push to the PR.
-  This should help catch common errors.
-- When the PR is approved, the [bors] bot enqueues the PR into a [merge queue].
-- Once the PR gets to the front of the queue, bors will create a merge commit
-  and run the [full test suite](#auto-builds) on it.
-  The merge commit either contains only one specific PR or it can be a ["rollup"](#rollups) which
-  combines multiple PRs together, to reduce CI costs and merge delays.
-- Once the whole test suite finishes, two things can happen. Either CI fails
-  with an error that needs to be addressed by the developer, or CI succeeds and
-  the merge commit is then pushed to the `main` branch.
+- PRへの各プッシュ後に、テストとチェックの小さな[サブセット](#pull-request-builds)が実行されます。
+  これは一般的なエラーを早期に捕捉するのに役立ちます。
+- PRが承認されると、[bors]ボットがPRを[マージキュー]にエンキューします。
+- PRがキューの先頭に到達すると、borsはマージコミットを作成し、その上で[完全なテストスイート](#auto-builds)を実行します。
+  マージコミットには、1つの特定のPRのみが含まれる場合もあれば、CIコストとマージ遅延を削減するために複数のPRをまとめた["ロールアップ"](#rollups)の場合もあります。
+- 完全なテストスイートが終了すると、2つのことが起こります。開発者が対処する必要があるエラーでCIが失敗するか、CIが成功してマージコミットが`main`ブランチにプッシュされます。
 
-If you want to modify what gets executed on CI, see [Modifying CI jobs](#modifying-ci-jobs).
+CIで実行される内容を変更したい場合は、[CIジョブの変更](#modifying-ci-jobs)を参照してください。
 
-## CI workflow
+## CIワークフロー
 
 <!-- date-check: Oct 2024 -->
 
-Our CI is primarily executed on [GitHub Actions], with a single workflow defined
-in [`.github/workflows/ci.yml`], which contains a bunch of steps that are
-unified for all CI jobs that we execute.
-When a commit is pushed to a corresponding branch or a PR, the workflow executes the
-[`src/ci/citool`] crate, which dynamically generates the specific CI jobs that should be executed.
-This script uses the [`jobs.yml`] file as an
-input, which contains a declarative configuration of all our CI jobs.
+CIは主に[GitHub Actions]上で実行され、[`.github/workflows/ci.yml`]で定義された単一のワークフローがあります。これには、実行するすべてのCIジョブに統一された多数のステップが含まれています。
+コミットが対応するブランチまたはPRにプッシュされると、ワークフローは[`src/ci/citool`]クレートを実行し、実行する特定のCIジョブを動的に生成します。
+このスクリプトは、すべてのCIジョブの宣言的な設定を含む[`jobs.yml`]ファイルを入力として使用します。
 
-> Almost all build steps shell out to separate scripts. This keeps the CI fairly
-> platform independent (i.e., we are not overly reliant on GitHub Actions).
-> GitHub Actions is only relied on for bootstrapping the CI process and for
-> orchestrating the scripts that drive the process.
+> ほとんどすべてのビルドステップは別々のスクリプトにシェルアウトします。これにより、CIはかなりプラットフォームに依存しません（つまり、GitHub Actionsに過度に依存していません）。
+> GitHub Actionsは、CIプロセスのブートストラップとプロセスを駆動するスクリプトのオーケストレーションにのみ依存されています。
 
-In essence, all CI jobs run `./x test`, `./x dist` or some other command with
-different configurations, across various operating systems, targets, and platforms.
-There are two broad categories of jobs that are executed, `dist` and non-`dist` jobs.
+本質的に、すべてのCIジョブは、さまざまなオペレーティングシステム、ターゲット、およびプラットフォームで、異なる構成で`./x test`、`./x dist`、またはその他のコマンドを実行します。
+実行されるジョブには、`dist`ジョブと非`dist`ジョブの2つの広いカテゴリーがあります。
 
-- Dist jobs build a full release of the compiler for a specific platform,
-  including all the tools we ship through rustup.
-  Those builds are then uploaded
-  to the `rust-lang-ci2` S3 bucket and are available to be locally installed
-  with the [rustup-toolchain-install-master] tool.
-  The same builds are also used
-  for actual releases: our release process basically consists of copying those
-  artifacts from `rust-lang-ci2` to the production endpoint and signing them.
-- Non-dist jobs run our full test suite on the platform, and the test suite of
-  all the tools we ship through rustup;
-  The amount of stuff we test depends on
-  the platform (for example some tests are run only on Tier 1 platforms), and
-  some quicker platforms are grouped together on the same builder to avoid wasting CI resources.
+- distジョブは、特定のプラットフォーム用のコンパイラの完全なリリースをビルドします。これには、rustupを介して出荷するすべてのツールが含まれます。
+  これらのビルドは`rust-lang-ci2` S3バケットにアップロードされ、[rustup-toolchain-install-master]ツールでローカルにインストールできます。
+  同じビルドは実際のリリースにも使用されます：リリースプロセスは基本的に、これらのアーティファクトを`rust-lang-ci2`から本番エンドポイントにコピーして署名することで構成されます。
+- 非distジョブは、プラットフォーム上で完全なテストスイートを実行し、rustupを介して出荷するすべてのツールのテストスイートを実行します。
+  テストする内容の量はプラットフォームに依存します（たとえば、一部のテストはTier 1プラットフォームでのみ実行されます）、
+  より高速なプラットフォームの一部は、CIリソースを無駄にしないように同じビルダー上でグループ化されます。
 
-Based on an input event (usually a push to a branch), we execute one of three
-kinds of builds (sets of jobs).
+入力イベント（通常はブランチへのプッシュ）に基づいて、3種類のビルド（ジョブのセット）のいずれかを実行します。
 
-1. PR builds
-2. Auto builds
-3. Try builds
+1. PRビルド
+2. Autoビルド
+3. Tryビルド
 
 [rustup-toolchain-install-master]: https://github.com/kennytm/rustup-toolchain-install-master
 
-### Pull Request builds
+### プルリクエストビルド
 
-After each push to a pull request, a set of `pr` jobs are executed.
-Currently, these execute the `x86_64-gnu-llvm-X`, `x86_64-gnu-tools`, `pr-check-1`, `pr-check-2`
-and `tidy` jobs, all running on Linux.
-These execute a relatively short
-(~40 minutes) and lightweight test suite that should catch common issues.
-More specifically, they run a set of lints, they try to perform a cross-compile check
-build to Windows mingw (without producing any artifacts), and they test the
-compiler using a *system* version of LLVM.
-Unfortunately, it would take too many
-resources to run the full test suite for each commit on every PR.
+プルリクエストへの各プッシュ後、`pr`ジョブのセットが実行されます。
+現在、これらは`x86_64-gnu-llvm-X`、`x86_64-gnu-tools`、`pr-check-1`、`pr-check-2`、および`tidy`ジョブを実行します。すべてLinux上で実行されます。
+これらは比較的短い（約40分）軽量なテストスイートを実行し、一般的な問題を捕捉する必要があります。
+より具体的には、一連のlintを実行し、Windows mingwへのクロスコンパイルチェックビルドを実行し（アーティファクトを生成せず）、*システム*バージョンのLLVMを使用してコンパイラをテストします。
+残念ながら、すべてのPRでコミットごとに完全なテストスイートを実行するには、リソースが多すぎます。
 
-> **Note on doc comments**
+> **ドキュメントコメントに関する注意**
 >
-> Note that PR CI as of Oct 2024 <!-- datecheck --> by default does not try to
-> run `./x doc xxx`. This means that if you have any broken intradoc links that
-> would lead to `./x doc xxx` failing, it will happen very late into the full
-> merge queue CI pipeline.
+> 2024年10月時点<!-- datecheck -->のPR CIはデフォルトで`./x doc xxx`を実行しようとしないことに注意してください。これは、`./x doc xxx`の失敗につながる壊れたintradocリンクがある場合、完全なマージキューCIパイプラインの非常に遅い段階で発生することを意味します。
 >
-> Thus, it is a good idea to run `./x doc xxx` locally for any doc comment
-> changes to help catch these early.
+> したがって、ドキュメントコメントの変更については、これらを早期に捕捉するために、ローカルで`./x doc xxx`を実行することをお勧めします。
 
-PR jobs are defined in the `pr` section of [`jobs.yml`].
-Their results can be observed
-directly on the PR, in the "CI checks" section at the bottom of the PR page.
+PRジョブは[`jobs.yml`]の`pr`セクションで定義されています。
+結果は、PRページの下部の「CIチェック」セクションで、PR上で直接観察できます。
 
-### Auto builds
+### Autoビルド
 
-Before a commit can be merged into the `main` branch, it needs to pass our complete test suite.
-We call this an `auto` build.
-This build runs tens of CI jobs that exercise various tests across operating systems and targets.
-The full test suite is quite slow;
-it can take several hours until all the `auto` CI jobs finish.
+コミットが`main`ブランチにマージされる前に、完全なテストスイートに合格する必要があります。
+これを`auto`ビルドと呼びます。
+このビルドは、オペレーティングシステムとターゲット全体でさまざまなテストを実行する数十のCIジョブを実行します。
+完全なテストスイートはかなり遅く、すべての`auto` CIジョブが終了するまでに数時間かかることがあります。
 
-Most platforms only run the build steps, some run a restricted set of tests;
-only a subset run the full suite of tests (see Rust's [platform tiers]).
+ほとんどのプラットフォームはビルドステップのみを実行し、一部は制限されたテストセットを実行します。
+完全なテストスイートを実行するのはサブセットのみです（Rustの[platform tiers]を参照）。
 
-Auto jobs are defined in the `auto` section of [`jobs.yml`].
-They are executed on the `auto` branch under the `rust-lang/rust` repository,
-and the final result will be reported via a comment made by bors on the corresponding PR.
-The live results can be seen on [the GitHub Actions workflows page].
+Autoジョブは[`jobs.yml`]の`auto`セクションで定義されています。
+`rust-lang/rust`リポジトリの`auto`ブランチで実行され、最終結果は対応するPRでborsによってコメントで報告されます。
+ライブ結果は[the GitHub Actions workflows page]で見ることができます。
 
-At any given time, at most a single `auto` build is being executed.
-Find out more in [Merging PRs serially with bors](#merging-prs-serially-with-bors).
+いつでも、最大で1つの`auto`ビルドのみが実行されます。
+詳細については、[borsによるPRの連続マージ](#merging-prs-serially-with-bors)を参照してください。
 
 [platform tiers]: https://forge.rust-lang.org/release/platform-support.html#rust-platform-support
 
-### Try builds
+### Tryビルド
 
-Sometimes we want to run a subset of the test suite on CI for a given PR, or
-build a set of compiler artifacts from that PR, without attempting to merge it.
-We call this a "try build".
-A try build is started after a user with the proper
-permissions posts a PR comment with the `@bors try` command.
+特定のPRに対してCIでテストスイートのサブセットを実行したり、マージを試みることなくそのPRからコンパイラアーティファクトのセットをビルドしたりしたい場合があります。
+これを「tryビルド」と呼びます。
+tryビルドは、適切な権限を持つユーザーが`@bors try`コマンドでPRコメントを投稿した後に開始されます。
 
-There are several use-cases for try builds:
+tryビルドにはいくつかのユースケースがあります：
 
-- Run a set of performance benchmarks using our [rustc-perf] benchmark suite.
-  For this, a working compiler build is needed, which can be generated with a
-  try build that runs the [dist-x86_64-linux] CI job, which builds an optimized
-  version of the compiler on Linux (this job is currently executed by default
-  when you start a try build).
-  To create a try build and schedule it for a
-  performance benchmark, you can use the `@bors try @rust-timer queue` command combination.
-- Check the impact of the PR across the Rust ecosystem, using a [Crater](crater.md) run.
-  Again, a working compiler build is needed for this, which can be produced by
-  the [dist-x86_64-linux] CI job.
-- Run a specific CI job (e.g. Windows tests) on a PR, to quickly test if it
-  passes the test suite executed by that job.
+- [rustc-perf]ベンチマークスイートを使用して、パフォーマンスベンチマークのセットを実行します。
+  これには、作業中のコンパイラビルドが必要です。これは、Linux上でコンパイラの最適化バージョンをビルドする[dist-x86_64-linux] CIジョブを実行するtryビルドで生成できます（このジョブは現在、tryビルドを開始するときにデフォルトで実行されます）。
+  tryビルドを作成してパフォーマンスベンチマークのスケジュールを設定するには、`@bors try @rust-timer queue`コマンドの組み合わせを使用できます。
+- [Crater](crater.md)実行を使用して、Rustエコシステム全体でのPRの影響をチェックします。
+  繰り返しになりますが、これには作業中のコンパイラビルドが必要です。これは[dist-x86_64-linux] CIジョブによって生成できます。
+- PRで特定のCIジョブ（Windowsテストなど）を実行して、そのジョブによって実行されるテストスイートに合格するかどうかを迅速にテストします。
 
-By default, if you send a comment with `@bors try`, the jobs defined in the `try` section of
-[`jobs.yml`] will be executed.
-We call this mode a "fast try build".
-Such a try build will not execute any tests, and it will allow compilation warnings.
-It is useful when you want to
-get an optimized toolchain as fast as possible, for a Crater run or performance benchmarks,
-even if it might not be working fully correctly.
-If you want to do a full build for the default try job,
-specify its job name in a job pattern (explained below).
+デフォルトでは、`@bors try`でコメントを送信すると、[`jobs.yml`]の`try`セクションで定義されたジョブが実行されます。
+このモードを「高速tryビルド」と呼びます。
+このようなtryビルドはテストを実行せず、コンパイル警告を許可します。
+Crater実行またはパフォーマンスベンチマークのために、完全に正しく動作しない可能性があっても、できるだけ早く最適化されたツールチェーンを取得したい場合に役立ちます。
+デフォルトのtryジョブの完全なビルドを実行したい場合は、ジョブパターン（以下で説明）でそのジョブ名を指定してください。
 
-If you want to run custom CI jobs in a try build and make sure that they pass all tests and do
-not produce any compilation warnings, you can select CI jobs to be executed by specifying a *job pattern*,
-which can be used in one of two ways:
-- You can add a set of `try-job: <job pattern>` directives to the PR description (described below) and then
-  simply run `@bors try`.
-  CI will read these directives and run the jobs that you have specified.
-  This is
-  useful if you want to rerun the same set of try jobs multiple times, after incrementally modifying a PR.
-- You can specify the job pattern using the `jobs` parameter of the try command: `@bors try jobs=<job pattern>`.
-  This is useful for one-off try builds with specific jobs.
-  Note that the `jobs` parameter has a higher priority than the PR description directives.
-  - There can also be multiple patterns specified, e.g. `@bors try jobs=job1,job2,job3`.
+tryビルドでカスタムCIジョブを実行し、すべてのテストに合格し、コンパイル警告を生成しないことを確認したい場合は、*ジョブパターン*を指定してCIジョブを選択できます。
+これは2つの方法のいずれかで使用できます：
+- PR説明に`try-job: <job pattern>`ディレクティブのセットを追加し（以下で説明）、`@bors try`を実行するだけです。
+  CIはこれらのディレクティブを読み取り、指定したジョブを実行します。
+  これは、PRを段階的に変更した後、同じtryジョブのセットを複数回再実行したい場合に役立ちます。
+- tryコマンドの`jobs`パラメータを使用してジョブパターンを指定できます：`@bors try jobs=<job pattern>`。
+  これは、特定のジョブを使用した1回限りのtryビルドに役立ちます。
+  `jobs`パラメータはPR説明ディレクティブよりも優先度が高いことに注意してください。
+  - 複数のパターンを指定することもできます。例：`@bors try jobs=job1,job2,job3`。
 
-Each job pattern can either be an exact name of a job or a glob pattern that matches multiple jobs,
-for example `*msvc*` or `*-alt`.
-You can start at most 20 jobs in a single try build.
-When using
-glob patterns in the PR description, you can optionally wrap them in backticks (`` ` ``) to avoid GitHub rendering
-the pattern as Markdown if it contains e.g. an asterisk. Note that this escaping will not work when using
-the `@bors jobs=` parameter.
+各ジョブパターンは、ジョブの正確な名前、または複数のジョブに一致するglobパターンのいずれかです。
+たとえば、`*msvc*`または`*-alt`です。
+1つのtryビルドで最大20個のジョブを開始できます。
+PR説明でglobパターンを使用する場合、アスタリスクなどが含まれている場合にGitHubがパターンをMarkdownとしてレンダリングしないように、バッククォート(`` ` ``)でラップすることができます。このエスケープは`@bors jobs=`パラメータを使用するときには機能しないことに注意してください。
 
-The job pattern needs to match one or more jobs defined in the `auto` or `optional` sections
-of [`jobs.yml`]:
+ジョブパターンは、[`jobs.yml`]の`auto`または`optional`セクションで定義された1つ以上のジョブと一致する必要があります：
 
-- `auto` jobs are executed before a commit is merged into the `main` branch.
-- `optional` jobs are executed only when explicitly requested via a try build.
-  They are typically used for tier 2 and tier 3 targets.
+- `auto`ジョブは、コミットが`main`ブランチにマージされる前に実行されます。
+- `optional`ジョブは、tryビルドを介して明示的にリクエストされた場合にのみ実行されます。
+  これらは通常、tier 2およびtier 3ターゲットに使用されます。
 
-One reason to do a try build is to do a perf run, as described above, with `@rust-timer queue`.
-This perf build then compares against some commit on main.
-With `@bors try parent=<sha>` you can base your try build and subsequent perf run on a specific commit on `main`,
-to help make the perf comparison as fair as possible.
+tryビルドを行う理由の1つは、上記のように`@rust-timer queue`でパフォーマンス実行を行うことです。
+このパフォーマンスビルドは、main上のいくつかのコミットと比較されます。
+`@bors try parent=<sha>`を使用すると、特定の`main`上のコミットに基づいてtryビルドとその後のパフォーマンス実行を行うことができ、パフォーマンス比較をできるだけ公平にするのに役立ちます。
 
-> **Using `try-job` PR description directives**
+> **`try-job` PR説明ディレクティブの使用**
 >
-> 1. Identify which set of try-jobs you would like to exercise. You can
->    find the name of the CI jobs in [`jobs.yml`].
+> 1. 実行したいtryジョブのセットを特定します。CIジョブの名前は[`jobs.yml`]で見つけることができます。
 >
-> 2. Amend PR description to include a set of patterns (usually at the end
->    of the PR description), for example:
+> 2. PR説明を修正して、パターンのセット（通常はPR説明の最後）を含めます。例：
 >
 >    ```text
 >    This PR fixes #123456.
@@ -194,52 +138,39 @@ to help make the perf comparison as fair as possible.
 >    try-job: `*-alt`
 >    ```
 >
->    Each `try-job` pattern must be on its own line.
+>    各`try-job`パターンは独自の行にある必要があります。
 >
-> 3. Run the prescribed try jobs with `@bors try`. As aforementioned, this
->    requires the user to either (1) have `try` permissions or (2) be delegated
->    with `try` permissions by `@bors delegate` by someone who has `try`
->    permissions.
+> 3. `@bors try`で指定されたtryジョブを実行します。前述のように、これにはユーザーが（1）`try`権限を持っているか、（2）`try`権限を持っている人による`@bors delegate`で`try`権限を委任されている必要があります。
 >
-> Note that this is usually easier to do than manually edit [`jobs.yml`].
-> However, it can be less flexible because you cannot adjust the set of tests
-> that are exercised this way.
+> これは通常、[`jobs.yml`]を手動で編集するよりも簡単です。
+> ただし、この方法では実行されるテストのセットを調整できないため、柔軟性が低くなる可能性があります。
 
-Try builds are executed on the `try` branch under the `rust-lang/rust` repository and
-their results can be seen on [the GitHub Actions workflows page],
-although usually you will be notified of the result by a comment made by bors on
-the corresponding PR.
+Tryビルドは`rust-lang/rust`リポジトリの`try`ブランチで実行され、
+結果は[the GitHub Actions workflows page]で見ることができますが、
+通常は対応するPRでborsによって作成されたコメントで結果が通知されます。
 
-Multiple try builds can execute concurrently across different PRs, but there can be at most
-a single try build running on a single PR at any given time.
+複数のtryビルドは異なるPR間で同時に実行できますが、単一のPRで一度に実行できるtryビルドは最大1つです。
 
-Note that try builds are handled using the [new bors] implementation.
+tryビルドは[new bors]実装を使用して処理されることに注意してください。
 
 [rustc-perf]: https://github.com/rust-lang/rustc-perf
 [new bors]: https://github.com/rust-lang/bors
 
-### Modifying CI jobs
+### CIジョブの変更
 
-If you want to modify what gets executed on our CI, you can simply modify the
-`pr`, `auto` or `try` sections of the [`jobs.yml`] file.
+CIで実行される内容を変更したい場合は、[`jobs.yml`]ファイルの`pr`、`auto`、または`try`セクションを変更するだけです。
 
-You can also modify what gets executed temporarily, for example to test a
-particular platform or configuration that is challenging to test locally (for
-example, if a Windows build fails, but you don't have access to a Windows machine).
-Don't hesitate to use CI resources in such situations.
+また、ローカルでテストすることが困難な特定のプラットフォームまたは構成をテストするために、実行される内容を一時的に変更することもできます（たとえば、Windowsビルドが失敗したが、Windowsマシンにアクセスできない場合）。
+このような状況ではCIリソースの使用をためらわないでください。
 
-You can perform an arbitrary CI job in two ways:
-- Use the [try build](#try-builds) functionality, and specify the CI jobs that
-  you want to be executed in try builds in your PR description.
-- Modify the [`pr`](#pull-request-builds) section of `jobs.yml` to specify which
-  CI jobs should be executed after each push to your PR.
-  This might be faster than repeatedly starting try builds.
+任意のCIジョブを実行するには、2つの方法があります：
+- [tryビルド](#try-builds)機能を使用し、PR説明でtryビルドで実行するCIジョブを指定します。
+- `jobs.yml`の[`pr`](#pull-request-builds)セクションを変更して、PRへの各プッシュ後に実行するCIジョブを指定します。
+  これは、繰り返しtryビルドを開始するよりも高速である可能性があります。
 
-To modify the jobs executed after each push to a PR, you can simply copy one of
-the job definitions from the `auto` section to the `pr` section.
-For example, the `x86_64-msvc` job is responsible for running the 64-bit MSVC tests.
-You can copy it to the `pr` section to cause it to be executed after a commit is pushed
-to your PR, like this:
+PRへの各プッシュ後に実行されるジョブを変更するには、`auto`セクションからジョブ定義の1つを`pr`セクションにコピーするだけです。
+たとえば、`x86_64-msvc`ジョブは64ビットMSVCテストの実行を担当します。
+次のように、PRにコミットがプッシュされた後に実行されるように`pr`セクションにコピーできます：
 
 ```yaml
 pr:
@@ -255,228 +186,169 @@ pr:
     <<: *job-windows-8c
 ```
 
-Then you can commit the file and push it to your PR branch on GitHub.
-GitHub Actions should then execute this CI job after each push to your PR.
+その後、ファイルをコミットしてGitHub上のPRブランチにプッシュできます。
+GitHub ActionsはPRへの各プッシュ後にこのCIジョブを実行するはずです。
 
 <div class="warning">
 
-**After you have finished your experiments, don't forget to remove any changes
-you have made to `jobs.yml`, if they were supposed to be temporary!**
+**実験が終了したら、一時的であると想定されていた場合は、`jobs.yml`に加えた変更を削除することを忘れないでください！**
 
-A good practice is to prefix `[WIP]` in PR title while still running try jobs
-and `[DO NOT MERGE]` in the commit that modifies the CI jobs for testing purposes.
+tryジョブをまだ実行している間はPRタイトルに`[WIP]`プレフィックスを付け、テスト目的でCIジョブを変更するコミットに`[DO NOT MERGE]`を付けるのが良い習慣です。
 </div>
 
-Although you are welcome to use CI, just be conscious that this is a shared
-resource with limited concurrency.
-Try not to enable too many jobs at once;
-one or two should be sufficient in most cases.
+CIを使用することは歓迎されますが、これは同時実行性が制限された共有リソースであることを意識してください。
+一度に有効にするジョブが多すぎないようにしてください。
+ほとんどの場合、1つまたは2つで十分です。
 
-## Merging PRs serially with bors
+## borsによるPRの連続マージ
 
-CI services usually test the last commit of a branch merged with the last commit
-in `main`, and while that’s great to check if the feature works in isolation,
-it doesn’t provide any guarantee the code is going to work once it’s merged.
-Breakages like these usually happen when another, incompatible PR is merged
-after the build happened.
+CIサービスは通常、ブランチの最後のコミットと`main`の最後のコミットをマージしてテストします。これは、機能が単独で機能するかどうかを確認するのに最適ですが、マージされた後にコードが機能するという保証はありません。
+このような破壊は通常、ビルドが発生した後に別の互換性のないPRがマージされたときに発生します。
 
-To ensure a `main` branch that works all the time, we forbid manual merges.
-Instead, all PRs have to be approved through our bot, [bors] (the software
-behind it is called [homu]).
-All the approved PRs are put in a [merge queue]
-(sorted by priority and creation date) and are automatically tested one at the time.
-If all the builders are green, the PR is merged, otherwise the failure is
-recorded and the PR will have to be re-approved again.
+常に機能する`main`ブランチを保証するために、手動マージを禁止しています。
+代わりに、すべてのPRは、ボット[bors]を介して承認される必要があります（その背後にあるソフトウェアは[homu]と呼ばれます）。
+承認されたすべてのPRは[マージキュー]に入れられ（優先度と作成日でソートされ）、一度に1つずつ自動的にテストされます。
+すべてのビルダーがグリーンの場合、PRはマージされます。それ以外の場合、失敗が記録され、PRは再度承認される必要があります。
 
-Bors doesn’t interact with CI services directly, but it works by pushing the
-merge commit it wants to test to specific branches (like `auto` or `try`), which
-are configured to execute CI checks.
-Bors then detects the outcome of the build by listening for either Commit Statuses or Check Runs.
-Since the merge commit is
-based on the latest `main` and only one can be tested at the same time, when
-the results are green, `main` is fast-forwarded to that merge commit.
+Borsは、CIサービスと直接対話するのではなく、テストしたいマージコミットを特定のブランチ（`auto`や`try`など）にプッシュすることで機能します。これらのブランチはCIチェックを実行するように構成されています。
+次に、BorsはCommit StatusesまたはCheck Runsをリッスンすることでビルドの結果を検出します。
+マージコミットは最新の`main`に基づいており、一度に1つしかテストできないため、結果がグリーンの場合、`main`はそのマージコミットに早送りされます。
 
-Unfortunately, testing a single PR at a time, combined with our long CI (~2
-hours for a full run), means we can’t merge a lot of PRs in a single day, and a
-single failure greatly impacts our throughput.
-The maximum number of PRs we can merge in a day is around ~10.
+残念ながら、一度に1つのPRをテストすることと、長いCI（完全実行で約2時間）を組み合わせると、1日に多くのPRをマージできず、単一の失敗がスループットに大きく影響します。
+1日にマージできるPRの最大数は約10です。
 
-The long CI run times, and requirement for a large builder pool, is largely due
-to the fact that full release artifacts are built in the `dist-` builders.
-This is worth it because these release artifacts:
+長いCI実行時間と大規模なビルダープールの要件は、主に`dist-`ビルダーで完全なリリースアーティファクトがビルドされているという事実によるものです。
+これらのリリースアーティファクトは次の理由で価値があります：
 
-- Allow perf testing even at a later date.
-- Allow bisection when bugs are discovered later.
-- Ensure release quality since if we're always releasing, we can catch problems
-  early.
+- 後日でもパフォーマンステストを可能にします。
+- 後でバグが発見されたときにバイセクションを可能にします。
+- 常にリリースしている場合、問題を早期に捕捉できるため、リリース品質を保証します。
 
-### Rollups
+### ロールアップ
 
-Some PRs don’t need the full test suite to be executed: trivial changes like
-typo fixes or README improvements *shouldn’t* break the build, and testing every
-single one of them for 2+ hours would be wasteful.
-To solve this, we regularly create a "rollup", a PR where we merge several pending trivial PRs so
-they can be tested together.
-Rollups are created manually by a team member using
-the "create a rollup" button on the [merge queue].
-The team member uses their judgment to decide if a PR is risky or not.
+一部のPRは完全なテストスイートを実行する必要がありません：タイプミス修正やREADME改善のような些細な変更はビルドを壊すべきではなく、それらすべてを2時間以上テストすることは無駄です。
+これを解決するために、いくつかの保留中の些細なPRをマージして一緒にテストできる「ロールアップ」と呼ばれるPRを定期的に作成します。
+ロールアップは、[マージキュー]の「ロールアップを作成」ボタンを使用してチームメンバーが手動で作成します。
+チームメンバーは、PRがリスクがあるかどうかを判断するために判断を使用します。
 
 ## Docker
 
-All CI jobs, except those on macOS and Windows, are executed inside that
-platform’s custom [Docker container].
-This has a lot of advantages for us:
+macOSとWindows上のものを除くすべてのCIジョブは、そのプラットフォームのカスタム[Dockerコンテナ]内で実行されます。
+これには多くの利点があります：
 
-- The build environment is consistent regardless of the changes of the
-  underlying image (switching from the trusty image to xenial was painless for us).
-- We can use ancient build environments to ensure maximum binary compatibility,
-  for example [using older CentOS releases][dist-x86_64-linux] on our Linux builders.
-- We can avoid reinstalling tools (like QEMU or the Android emulator) every time,
-  thanks to Docker image caching.
-- Users can run the same tests in the same environment locally by just running this command:
+- ビルド環境は、基盤となるイメージの変更に関係なく一貫しています（trustyイメージからxenialへの切り替えは、私たちにとって痛みのないものでした）。
+- 最大のバイナリ互換性を保証するために、古いビルド環境を使用できます。たとえば、Linuxビルダーで[古いCentOSリリースを使用][dist-x86_64-linux]します。
+- Dockerイメージキャッシングのおかげで、ツール（QEMUやAndroidエミュレータなど）を毎回再インストールする必要がありません。
+- ユーザーは、次のコマンドを実行するだけで、同じ環境で同じテストをローカルで実行できます：
 
       cargo run --manifest-path src/ci/citool/Cargo.toml run-local <job-name>
 
-  This is helpful for debugging failures.
-  Note that there are only Linux Docker images available locally due to licensing and
-  other restrictions.
+  これは、失敗のデバッグに役立ちます。
+  ライセンスやその他の制限により、Linux Dockerイメージのみがローカルで利用可能であることに注意してください。
 
-The Docker images prefixed with `dist-` are used for building artifacts while
-those without that prefix run tests and checks.
+`dist-`プレフィックスが付いたDockerイメージはアーティファクトのビルドに使用され、
+そのプレフィックスがないものはテストとチェックを実行します。
 
-We also run tests for less common architectures (mainly Tier 2 and Tier 3 platforms) in CI.
-Since those platforms are not x86, we either run everything
-inside QEMU, or we just cross-compile if we don’t want to run the tests for that platform.
+また、CIで一般的でないアーキテクチャ（主にTier 2およびTier 3プラットフォーム）のテストも実行します。
+これらのプラットフォームはx86ではないため、QEMU内ですべてを実行するか、そのプラットフォームのテストを実行したくない場合はクロスコンパイルするだけです。
 
-These builders are running on a special pool of builders set up and maintained for us by GitHub.
+これらのビルダーは、GitHubによって設定および維持されている特別なビルダープールで実行されています。
 
-[Docker container]: https://github.com/rust-lang/rust/tree/HEAD/src/ci/docker
+[Dockerコンテナ]: https://github.com/rust-lang/rust/tree/HEAD/src/ci/docker
 
-## Caching
+## キャッシング
 
-Our CI workflow uses various caching mechanisms, mainly for two things:
+CIワークフローは、主に2つのことのためにさまざまなキャッシングメカニズムを使用します：
 
-### Docker images caching
+### Dockerイメージのキャッシング
 
-The Docker images we use to run most of the Linux-based builders take a *long* time to fully build.
-To speed up the build, we cache them using [Docker registry
-caching], with the intermediate artifacts being stored on [ghcr.io].
-We also push the built Docker images to ghcr, so that they can be reused by other tools
-(rustup) or by developers running the Docker build locally (to speed up their build).
+ほとんどのLinuxベースのビルダーを実行するために使用するDockerイメージは、完全にビルドするのに*長い*時間がかかります。
+ビルドを高速化するために、[Dockerレジストリキャッシング]を使用してキャッシュし、中間アーティファクトを[ghcr.io]に保存します。
+また、ビルドされたDockerイメージをghcrにプッシュして、他のツール（rustup）やローカルでDockerビルドを実行する開発者が再利用できるようにします（ビルドを高速化するため）。
 
-Since we test multiple, diverged branches (`main`, `beta` and `stable`), we
-can’t rely on a single cache for the images, otherwise builds on a branch would
-override the cache for the others.
-Instead, we store the images under different
-tags, identifying them with a custom hash made from the contents of all the
-Dockerfiles and related scripts.
+複数の分岐したブランチ（`main`、`beta`、`stable`）をテストするため、イメージに対して単一のキャッシュに依存することはできません。そうしないと、あるブランチでのビルドが他のブランチのキャッシュを上書きしてしまいます。
+代わりに、すべてのDockerfilesと関連スクリプトの内容から作成されたカスタムハッシュでイメージを識別し、異なるタグの下にイメージを保存します。
 
-The CI calculates a hash key, so that the cache of a Docker image is
-invalidated if one of the following changes:
+CIはハッシュキーを計算して、次のいずれかが変更された場合にDockerイメージのキャッシュが無効化されるようにします：
 
 - Dockerfile
-- Files copied into the Docker image in the Dockerfile
-- The architecture of the GitHub runner (x86 or ARM)
+- Dockerfileでdockerイメージにコピーされたファイル
+- GitHubランナーのアーキテクチャ（x86またはARM）
 
 [ghcr.io]: https://github.com/rust-lang/rust/pkgs/container/rust-ci
-[Docker registry caching]: https://docs.docker.com/build/cache/backends/registry/
+[Dockerレジストリキャッシング]: https://docs.docker.com/build/cache/backends/registry/
 
-### LLVM caching with Sccache
+### SccacheによるLLVMキャッシング
 
-We build some C/C++ stuff in various CI jobs, and we rely on [Sccache] to cache
-the intermediate LLVM artifacts.
-Sccache is a distributed ccache developed by
-Mozilla, which can use an object storage bucket as the storage backend.
+さまざまなCIジョブでいくつかのC/C++のものをビルドし、中間LLVMアーティファクトをキャッシュするために[Sccache]に依存しています。
+SccacheはMozillaによって開発された分散ccacheで、オブジェクトストレージバケットをストレージバックエンドとして使用できます。
 
-With Sccache there's no need to calculate the hash key ourselves.
-Sccache invalidates the cache automatically when it detects changes to relevant inputs,
-such as the source code, the version of the compiler, and important environment variables.
-So we just pass the Sccache wrapper on top of Cargo and Sccache does the rest.
+Sccacheでは、ハッシュキーを自分で計算する必要はありません。
+Sccacheは、ソースコード、コンパイラのバージョン、重要な環境変数などの関連する入力の変更を検出すると、自動的にキャッシュを無効化します。
+したがって、CargoのトップにSccacheラッパーを渡すだけで、Sccacheが残りを行います。
 
-We store the persistent artifacts on the S3 bucket, `rust-lang-ci-sccache2`.
-So when the CI runs, if Sccache sees that LLVM is being compiled with the same C/C++
-compiler and the LLVM source code is the same, Sccache retrieves the individual
-compiled translation units from S3.
+永続的なアーティファクトをS3バケット`rust-lang-ci-sccache2`に保存します。
+したがって、CIが実行されると、SccacheがLLVMが同じC/C++コンパイラでコンパイルされており、LLVMソースコードが同じであることを確認した場合、SccacheはS3から個々のコンパイル済み翻訳ユニットを取得します。
 
 [sccache]: https://github.com/mozilla/sccache
 
-## Custom tooling around CI
+## CI周辺のカスタムツール
 
-During the years, we developed some custom tooling to improve our CI experience.
+長年にわたり、CI体験を向上させるためにいくつかのカスタムツールを開発しました。
 
-### Rust Log Analyzer to show the error message in PRs
+### PRにエラーメッセージを表示するRust Log Analyzer
 
-The build logs for `rust-lang/rust` are huge, and it’s not practical to find
-what caused the build to fail by looking at the logs.
-We therefore developed a bot called [Rust Log Analyzer][rla] (RLA) that
-receives the build logs on failure, and extracts the error message automatically,
-posting it on the PR thread.
+`rust-lang/rust`のビルドログは巨大で、ログを見てビルドが失敗した原因を見つけることは現実的ではありません。
+したがって、失敗時にビルドログを受信し、エラーメッセージを自動的に抽出してPRスレッドに投稿する[Rust Log Analyzer][rla]（RLA）と呼ばれるボットを開発しました。
 
-The bot is not hardcoded to look for error strings, but was trained with a bunch
-of build failures to recognize which lines are common between builds and which are not.
-While the generated snippets can be weird sometimes, the bot is pretty
-good at identifying the relevant lines, even if it’s an error we've never seen before.
+ボットはエラー文字列を探すようにハードコードされているのではなく、多数のビルド失敗でトレーニングされて、ビルド間で共通する行と共通しない行を認識します。
+生成されたスニペットは時々奇妙になることがありますが、ボットは以前に見たことがないエラーであっても、関連する行を識別するのにかなり優れています。
 
 [rla]: https://github.com/rust-lang/rust-log-analyzer
 
-### Toolstate to support allowed failures
+### 許可された失敗をサポートするToolstate
 
-The `rust-lang/rust` repo doesn’t only test the compiler on its CI, but also a
-variety of tools and documentation.
-Some documentation is pulled in via git submodules.
-If we blocked merging rustc PRs on the documentation being fixed, we
-would be stuck in a chicken-and-egg problem, because the documentation's CI
-would not pass since updating it would need the not-yet-merged version of rustc
-to test against (and we usually require CI to be passing).
+`rust-lang/rust`リポジトリは、CIでコンパイラをテストするだけでなく、さまざまなツールとドキュメンテーションもテストします。
+一部のドキュメンテーションはgitサブモジュールを介してプルされます。
+ドキュメンテーションが修正されることでrustc PRのマージをブロックした場合、卵が先か鶏が先かという問題に陥ります。ドキュメンテーションのCIは、まだマージされていないバージョンのrustcに対してテストする必要があるため、更新しても合格しないためです（通常、CIが合格することを要求します）。
 
-To avoid the problem, submodules are allowed to fail, and their status is
-recorded in [rust-toolstate].
-When a submodule breaks, a bot automatically pings
-the maintainers so they know about the breakage, and it records the failure on
-the toolstate repository.
-The release process will then ignore broken tools on
-nightly, removing them from the shipped nightlies.
+問題を回避するために、サブモジュールは失敗が許可され、そのステータスは[rust-toolstate]に記録されます。
+サブモジュールが壊れると、ボットは自動的にメンテナーにpingして破壊を知らせ、toolstateリポジトリに失敗を記録します。
+リリースプロセスは、nightlyで壊れたツールを無視し、出荷されるnightlyからそれらを削除します。
 
-While tool failures are allowed most of the time, they’re automatically
-forbidden a week before a release: we don’t care if tools are broken on nightly
-but they must work on beta and stable, so they also need to work on nightly a
-few days before we promote nightly to beta.
+ツールの失敗はほとんどの場合許可されますが、リリースの1週間前に自動的に禁止されます：nightlyでツールが壊れていても構いませんが、betaとstableで機能する必要があるため、nightlyをbetaに昇格する数日前にnightlyでも機能する必要があります。
 
-More information is available in the [toolstate documentation].
+詳細については、[toolstate documentation]を参照してください。
 
 [rust-toolstate]: https://rust-lang-nursery.github.io/rust-toolstate
 [toolstate documentation]: https://forge.rust-lang.org/infra/toolstate.html
 
-## Public CI dashboard
+## パブリックCIダッシュボード
 
-To monitor the Rust CI, you can have a look at the [public dashboard] maintained by the infra team.
+Rust CIを監視するために、infraチームが維持している[public dashboard]を見ることができます。
 
-These are some useful panels from the dashboard:
+ダッシュボードからの有用なパネルのいくつか：
 
-- Pipeline duration: check how long the auto builds take to run.
-- Top slowest jobs: check which jobs are taking the longest to run.
-- Change in median job duration: check what jobs are slowest than before. Useful
-  to detect regressions.
-- Top failed jobs: check which jobs are failing the most.
+- Pipeline duration：autoビルドの実行にかかる時間を確認します。
+- Top slowest jobs：最も時間がかかっているジョブを確認します。
+- Change in median job duration：以前より遅いジョブを確認します。回帰を検出するのに役立ちます。
+- Top failed jobs：最も失敗しているジョブを確認します。
 
-To learn more about the dashboard, see the [Datadog CI docs].
+ダッシュボードの詳細については、[Datadog CI docs]を参照してください。
 
 [Datadog CI docs]: https://docs.datadoghq.com/continuous_integration/
 [public dashboard]: https://p.datadoghq.com/sb/3a172e20-e9e1-11ed-80e3-da7ad0900002-b5f7bb7e08b664a06b08527da85f7e30
 
-## Determining the CI configuration
+## CI構成の決定
 
-If you want to determine which `bootstrap.toml` settings are used in CI for a
-particular job, it is probably easiest to just look at the build log.
-To do this:
+特定のジョブでCIで使用される`bootstrap.toml`設定を決定したい場合は、ビルドログを見るのがおそらく最も簡単です。
+これを行うには：
 
-1. Go to
-   <https://github.com/rust-lang/rust/actions?query=branch%3Aauto+is%3Asuccess>
-   to find the most recently successful build, and click on it.
-2. Choose the job you are interested in on the left-hand side.
-3. Click on the gear icon and choose "View raw logs"
-4. Search for the string "Configure the build"
-5. All of the build settings are listed on the line with the text, `build.configure-args`
+1. <https://github.com/rust-lang/rust/actions?query=branch%3Aauto+is%3Asuccess>にアクセスして、最近成功したビルドを見つけてクリックします。
+2. 左側で興味のあるジョブを選択します。
+3. 歯車アイコンをクリックして「View raw logs」を選択します。
+4. 文字列「Configure the build」を検索します。
+5. すべてのビルド設定は、テキスト`build.configure-args`を含む行にリストされています。
 
 [GitHub Actions]: https://github.com/rust-lang/rust/actions
 [`jobs.yml`]: https://github.com/rust-lang/rust/blob/HEAD/src/ci/github-actions/jobs.yml
@@ -484,6 +356,6 @@ To do this:
 [`src/ci/citool`]: https://github.com/rust-lang/rust/blob/HEAD/src/ci/citool
 [bors]: https://github.com/bors
 [homu]: https://github.com/rust-lang/homu
-[merge queue]: https://bors.rust-lang.org/queue/rust
+[マージキュー]: https://bors.rust-lang.org/queue/rust
 [dist-x86_64-linux]: https://github.com/rust-lang/rust/blob/HEAD/src/ci/docker/host-x86_64/dist-x86_64-linux/Dockerfile
 [the GitHub Actions workflows page]: https://github.com/rust-lang/rust/actions

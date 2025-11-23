@@ -1,43 +1,36 @@
-# Propagating closure constraints
+# クロージャ制約の伝播
 
-When we are checking the type tests and universal regions, we may come
-across a constraint that we can't prove yet if we are in a closure
-body! However, the necessary constraints may actually hold (we just
-don't know it yet). Thus, if we are inside a closure, we just collect
-all the constraints we can't prove yet and return them. Later, when we
-are borrow check the MIR node that created the closure, we can also
-check that these constraints hold. At that time, if we can't prove
-they hold, we report an error.
+型テストと全称領域をチェックするとき、クロージャ本体内にいる場合、まだ証明できない制約に遭遇することがあります！しかし、必要な制約は実際には成立するかもしれません（ただ、まだわからないだけです）。したがって、クロージャ内にいる場合、まだ証明できないすべての制約を収集して返します。後で、クロージャを作成した MIR ノードを borrow check するときに、これらの制約が成立することもチェックできます。その時点で、成立することを証明できない場合、エラーを報告します。
 
-## How this is implemented
+## これがどのように実装されているか
 
-While borrow-checking a closure inside of `RegionInferenceContext::solve` we separately try to propagate type-outlives and region-outlives constraints to the parent if we're unable to prove them locally.
+`RegionInferenceContext::solve` 内でクロージャを borrow check する際、ローカルで証明できない場合、型 outlives および領域 outlives 制約を親に伝播しようと別々に試みます。
 
-### Region-outlive constraints
+### 領域 outlive 制約
 
-If `RegionInferenceContext::check_universal_regions` fails to prove some outlives constraint `'longer_fr: 'shorter_fr`, we try to propagate it in `fn try_propagate_universal_region_error`. Both these universal regions are either local to the closure or an external region.
+`RegionInferenceContext::check_universal_regions` が何らかの outlives 制約 `'longer_fr: 'shorter_fr` を証明できない場合、`fn try_propagate_universal_region_error` で伝播しようとします。これらの全称領域は両方とも、クロージャにローカルまたは外部領域のいずれかです。
 
-In case `'longer_fr` is a local universal region, we search for the largest external region `'fr_minus` which is outlived by `'longer_fr`, i.e. `'longer_fr: 'fr_minus`. In case there are multiple such regions, we pick the `mutual_immediate_postdominator`: the fixpoint of repeatedly computing the GLB of all GLBs, see [TransitiveRelation::postdom_upper_bound](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_data_structures/transitive_relation/struct.TransitiveRelation.html#method.postdom_upper_bound) for more details.
+`'longer_fr` がローカル全称領域の場合、`'longer_fr` によって生存される最大の外部領域 `'fr_minus` を検索します。つまり、`'longer_fr: 'fr_minus`。複数のそのような領域がある場合、`mutual_immediate_postdominator` を選びます: すべての GLB の GLB を繰り返し計算する不動点です。詳細については [TransitiveRelation::postdom_upper_bound](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_data_structures/transitive_relation/struct.TransitiveRelation.html#method.postdom_upper_bound) を参照してください。
 
-If `'fr_minus` exists we require it to outlive all non-local upper bounds of `'shorter_fr`. There will always be at least one non-local upper bound `'static`.
+`'fr_minus` が存在する場合、`'shorter_fr` のすべての非ローカル上界を生存するよう要求します。常に少なくとも 1 つの非ローカル上界 `'static` があります。
 
-### Type-outlive constraints
+### 型 outlive 制約
 
-Type-outlives constraints are proven in `check_type_tests`. This happens after computing the outlives graph, which is now immutable.
+型 outlives 制約は `check_type_tests` で証明されます。これは outlives グラフの計算後に行われ、グラフは今は不変です。
 
-For all type tests we fail to prove via `fn eval_verify_bound` inside of the closure we call `try_promote_type_test`. A `TypeTest` represents a type-outlives bound `generic_kind: lower_bound` together with a `verify_bound`. If the `VerifyBound` holds for the `lower_bound`, the constraint is satisfied. `try_promote_type_test`  does not care about the ` verify_bound`.
+クロージャ内で `fn eval_verify_bound` 経由で証明できないすべての型テストについて、`try_promote_type_test` を呼び出します。`TypeTest` は、`verify_bound` とともに型 outlives 境界 `generic_kind: lower_bound` を表します。`VerifyBound` が `lower_bound` に対して成立する場合、制約は満たされます。`try_promote_type_test` は `verify_bound` を気にしません。
 
-It starts by calling `fn try_promote_type_test_subject`. This function takes the `GenericKind` and tries to transform it to a `ClosureOutlivesSubject`  which is no longer references anything local to the closure. This is done by replacing all free regions in that type with either `'static`  or region parameters which are equal to that free region. This operation fails if the `generic_kind` contains a region which cannot be replaced.
+まず、`fn try_promote_type_test_subject` を呼び出します。この関数は `GenericKind` を受け取り、クロージャにローカルなものを参照しなくなった `ClosureOutlivesSubject` に変換しようとします。これは、その型のすべての自由領域を `'static` または、その自由領域と等しい領域パラメータのいずれかに置き換えることによって行われます。この操作は、`generic_kind` に置き換えられない領域が含まれている場合に失敗します。
 
-We then promote the `lower_bound` into the context of the caller. If the lower bound is equal to a placeholder, we replace it with `'static`
+次に、`lower_bound` を呼び出し元のコンテキストに昇格させます。下界がプレースホルダーと等しい場合、それを `'static` に置き換えます
 
-We then look at all universal regions `uv` which are required to be outlived by `lower_bound`, i.e. for which borrow checking added region constraints. For each of these we then emit a `ClosureOutlivesRequirement` for all non-local universal regions which are known to outlive `uv`.
+次に、`lower_bound` によって生存されることが要求されるすべての全称領域 `uv`、つまり borrow checking が領域制約を追加したものを見ます。これらのそれぞれについて、`uv` を生存することが知られているすべての非ローカル全称領域に対して `ClosureOutlivesRequirement` を発行します。
 
-As we've already built the region graph of the closure at this point and separately check that it is consistent, we are also able to assume the outlive constraints `uv: lower_bound` here.
+この時点で、クロージャの領域グラフを既に構築し、それが一貫していることを別々にチェックしているため、ここで outlive 制約 `uv: lower_bound` を仮定することもできます。
 
-So if we have a type-outlives bounds we can't prove, e.g. `T: 'local_infer`, we use the region graph to go to universal variables `'a` with `'a: local_infer`. In case `'a` are local, we then use the assumed outlived constraints to go to non-local ones.
+したがって、証明できない型 outlives 境界がある場合、例えば `T: 'local_infer`、領域グラフを使用して `'a: local_infer` を持つ全称変数 `'a` に移動します。`'a` がローカルの場合、仮定された outlived 制約を使用して非ローカルのものに移動します。
 
-We then store the list of promoted type tests in the `BorrowCheckResults`.
-We then apply them in while borrow-checking its parent in `TypeChecker::prove_closure_bounds`.
+次に、昇格された型テストのリストを `BorrowCheckResults` に格納します。
+その親を borrow check する際に、`TypeChecker::prove_closure_bounds` でそれらを適用します。
 
-TODO: explain how exactly that works :3
+TODO: それが正確にどのように機能するかを説明する :3

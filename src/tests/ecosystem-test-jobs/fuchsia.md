@@ -1,106 +1,75 @@
-# Fuchsia integration tests
+# Fuchsia 統合テスト
 
-[Fuchsia](https://fuchsia.dev) is an open-source operating system with about 2
-million lines of Rust code.[^loc] It has caught a large number of [regressions]
-in the past and was subsequently included in CI.
+[Fuchsia](https://fuchsia.dev) は、約200万行の Rust コードを持つオープンソースのオペレーティングシステムです。[^loc] 過去に多くの[退行][regressions]を捉えており、その後 CI に含まれました。
 
-## What to do if the Fuchsia job breaks?
+## Fuchsia ジョブが壊れた場合にどうすべきか？
 
-Please contact the [fuchsia][fuchsia-ping] ping group and ask them for help.
+[fuchsia][fuchsia-ping] ピンググループに連絡して助けを求めてください。
 
 ```text
 @rustbot ping fuchsia
 ```
 
-## Building Fuchsia in CI
+## CI での Fuchsia のビルド
 
-Fuchsia builds as part of the suite of bors tests that run before a pull request
-is merged.
+Fuchsia は、プルリクエストがマージされる前に実行される bors テストのスイートの一部としてビルドされます。
 
-If you are worried that a pull request might break the Fuchsia builder and want
-to test it out before submitting it to the bors queue, simply ask bors to run
-the try job that builds the Fuchsia integration: `@bors try jobs=x86_64-fuchsia`.
+プルリクエストが Fuchsia ビルダーを壊す可能性があり、bors キューに送信する前にテストしたい場合は、単に bors に Fuchsia 統合をビルドする try ジョブを実行するように依頼してください：`@bors try jobs=x86_64-fuchsia`。
 
-## Building Fuchsia locally
+## Fuchsia をローカルでビルド
 
-Because Fuchsia uses languages other than Rust, it does not use Cargo as a build
-system. It also requires the toolchain build to be configured in a [certain
-way][build-toolchain].
+Fuchsia は Rust 以外の言語を使用しているため、ビルドシステムとして Cargo を使用しません。また、ツールチェーンのビルドを[特定の方法][build-toolchain]で構成する必要があります。
 
-The recommended way to build Fuchsia is to use the Docker scripts that check out
-and run a Fuchsia build for you. If you've run Docker tests before, you can
-simply run this command from your Rust checkout to download and build Fuchsia
-using your local Rust toolchain.
+Fuchsia をビルドする推奨される方法は、Fuchsia のチェックアウトとビルドを実行する Docker スクリプトを使用することです。以前に Docker テストを実行したことがある場合は、Rust チェックアウトから次のコマンドを実行するだけで、ローカルの Rust ツールチェーンを使用して Fuchsia をダウンロードしてビルドできます。
 
 ```
 src/ci/docker/run.sh x86_64-fuchsia
 ```
 
-See the [Testing with Docker](../docker.md) chapter for more details on how to run
-and debug jobs with Docker.
+Docker でジョブを実行およびデバッグする方法の詳細については、[Docker を使用したテスト](../docker.md) の章を参照してください。
 
-Note that a Fuchsia checkout is *large* – as of this writing, a checkout and
-build takes 46G of space – and as you might imagine, it takes a while to
-complete.
+Fuchsia のチェックアウトは*大きい*ことに注意してください。執筆時点では、チェックアウトとビルドで 46G のスペースが必要です。想像できるように、完了するには時間がかかります。
 
-### Modifying the Fuchsia checkout
+### Fuchsia チェックアウトの変更
 
-The main reason you would want to build Fuchsia locally is because you need to
-investigate a regression. After running a Docker build, you'll find the Fuchsia
-checkout inside the `obj/fuchsia` directory of your Rust checkout.  If you
-modify the `KEEP_CHECKOUT` line in the [build-fuchsia.sh] script to
-`KEEP_CHECKOUT=1`, you can change the checkout as needed and rerun the build
-command above. This will reuse all the build results from before.
+ローカルで Fuchsia をビルドしたい主な理由は、退行を調査する必要があるためです。Docker ビルドを実行した後、Rust チェックアウトの `obj/fuchsia` ディレクトリ内に Fuchsia チェックアウトが見つかります。[build-fuchsia.sh] スクリプトの `KEEP_CHECKOUT` 行を `KEEP_CHECKOUT=1` に変更すると、チェックアウトを必要に応じて変更し、上記のビルドコマンドを再実行できます。これにより、以前のすべてのビルド結果が再利用されます。
 
-You can find more options to customize the Fuchsia checkout in the
-[build-fuchsia.sh] script.
+Fuchsia チェックアウトをカスタマイズするための詳細なオプションは、[build-fuchsia.sh] スクリプトで見つけることができます。
 
-### Customizing the Fuchsia build
+### Fuchsia ビルドのカスタマイズ
 
-You can find more info about the options used to build Fuchsia in Rust CI in the
-[build_fuchsia_from_rust_ci.sh] script invoked by [build-fuchsia.sh].
+Rust CI で Fuchsia をビルドするために使用されるオプションの詳細については、[build-fuchsia.sh] から呼び出される [build_fuchsia_from_rust_ci.sh] スクリプトで見つけることができます。
 
-The Fuchsia build system uses [GN], a metabuild system that generates [Ninja]
-files and then hands off the work of running the build to Ninja.
+Fuchsia ビルドシステムは、[Ninja] ファイルを生成してビルドの実行を Ninja に引き渡すメタビルドシステムである [GN] を使用します。
 
-Fuchsia developers use `fx` to run builds and perform other development tasks.
-This tool is located in `.jiri_root/bin` of the Fuchsia checkout; you may need
-to add this to your `$PATH` for some workflows.
+Fuchsia 開発者は `fx` を使用してビルドを実行し、その他の開発タスクを実行します。
+このツールは Fuchsia チェックアウトの `.jiri_root/bin` にあります。一部のワークフローでは、これを `$PATH` に追加する必要があるかもしれません。
 
-There are a few `fx` subcommands that are relevant, including:
+関連するいくつかの `fx` サブコマンドがあります：
 
-- `fx set` accepts build arguments, writes them to `out/default/args.gn`, and
-  runs GN.
-- `fx build` builds the Fuchsia project using Ninja. It will automatically pick
-  up changes to build arguments and rerun GN. By default it builds everything,
-  but it also accepts target paths to build specific targets (see below).
-- `fx clippy` runs Clippy on specific Rust targets (or all of them). We use this
-  in the Rust CI build to avoid running codegen on most Rust targets. Underneath
-  it invokes Ninja, just like `fx build`. The clippy results are saved in json
-  files inside the build output directory before being printed.
+- `fx set` はビルド引数を受け取り、`out/default/args.gn` に書き込み、
+  GN を実行します。
+- `fx build` は Ninja を使用して Fuchsia プロジェクトをビルドします。ビルド引数への変更を自動的に検出して GN を再実行します。デフォルトではすべてをビルドしますが、
+  特定のターゲットをビルドするためのターゲットパスも受け入れます（下記参照）。
+- `fx clippy` は特定の Rust ターゲット（またはすべて）で Clippy を実行します。Rust CI ビルドでは、ほとんどの Rust ターゲットでコード生成を実行しないようにこれを使用します。内部では、`fx build` と同じように Ninja を呼び出します。clippy の結果は、出力される前にビルド出力ディレクトリ内の json ファイルに保存されます。
 
-#### Target paths
+#### ターゲットパス
 
-GN uses paths like the following to identify build targets:
+GN は次のようなパスを使用してビルドターゲットを識別します：
 
 ```
 //src/starnix/kernel:starnix_core
 ```
 
-The initial `//` means the root of the checkout, and the remaining slashes are
-directory names. The string after `:` is the _target name_ of a target defined
-in the `BUILD.gn` file of that directory.
+最初の `//` はチェックアウトのルートを意味し、残りのスラッシュはディレクトリ名です。`:` の後の文字列は、そのディレクトリの `BUILD.gn` ファイルで定義されたターゲットの_ターゲット名_です。
 
-The target name can be omitted if it is the same as the directory name. In other
-words, `//src/starnix/kernel` is the same as `//src/starnix/kernel:kernel`.
+ターゲット名がディレクトリ名と同じ場合は省略できます。つまり、`//src/starnix/kernel` は `//src/starnix/kernel:kernel` と同じです。
 
-These target paths are used inside `BUILD.gn` files to reference dependencies,
-and can also be used in `fx build`.
+これらのターゲットパスは `BUILD.gn` ファイル内で依存関係を参照するために使用され、`fx build` でも使用できます。
 
-#### Modifying compiler flags
+#### コンパイラフラグの変更
 
-You can put custom compiler flags inside a GN `config` that is added to a
-target. As a simple example:
+ターゲットに追加される GN `config` 内にカスタムコンパイラフラグを配置できます。簡単な例として：
 
 ```
 config("everybody_loops") {
@@ -109,52 +78,36 @@ config("everybody_loops") {
 
 rustc_binary("example") {
     crate_root = "src/bin.rs"
-    # ...existing keys here...
+    # ...既存のキーがここにあります...
     configs += [ ":everybody_loops" ]
 }
 ```
 
-This will add the flag `-Zeverybody-loops` to rustc when building the `example`
-target. Note that you can also use [`public_configs`] for a config to be added
-to every target that depends on that target.
+これにより、`example` ターゲットをビルドするときに rustc にフラグ `-Zeverybody-loops` が追加されます。また、そのターゲットに依存するすべてのターゲットに config を追加するために [`public_configs`] を使用することもできます。
 
-If you want to add a flag to every Rust target in the build, you can add
-rustflags to the [`//build/config:compiler`] config or to the OS-specific
-configs referenced in that file. Note that `cflags` and `ldflags` are ignored on
-Rust targets.
+ビルド内のすべての Rust ターゲットにフラグを追加したい場合は、[`//build/config:compiler`] config またはそのファイルで参照される OS 固有の config に rustflags を追加できます。`cflags` と `ldflags` は Rust ターゲットでは無視されることに注意してください。
 
-#### Running ninja and rustc commands directly
+#### ninja と rustc コマンドを直接実行
 
-Going down one layer, `fx build` invokes `ninja`, which in turn eventually
-invokes `rustc`. All build actions are run inside the out directory, which is
-usually `out/default` inside the Fuchsia checkout.
+1つ下のレイヤーに行くと、`fx build` は `ninja` を呼び出し、それが最終的に `rustc` を呼び出します。すべてのビルドアクションは out ディレクトリ内で実行されます。これは通常、Fuchsia チェックアウト内の `out/default` です。
 
-You can get ninja to print the actual command it invokes by forcing that command
-to fail, e.g. by adding a syntax error to one of the source files of the target.
-Once you have the command, you can run it from inside the output directory.
+ninja にそれが呼び出す実際のコマンドを出力させるには、ターゲットのソースファイルの1つに構文エラーを追加するなどして、そのコマンドを強制的に失敗させます。
+コマンドを取得したら、出力ディレクトリ内から実行できます。
 
-After changing the toolchain itself, the build setting `rustc_version_string` in
-`out/default/args.gn` needs to be changed so that `fx build` or `ninja` will
-rebuild all the Rust targets. This can be done in a text editor and the contents
-of the string do not matter, as long as it changes from one build to the next.
-[build_fuchsia_from_rust_ci.sh] does this for you by hashing the toolchain
-directory.
+ツールチェーン自体を変更した後、`out/default/args.gn` のビルド設定 `rustc_version_string` を変更して、`fx build` または `ninja` がすべての Rust ターゲットを再ビルドするようにする必要があります。これはテキストエディタで行うことができ、文字列の内容は重要ではありません。次のビルドから次のビルドに変更されればよいだけです。
+[build_fuchsia_from_rust_ci.sh] は、ツールチェーンディレクトリをハッシュすることでこれを自動的に行います。
 
-The Fuchsia website has more detailed documentation of the [build system].
+Fuchsia ウェブサイトには、[ビルドシステム] のより詳細なドキュメントがあります。
 
-#### Other tips and tricks
+#### その他のヒントとコツ
 
-When using `build_fuchsia_from_rust_ci.sh` you can comment out the `fx set`
-command after the initial run so it won't rerun GN each time. If you do this you
-can also comment out the version_string line to save a couple seconds.
+`build_fuchsia_from_rust_ci.sh` を使用するときは、初回実行後に `fx set` コマンドをコメントアウトして、毎回 GN が再実行されないようにできます。これを行う場合は、version_string 行もコメントアウトして数秒節約できます。
 
-`export NINJA_PERSISTENT_MODE=1` to get faster ninja startup times after the
-initial build.
+`export NINJA_PERSISTENT_MODE=1` を設定して、初回ビルド後に ninja の起動時間を短縮します。
 
-## Fuchsia target support
+## Fuchsia ターゲットのサポート
 
-To learn more about Fuchsia target support, see the Fuchsia chapter in [the
-rustc book][platform-support].
+Fuchsia ターゲットのサポートについて詳しく知りたい場合は、[rustc book][platform-support] の Fuchsia の章を参照してください。
 
 [regressions]: https://gist.github.com/tmandry/7103eba4bd6a6fb0c439b5a90ae355fa
 [build-toolchain]: https://fuchsia.dev/fuchsia-src/development/build/rust_toolchain
@@ -165,9 +118,7 @@ rustc book][platform-support].
 [Ninja]: https://ninja-build.org/
 [`public_configs`]: https://gn.googlesource.com/gn/+/main/docs/reference.md#var_public_configs
 [`//build/config:compiler`]: https://cs.opensource.google/fuchsia/fuchsia/+/main:build/config/BUILD.gn;l=121;drc=c26c473bef93b33117ae417893118907a026fec7
-[build system]: https://fuchsia.dev/fuchsia-src/development/build/build_system
+[ビルドシステム]: https://fuchsia.dev/fuchsia-src/development/build/build_system
 [fuchsia-ping]: ../../notification-groups/fuchsia.md
 
-[^loc]: As of June 2024, Fuchsia had about 2 million lines of first-party Rust
-code and a roughly equal amount of third-party code, as counted by tokei
-(excluding comments and blanks).
+[^loc]: 2024年6月時点で、Fuchsia には約200万行のファーストパーティ Rust コードと、ほぼ同量のサードパーティコードがあり、tokei によってカウントされています（コメントと空白を除く）。

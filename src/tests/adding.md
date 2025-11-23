@@ -1,60 +1,37 @@
-# Adding new tests
+# 新しいテストの追加
 
-**In general, we expect every PR that fixes a bug in rustc to come accompanied
-by a regression test of some kind.** This test should fail in `main` but pass
-after the PR. These tests are really useful for preventing us from repeating the
-mistakes of the past.
+**一般的に、rustcのバグを修正するすべてのPRには、何らかの種類の回帰テストが付随することを期待しています。** このテストは`main`ブランチでは失敗し、PRの後では成功する必要があります。これらのテストは、過去の過ちを繰り返さないために本当に役立ちます。
 
-The first thing to decide is which kind of test to add. This will depend on the
-nature of the change and what you want to exercise. Here are some rough
-guidelines:
+最初に決めるべきことは、どの種類のテストを追加するかです。これは変更の性質と何を実行したいかに依存します。大まかなガイドラインは次のとおりです：
 
-- The majority of compiler tests are done with [compiletest].
-  - The majority of compiletest tests are [UI](ui.md) tests in the [`tests/ui`]
-    directory.
-- Changes to the standard library are usually tested within the standard library
-  itself.
-  - The majority of standard library tests are written as doctests, which
-    illustrate and exercise typical API behavior.
-  - Additional [unit tests](intro.md#package-tests) should go in
-    `library/${crate}/tests` (where `${crate}` is usually `core`, `alloc`, or
-    `std`).
-- If the code is part of an isolated system, and you are not testing compiler
-  output, consider using a [unit or integration test](intro.md#package-tests).
-- Need to run rustdoc? Prefer a `rustdoc` or `rustdoc-ui` test. Occasionally
-  you'll need `rustdoc-js` as well.
-- Other compiletest test suites are generally used for special purposes:
-  - Need to run gdb or lldb? Use the `debuginfo` test suite.
-  - Need to inspect LLVM IR or MIR IR? Use the `codegen` or `mir-opt` test
-    suites.
-  - Need to inspect the resulting binary in some way? Or if all the other test
-    suites are too limited for your purposes? Then use `run-make`.
-    - Use `run-make-cargo` if you need to exercise in-tree `cargo` in conjunction
-      with in-tree `rustc`.
-  - Check out the [compiletest] chapter for more specialized test suites.
+- コンパイラテストの大部分は[compiletest]で行われます。
+  - compiletestテストの大部分は[`tests/ui`]ディレクトリの[UI](ui.md)テストです。
+- 標準ライブラリへの変更は、通常、標準ライブラリ自体内でテストされます。
+  - 標準ライブラリテストの大部分は、典型的なAPIの動作を示し、実行するdoctestsとして書かれています。
+  - 追加の[ユニットテスト](intro.md#package-tests)は`library/${crate}/tests`に配置する必要があります（`${crate}`は通常`core`、`alloc`、または`std`です）。
+- コードが独立したシステムの一部であり、コンパイラの出力をテストしていない場合は、[ユニットテストまたは統合テスト](intro.md#package-tests)の使用を検討してください。
+- rustdocを実行する必要がありますか？`rustdoc`または`rustdoc-ui`テストを優先してください。場合によっては`rustdoc-js`も必要になります。
+- 他のcompiletestテストスイートは一般的に特別な目的で使用されます：
+  - gdbまたはlldbを実行する必要がありますか？`debuginfo`テストスイートを使用してください。
+  - LLVM IRまたはMIR IRを検査する必要がありますか？`codegen`または`mir-opt`テストスイートを使用してください。
+  - 何らかの方法で結果のバイナリを検査する必要がありますか？または、他のすべてのテストスイートが目的に対して制限が多すぎる場合は？`run-make`を使用してください。
+    - ツリー内の`cargo`とツリー内の`rustc`を組み合わせて実行する必要がある場合は、`run-make-cargo`を使用してください。
+  - より専門的なテストスイートについては、[compiletest]章を確認してください。
 
-After deciding on which kind of test to add, see [best
-practices](best-practices.md) for guidance on how to author tests that are easy
-to work with that stand the test of time (i.e. if a test fails or need to be
-modified several years later, how can we make it easier for them?).
+追加するテストの種類を決定したら、作業しやすく時の試練に耐えるテストを作成する方法についてのガイダンスについては、[ベストプラクティス](best-practices.md)を参照してください（つまり、テストが失敗したり、数年後に変更する必要がある場合、どうすればそれらを簡単にできるでしょうか）。
 
 [compiletest]: compiletest.md
 [`tests/ui`]: https://github.com/rust-lang/rust/tree/HEAD/tests/ui/
 
-## UI test walkthrough
+## UIテストのウォークスルー
 
-The following is a basic guide for creating a [UI test](ui.md), which is one of
-the most common compiler tests. For this tutorial, we'll be adding a test for an
-async error message.
+以下は、最も一般的なコンパイラテストの1つである[UIテスト](ui.md)を作成するための基本的なガイドです。このチュートリアルでは、非同期エラーメッセージのテストを追加します。
 
-### Step 1: Add a test file
+### ステップ1：テストファイルの追加
 
-The first step is to create a Rust source file somewhere in the [`tests/ui`]
-tree. When creating a test, do your best to find a good location and name (see
-[Test organization](ui.md#test-organization) for more). Since naming is the
-hardest part of development, everything should be downhill from here!
+最初のステップは、[`tests/ui`]ツリーのどこかにRustソースファイルを作成することです。テストを作成するときは、適切な場所と名前を見つけるために最善を尽くしてください（詳細については[テストの整理](ui.md#test-organization)を参照してください）。命名は開発の最も難しい部分なので、ここからはすべて下り坂です！
 
-Let's place our async test at `tests/ui/async-await/await-without-async.rs`:
+非同期テストを`tests/ui/async-await/await-without-async.rs`に配置しましょう：
 
 ```rust,ignore
 // Provide diagnostics when the user writes `await` in a non-`async` function.
@@ -69,47 +46,34 @@ fn bar() {
 fn main() {}
 ```
 
-A few things to notice about our test:
+テストについていくつか注意すべき点：
 
-- The top should start with a short comment that [explains what the test is
-  for](#explanatory_comment).
-- The `//@ edition:2018` comment is called a [directive](directives.md) which
-  provides instructions to compiletest on how to build the test. Here we need to
-  set the edition for `async` to work (the default is edition 2015).
-- Following that is the source of the test. Try to keep it succinct and to the
-  point. This may require some effort if you are trying to minimize an example
-  from a bug report.
-- We end this test with an empty `fn main` function. This is because the default
-  for UI tests is a `bin` crate-type, and we don't want the "main not found"
-  error in our test. Alternatively, you could add `#![crate_type="lib"]`.
+- 上部は[テストが何のためのものかを説明する](#explanatory_comment)短いコメントで始まる必要があります。
+- `//@ edition:2018`コメントは[ディレクティブ](directives.md)と呼ばれ、テストの構築方法についてcompiletestに指示を提供します。ここでは、`async`が機能するようにエディションを設定する必要があります（デフォルトはedition 2015です）。
+- それに続くのは、テストのソースです。テストを簡潔で要点を押さえたものにするよう努めてください。バグレポートの例を最小化しようとする場合、これにはいくらかの努力が必要になるかもしれません。
+- このテストは空の`fn main`関数で終わります。これは、UIテストのデフォルトが`bin`クレートタイプであり、テストで「main not found」エラーが発生しないようにするためです。あるいは、`#![crate_type="lib"]`を追加することもできます。
 
-### Step 2: Generate the expected output
+### ステップ2：期待される出力の生成
 
-The next step is to create the expected output snapshots from the compiler. This
-can be done with the `--bless` option:
+次のステップは、コンパイラからの期待される出力スナップショットを作成することです。これは`--bless`オプションで実行できます：
 
 ```sh
 ./x test tests/ui/async-await/await-without-async.rs --bless
 ```
 
-This will build the compiler (if it hasn't already been built), compile the
-test, and place the output of the compiler in a file called
-`tests/ui/async-await/await-without-async.stderr`.
+これにより、コンパイラがビルドされ（まだビルドされていない場合）、テストがコンパイルされ、コンパイラの出力が`tests/ui/async-await/await-without-async.stderr`というファイルに配置されます。
 
-However, this step will fail! You should see an error message, something like
-this:
+ただし、このステップは失敗します！次のようなエラーメッセージが表示されるはずです：
 
 > error: /rust/tests/ui/async-await/await-without-async.rs:7: unexpected
 > error: '7:10: 7:16: `await` is only allowed inside `async` functions and
 > blocks E0728'
 
-This is because the stderr contains errors which were not matched by error
-annotations in the source file.
+これは、stderrにソースファイルのエラーアノテーションで一致しないエラーが含まれているためです。
 
-### Step 3: Add error annotations
+### ステップ3：エラーアノテーションの追加
 
-Every error needs to be annotated with a comment in the source with the text of
-the error. In this case, we can add the following comment to our test file:
+すべてのエラーは、エラーのテキストを含むソース内のコメントで注釈を付ける必要があります。この場合、テストファイルに次のコメントを追加できます：
 
 ```rust,ignore
 fn bar() {
@@ -118,35 +82,29 @@ fn bar() {
 }
 ```
 
-The `//~^` squiggle caret comment tells compiletest that the error belongs to
-the *previous* line (more on this in the [Error
-annotations](ui.md#error-annotations) section).
+`//~^`波線キャレットコメントは、エラーが*前の*行に属することをcompiletestに伝えます（これについての詳細は、[エラーアノテーション](ui.md#error-annotations)セクションにあります）。
 
-Save that, and run the test again:
+それを保存して、テストを再度実行します：
 
 ```sh
 ./x test tests/ui/async-await/await-without-async.rs
 ```
 
-It should now pass, yay!
+これで成功するはずです、やった！
 
-### Step 4: Review the output
+### ステップ4：出力のレビュー
 
-Somewhat hand-in-hand with the previous step, you should inspect the `.stderr`
-file that was created to see if it looks like how you expect. If you are adding
-a new diagnostic message, now would be a good time to also consider how readable
-the message looks overall, particularly for people new to Rust.
+前のステップとやや手を取り合って、作成された`.stderr`ファイルを検査して、期待どおりに見えるかどうかを確認する必要があります。新しい診断メッセージを追加している場合、今はメッセージ全体がどのように見えるか、特にRustに不慣れな人にとって読みやすいかどうかを検討する良い機会です。
 
-Our example `tests/ui/async-await/await-without-async.stderr` file should look
-like this:
+この例の`tests/ui/async-await/await-without-async.stderr`ファイルは次のようになるはずです：
 
 ```text
 error[E0728]: `await` is only allowed inside `async` functions and blocks
   --> $DIR/await-without-async.rs:7:10
    |
-LL | fn bar() {
+ LL | fn bar() {
    |    --- this is not `async`
-LL |     foo().await
+ LL |     foo().await
    |          ^^^^^^ only allowed inside `async` functions and blocks
 
 error: aborting due to previous error
@@ -154,47 +112,31 @@ error: aborting due to previous error
 For more information about this error, try `rustc --explain E0728`.
 ```
 
-You may notice some things look a little different than the regular compiler
-output.
+通常のコンパイラ出力とは少し異なるものがあることに気付くかもしれません。
 
-- The `$DIR` removes the path information which will differ between systems.
-- The `LL` values replace the line numbers. That helps avoid small changes in
-  the source from triggering large diffs. See the
-  [Normalization](ui.md#normalization) section for more.
+- `$DIR`はシステム間で異なるパス情報を削除します。
+- `LL`値は行番号を置き換えます。これにより、ソースの小さな変更が大きな差分をトリガーするのを避けられます。詳細については、[正規化](ui.md#normalization)セクションを参照してください。
 
-Around this stage, you may need to iterate over the last few steps a few times
-to tweak your test, re-bless the test, and re-review the output.
+この段階で、テストを微調整し、テストを再祝福し、出力を再レビューするために、最後のいくつかのステップを何度か繰り返す必要があるかもしれません。
 
-### Step 5: Check other tests
+### ステップ5：他のテストの確認
 
-Sometimes when adding or changing a diagnostic message, this will affect other
-tests in the test suite. The final step before posting a PR is to check if you
-have affected anything else. Running the UI suite is usually a good start:
+診断メッセージを追加または変更すると、テストスイートの他のテストに影響を与えることがあります。PRを投稿する前の最後のステップは、他に何かに影響を与えたかどうかを確認することです。UIスイートを実行することは通常良い出発点です：
 
 ```sh
 ./x test tests/ui
 ```
 
-If other tests start failing, you may need to investigate what has changed and
-if the new output makes sense.
+他のテストが失敗し始めた場合は、何が変わったのか、新しい出力が意味をなすのかを調査する必要があります。
 
-You may also need to re-bless the output with the `--bless` flag.
+また、`--bless`フラグで出力を再祝福する必要があるかもしれません。
 
 <a id="explanatory_comment"></a>
 
-## Comment explaining what the test is about
+## テストが何についてのものかを説明するコメント
 
-The first comment of a test file should **summarize the point of the test**, and
-highlight what is important about it. If there is an issue number associated
-with the test, include the issue number.
+テストファイルの最初のコメントは、**テストの要点を要約し**、それについて重要なことを強調する必要があります。テストに関連する問題番号がある場合は、問題番号を含めてください。
 
-This comment doesn't have to be super extensive. Just something like "Regression
-test for #18060: match arms were matching in the wrong order." might already be
-enough.
+このコメントは非常に広範囲である必要はありません。「#18060の回帰テスト：マッチアームが間違った順序でマッチしていました。」のようなものですでに十分かもしれません。
 
-These comments are very useful to others later on when your test breaks, since
-they often can highlight what the problem is. They are also useful if for some
-reason the tests need to be refactored, since they let others know which parts
-of the test were important. Often a test must be rewritten because it no longer
-tests what it was meant to test, and then it's useful to know what it *was*
-meant to test exactly.
+これらのコメントは、テストが壊れたときに他の人にとって非常に役立ちます。問題が何であるかを強調できることが多いためです。また、何らかの理由でテストをリファクタリングする必要がある場合にも役立ちます。テストのどの部分が重要だったかを他の人に知らせるためです。多くの場合、テストはもはや意図したものをテストしなくなったために書き直す必要があり、そのときに*何を*テストすることを意図していたかを正確に知ることが役立ちます。

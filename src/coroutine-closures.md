@@ -1,26 +1,26 @@
-# Async closures/"coroutine-closures"
+# 非同期クロージャ/"coroutine-closures"
 
-Please read [RFC 3668](https://rust-lang.github.io/rfcs/3668-async-closures.html) to understand the general motivation of the feature. This is a very technical and somewhat "vertical" chapter; ideally we'd split this and sprinkle it across all the relevant chapters, but for the purposes of understanding async closures *holistically*, I've put this together all here in one chapter.
+機能の一般的な動機を理解するには、[RFC 3668](https://rust-lang.github.io/rfcs/3668-async-closures.html)をお読みください。これは非常に技術的でやや「縦断的な」章です。理想的には、これを分割して関連するすべての章に散りばめるべきですが、非同期クロージャを*全体的に*理解する目的で、ここに一つの章としてまとめました。
 
-## Coroutine-closures -- a technical deep dive
+## コルーチンクロージャ -- 技術的な深掘り
 
-Coroutine-closures are a generalization of async closures, being special syntax for closure expressions which return a coroutine, notably one that is allowed to capture from the closure's upvars.
+コルーチンクロージャは、非同期クロージャの一般化であり、コルーチンを返すクロージャ式の特別な構文です。特に、クロージャのupvarsからキャプチャすることが許可されているものです。
 
-For now, the only usable kind of coroutine-closure is the async closure, and supporting async closures is the extent of this PR. We may eventually support `gen || {}`, etc., and most of the problems and curiosities described in this document apply to all coroutine-closures in general.
+今のところ、使用可能なコルーチンクロージャの唯一の種類は非同期クロージャであり、非同期クロージャをサポートすることがこのPRの範囲です。最終的には`gen || {}`などをサポートする可能性があり、このドキュメントで説明されている問題や興味深い点のほとんどは、一般的なすべてのコルーチンクロージャに適用されます。
 
-As a consequence of the code being somewhat general, this document may flip between calling them "async closures" and "coroutine-closures". The future that is returned by the async closure will generally be called the "coroutine" or the "child coroutine".
+コードがやや一般的であるため、このドキュメントは「非同期クロージャ」と「コルーチンクロージャ」を入れ替えて呼ぶことがあります。非同期クロージャによって返されるfutureは、一般的に「コルーチン」または「子コルーチン」と呼ばれます。
 
 ### HIR
 
-Async closures (and in the future, other coroutine flavors such as `gen`) are represented in HIR as a `hir::Closure`.
-The closure-kind of the `hir::Closure` is `ClosureKind::CoroutineClosure(_)`[^k1], which wraps an async block, which is also represented in HIR as a `hir::Closure`.
-The closure-kind of the async block is `ClosureKind::Closure(CoroutineKind::Desugared(_, CoroutineSource::Closure))`[^k2].
+非同期クロージャ(および将来的には`gen`などの他のコルーチンフレーバー)は、HIRでは`hir::Closure`として表現されます。
+`hir::Closure`のclosure-kindは`ClosureKind::CoroutineClosure(_)`[^k1]であり、これは非同期ブロックをラップします。非同期ブロックもHIRでは`hir::Closure`として表現されます。
+非同期ブロックのclosure-kindは`ClosureKind::Closure(CoroutineKind::Desugared(_, CoroutineSource::Closure))`[^k2]です。
 
 [^k1]: <https://github.com/rust-lang/rust/blob/5ca0e9fa9b2f92b463a0a2b0b34315e09c0b7236/compiler/rustc_ast_lowering/src/expr.rs#L1147>
 
 [^k2]: <https://github.com/rust-lang/rust/blob/5ca0e9fa9b2f92b463a0a2b0b34315e09c0b7236/compiler/rustc_ast_lowering/src/expr.rs#L1117>
 
-Like `async fn`, when lowering an async closure's body, we need to unconditionally move all of the closures arguments into the body so they are captured. This is handled by `lower_coroutine_body_with_moved_arguments`[^l1]. The only notable quirk with this function is that the async block we end up generating as a capture kind of `CaptureBy::ByRef`[^l2]. We later force all of the *closure args* to be captured by-value[^l3], but we don't want the *whole* async block to act as if it were an `async move`, since that would defeat the purpose of the self-borrowing of an async closure.
+`async fn`のように、非同期クロージャの本体を下げる際には、クロージャのすべての引数を本体に無条件に移動する必要があります。これは`lower_coroutine_body_with_moved_arguments`[^l1]によって処理されます。この関数の唯一の注目すべき癖は、生成する非同期ブロックのキャプチャ種類が`CaptureBy::ByRef`[^l2]であることです。後で*クロージャ引数*のすべてをby-valueでキャプチャするよう強制します[^l3]が、*全体の*非同期ブロックが`async move`であるかのように動作させたくありません。それでは非同期クロージャの自己借用の目的が損なわれるからです。
 
 [^l1]: <https://github.com/rust-lang/rust/blob/5ca0e9fa9b2f92b463a0a2b0b34315e09c0b7236/compiler/rustc_ast_lowering/src/item.rs#L1096-L1100>
 
@@ -28,39 +28,39 @@ Like `async fn`, when lowering an async closure's body, we need to unconditional
 
 [^l3]: <https://github.com/rust-lang/rust/blob/5ca0e9fa9b2f92b463a0a2b0b34315e09c0b7236/compiler/rustc_hir_typeck/src/upvar.rs#L250-L256>
 
-### `rustc_middle::ty` Representation
+### `rustc_middle::ty`表現
 
-For the purposes of keeping the implementation mostly future-compatible (i.e. with gen `|| {}` and `async gen || {}`), most of this section calls async closures "coroutine-closures".
+実装をほぼ将来互換性のあるもの(つまり、`gen || {}`や`async gen || {}`など)に保つために、このセクションのほとんどは非同期クロージャを「コルーチンクロージャ」と呼びます。
 
-The main thing that this PR introduces is a new `TyKind` called `CoroutineClosure`[^t1] and corresponding variants on other relevant enums in typeck and borrowck (`UpvarArgs`, `DefiningTy`, `AggregateKind`).
+このPRが導入する主なものは、`CoroutineClosure`[^t1]と呼ばれる新しい`TyKind`と、typeckとborrowckの他の関連する列挙型の対応するバリアント(`UpvarArgs`、`DefiningTy`、`AggregateKind`)です。
 
 [^t1]: <https://github.com/rust-lang/rust/blob/5ca0e9fa9b2f92b463a0a2b0b34315e09c0b7236/compiler/rustc_type_ir/src/ty_kind.rs#L163-L168>
 
-We introduce a new `TyKind` instead of generalizing the existing `TyKind::Closure` due to major representational differences in the type. The major differences between `CoroutineClosure`s can be explored by first inspecting the `CoroutineClosureArgsParts`, which is the "unpacked" representation of the coroutine-closure's generics.
+既存の`TyKind::Closure`を一般化するのではなく、新しい`TyKind`を導入します。これは、型の表現上の大きな違いによるものです。`CoroutineClosure`と通常のクロージャの主な違いは、まずコルーチンクロージャのジェネリクスの「展開された」表現である`CoroutineClosureArgsParts`を検査することで探ることができます。
 
-#### Similarities to closures
+#### クロージャとの類似点
 
-Like a closure, we have `parent_args`, a `closure_kind_ty`, and a `tupled_upvars_ty`. These represent the same thing as their closure counterparts; namely: the generics inherited from the body that the closure is defined in, the maximum "calling capability" of the closure (i.e. must it be consumed to be called, like `FnOnce`, or can it be called by-ref), and the captured upvars of the closure itself.
+クロージャのように、`parent_args`、`closure_kind_ty`、`tupled_upvars_ty`があります。これらは、クロージャの対応物と同じものを表します。つまり: クロージャが定義された本体から継承されたジェネリクス、クロージャの最大「呼び出し能力」(つまり、`FnOnce`のように呼び出すために消費する必要があるか、by-refで呼び出すことができるか)、クロージャ自体のキャプチャされたupvarsです。
 
-#### The signature
+#### シグネチャ
 
-A traditional closure has a `fn_sig_as_fn_ptr_ty` which it uses to represent the signature of the closure. In contrast, we store the signature of a coroutine closure in a somewhat "exploded" way, since coroutine-closures have *two* signatures depending on what `AsyncFn*` trait you call it with (see below sections).
+従来のクロージャは、クロージャのシグネチャを表すために使用される`fn_sig_as_fn_ptr_ty`を持っています。対照的に、コルーチンクロージャのシグネチャは、やや「爆発的な」方法で保存されます。コルーチンクロージャは、どの`AsyncFn*`トレイトで呼び出されるかに応じて*2つの*シグネチャを持つためです(以下のセクションを参照)。
 
-Conceptually, the coroutine-closure may be thought as containing several different signature types depending on whether it is being called by-ref or by-move.
+概念的には、コルーチンクロージャは、by-refで呼び出されるかby-moveで呼び出されるかに応じて、いくつかの異なるシグネチャ型を含んでいると考えることができます。
 
-To conveniently recreate both of these signatures, the `signature_parts_ty` stores all of the relevant parts of the coroutine returned by this coroutine-closure. This signature parts type will have the general shape of `fn(tupled_inputs, resume_ty) -> (return_ty, yield_ty)`, where `resume_ty`, `return_ty`, and `yield_ty` are the respective types for the *coroutine* returned by the coroutine-closure[^c1].
+これらのシグネチャの両方を便利に再作成するために、`signature_parts_ty`は、このコルーチンクロージャによって返されるコルーチンのすべての関連部分を保存します。このシグネチャパーツ型は、一般的に`fn(tupled_inputs, resume_ty) -> (return_ty, yield_ty)`の形式を持ちます。ここで、`resume_ty`、`return_ty`、`yield_ty`は、それぞれコルーチンクロージャによって返される*コルーチン*の対応する型です[^c1]。
 
 [^c1]: <https://github.com/rust-lang/rust/blob/5ca0e9fa9b2f92b463a0a2b0b34315e09c0b7236/compiler/rustc_type_ir/src/ty_kind/closure.rs#L221-L229>
 
-The compiler mainly deals with the `CoroutineClosureSignature` type[^c2], which is created by extracting the relevant types out of the `fn()` ptr type described above, and which exposes methods that can be used to construct the *coroutine* that the coroutine-closure ultimately returns.
+コンパイラは主に`CoroutineClosureSignature`型[^c2]を扱います。これは、上記の`fn()`ポインタ型から関連する型を抽出して作成され、コルーチンクロージャが最終的に返す*コルーチン*を構築するために使用できるメソッドを公開します。
 
 [^c2]: <https://github.com/rust-lang/rust/blob/5ca0e9fa9b2f92b463a0a2b0b34315e09c0b7236/compiler/rustc_type_ir/src/ty_kind/closure.rs#L362>
 
-#### The data we need to carry along to construct a `Coroutine` return type
+#### `Coroutine`戻り型を構築するために持ち運ぶ必要があるデータ
 
-Along with the data stored in the signature, to construct a `TyKind::Coroutine` to return, we also need to store the "witness" of the coroutine.
+シグネチャに保存されたデータに加えて、戻すべき`TyKind::Coroutine`を構築するには、コルーチンの「witness」も保存する必要があります。
 
-So what about the upvars of the `Coroutine` that is returned? Well, for `AsyncFnOnce` (i.e. call-by-move), this is simply the same upvars that the coroutine returns. But for `AsyncFnMut`/`AsyncFn`, the coroutine that is returned from the coroutine-closure borrows data from the coroutine-closure with a given "environment" lifetime[^c3]. This corresponds to the `&self` lifetime[^c4] on the `AsyncFnMut`/`AsyncFn` call signature, and the GAT lifetime of the `ByRef`[^c5].
+それでは、返されるコルーチンのupvarsはどうでしょうか?まあ、`AsyncFnOnce`(つまり、call-by-move)の場合、これは単にコルーチンが返すのと同じupvarsです。しかし、`AsyncFnMut`/`AsyncFn`の場合、コルーチンクロージャから返されるコルーチンは、与えられた「environment」ライフタイム[^c3]でコルーチンクロージャからデータを借用します。これは、`AsyncFnMut`/`AsyncFn`呼び出しシグネチャの`&self`ライフタイム[^c4]、および`ByRef`のGATライフタイム[^c5]に対応します。
 
 [^c3]: <https://github.com/rust-lang/rust/blob/5ca0e9fa9b2f92b463a0a2b0b34315e09c0b7236/compiler/rustc_type_ir/src/ty_kind/closure.rs#L447-L455>
 
@@ -68,70 +68,70 @@ So what about the upvars of the `Coroutine` that is returned? Well, for `AsyncFn
 
 [^c5]: <https://github.com/rust-lang/rust/blob/5ca0e9fa9b2f92b463a0a2b0b34315e09c0b7236/library/core/src/ops/async_function.rs#L30>
 
-#### Actually getting the coroutine return type(s)
+#### 実際にコルーチン戻り型を取得する
 
-To most easily construct the `Coroutine` that a coroutine-closure returns, you can use the `to_coroutine_given_kind_and_upvars`[^helper] helper on `CoroutineClosureSignature`, which can be acquired from the `CoroutineClosureArgs`.
+コルーチンクロージャが返す`Coroutine`を最も簡単に構築するには、`CoroutineClosureArgs`から取得できる`CoroutineClosureSignature`の`to_coroutine_given_kind_and_upvars`[^helper]ヘルパーを使用できます。
 
 [^helper]: <https://github.com/rust-lang/rust/blob/5ca0e9fa9b2f92b463a0a2b0b34315e09c0b7236/compiler/rustc_type_ir/src/ty_kind/closure.rs#L419>
 
-Most of the args to that function will be components that you can get out of the `CoroutineArgs`, except for the `goal_kind: ClosureKind` which controls which flavor of coroutine to return based off of the `ClosureKind` passed in -- i.e. it will prepare the by-ref coroutine if `ClosureKind::Fn | ClosureKind::FnMut`, and the by-move coroutine if `ClosureKind::FnOnce`.
+その関数への引数のほとんどは、`CoroutineArgs`から取得できるコンポーネントですが、`goal_kind: ClosureKind`は例外で、これは渡された`ClosureKind`に基づいてどのフレーバーのコルーチンを返すかを制御します - つまり、`ClosureKind::Fn | ClosureKind::FnMut`の場合はby-refコルーチンを準備し、`ClosureKind::FnOnce`の場合はby-moveコルーチンを準備します。
 
-### Trait Hierarchy
+### トレイト階層
 
-We introduce a parallel hierarchy of `Fn*` traits that are implemented for . The motivation for the introduction was covered in a blog post: [Async Closures](https://hackmd.io/@compiler-errors/async-closures).
+`Fn*`トレイトの並列階層を導入します。導入の動機は、ブログ投稿:[Async Closures](https://hackmd.io/@compiler-errors/async-closures)でカバーされています。
 
-All currently-stable callable types (i.e., closures, function items, function pointers, and `dyn Fn*` trait objects) automatically implement `AsyncFn*() -> T` if they implement `Fn*() -> Fut` for some output type `Fut`, and `Fut` implements `Future<Output = T>`[^tr1].
+現在安定しているすべての呼び出し可能型(つまり、クロージャ、関数アイテム、関数ポインタ、および`dyn Fn*`トレイトオブジェクト)は、何らかの出力型`Fut`に対して`Fn*() -> Fut`を実装し、`Fut`が`Future<Output = T>`を実装している場合、自動的に`AsyncFn*() -> T`を実装します[^tr1]。
 
 [^tr1]: <https://github.com/rust-lang/rust/blob/7c7bb7dc017545db732f5cffec684bbaeae0a9a0/compiler/rustc_next_trait_solver/src/solve/assembly/structural_traits.rs#L404-L409>
 
-Async closures implement `AsyncFn*` as their bodies permit; i.e. if they end up using upvars in a way that is compatible (i.e. if they consume or mutate their upvars, it may affect whether they implement `AsyncFn` and `AsyncFnMut`...)
+非同期クロージャは、その本体が許す限り`AsyncFn*`を実装します。つまり、upvarsを消費または変更する方法で使用する場合、`AsyncFn`および`AsyncFnMut`を実装するかどうかに影響を与える可能性があります...
 
-#### Lending
+#### レンディング
 
-We may in the future move `AsyncFn*` onto a more general set of `LendingFn*` traits; however, there are some concrete technical implementation details that limit our ability to use `LendingFn` ergonomically in the compiler today. These have to do with:
+将来的には、`AsyncFn*`をより一般的な`LendingFn*`トレイトのセットに移行する可能性があります。ただし、今日のコンパイラで`LendingFn`を人間工学的に使用する能力を制限する具体的な技術実装の詳細があります。これらは以下に関連しています:
 
-- Closure signature inference.
-- Limitations around higher-ranked trait bounds.
-- Shortcomings with error messages.
+- クロージャシグネチャ推論。
+- 高ランクトレイト境界の制限。
+- エラーメッセージの欠点。
 
-These limitations, plus the fact that the underlying trait should have no effect on the user experience of async closures and async `Fn` trait bounds, leads us to `AsyncFn*` for now. To ensure we can eventually move to these more general traits, the precise `AsyncFn*` trait definitions (including the associated types) are left as an implementation detail.
+これらの制限に加えて、基礎となるトレイトは非同期クロージャと非同期`Fn`トレイト境界のユーザーエクスペリエンスに影響を与えないという事実により、今のところ`AsyncFn*`を使用することにしました。最終的にこれらのより一般的なトレイトに移行できるようにするために、正確な`AsyncFn*`トレイト定義(関連型を含む)は実装の詳細として残されています。
 
-#### When do async closures implement the regular `Fn*` traits?
+#### 非同期クロージャは通常の`Fn*`トレイトをいつ実装しますか?
 
-We mention above that "regular" callable types can implement `AsyncFn*`, but the reverse question exists of "can async closures implement `Fn*` too"? The short answer is "when it's valid", i.e. when the coroutine that would have been returned from `AsyncFn`/`AsyncFnMut` does not actually have any upvars that are "lent" from the parent coroutine-closure.
+上記では「通常の」呼び出し可能型が`AsyncFn*`を実装できることを述べましたが、逆の質問が存在します:「非同期クロージャも`Fn*`を実装できますか?」答えは「有効な場合」です。つまり、`AsyncFn`/`AsyncFnMut`から返されるはずのコルーチンが、実際には親のコルーチンクロージャから「貸し出された」upvarsを持っていない場合です。
 
-See the "follow-up: when do..." section below for an elaborated answer. The full answer describes a pretty interesting and hopefully thorough heuristic that is used to ensure that most async closures "just work".
+詳細な答えについては、以下の「フォローアップ: いつ...」セクションを参照してください。完全な答えは、ほとんどの非同期クロージャが「うまく動作する」ことを保証するために使用される、非常に興味深く、願わくば徹底的なヒューリスティックを説明しています。
 
-### Tale of two bodies...
+### 2つの本体の物語...
 
-When async closures are called with `AsyncFn`/`AsyncFnMut`, they return a coroutine that borrows from the closure. However, when they are called via `AsyncFnOnce`, we consume that closure, and cannot return a coroutine that borrows from data that is now dropped.
+非同期クロージャが`AsyncFn`/`AsyncFnMut`で呼び出された場合、クロージャから借用するコルーチンを返します。ただし、`AsyncFnOnce`を介して呼び出された場合、そのクロージャを消費し、現在ドロップされているデータから借用するコルーチンを返すことはできません。
 
-To work around this limitation, we synthesize a separate by-move MIR body for calling `AsyncFnOnce::call_once` on a coroutine-closure that can be called by-ref.
+この制限を回避するために、by-refで呼び出すことができるコルーチンクロージャで`AsyncFnOnce::call_once`を呼び出すための別個のby-move MIR本体を合成します。
 
-This body operates identically to the "normal" coroutine returned from calling the coroutine-closure, except for the fact that it has a different set of upvars, since we must *move* the captures from the parent coroutine-closure into the child coroutine.
+この本体は、「通常の」コルーチンクロージャを呼び出すことで返されるコルーチンと同じように動作しますが、異なるupvarsのセットを持っているという点が異なります。親のコルーチンクロージャからのキャプチャを子コルーチンに*移動*する必要があるためです。
 
-#### Synthesizing the by-move body
+#### by-move本体の合成
 
-When we want to access the by-move body of the coroutine returned by a coroutine-closure, we can do so via the `coroutine_by_move_body_def_id`[^b1] query.
+コルーチンクロージャによって返されるコルーチンのby-move本体にアクセスしたい場合、`coroutine_by_move_body_def_id`[^b1]クエリを介してアクセスできます。
 
 [^b1]: <https://github.com/rust-lang/rust/blob/5ca0e9fa9b2f92b463a0a2b0b34315e09c0b7236/compiler/rustc_mir_transform/src/coroutine/by_move_body.rs#L1-L70>
 
-This query synthesizes a new MIR body by copying the MIR body of the coroutine and inserting additional derefs and field projections[^b2] to preserve the semantics of the body.
+このクエリは、コルーチンのMIR本体をコピーし、本体のセマンティクスを保持するために追加のデリファレンスとフィールド投影[^b2]を挿入することにより、新しいMIR本体を合成します。
 
 [^b2]: <https://github.com/rust-lang/rust/blob/5ca0e9fa9b2f92b463a0a2b0b34315e09c0b7236/compiler/rustc_mir_transform/src/coroutine/by_move_body.rs#L131-L195>
 
-Since we've synthesized a new def id, this query is also responsible for feeding a ton of other relevant queries for the MIR body. This query is `ensure()`d[^b3] during the `mir_promoted` query, since it operates on the *built* mir of the coroutine.
+新しいdef idを合成したため、このクエリはMIR本体の他の多くの関連クエリをフィードすることも担当しています。このクエリは、コルーチンの*ビルド済み*mirで動作するため、`mir_promoted`クエリ中に`ensure()`されます[^b3]。
 
 [^b3]: <https://github.com/rust-lang/rust/blob/5ca0e9fa9b2f92b463a0a2b0b34315e09c0b7236/compiler/rustc_mir_transform/src/lib.rs#L339-L342>
 
-### Closure signature inference
+### クロージャシグネチャ推論
 
-The closure signature inference algorithm for async closures is a bit more complicated than the inference algorithm for "traditional" closures. Like closures, we iterate through all of the clauses that may be relevant (for the expectation type passed in)[^deduce1].
+非同期クロージャのクロージャシグネチャ推論アルゴリズムは、「従来の」クロージャの推論アルゴリズムよりも少し複雑です。クロージャのように、関連する可能性のあるすべての句を反復処理します(渡された期待型の場合)[^deduce1]。
 
-To extract a signature, we consider two situations:
-* Projection predicates with `AsyncFnOnce::Output`, which we will use to extract the inputs and output type for the closure. This corresponds to the situation that there was a `F: AsyncFn*() -> T` bound[^deduce2].
-* Projection predicates with `FnOnce::Output`, which we will use to extract the inputs. For the output, we also try to deduce an output by looking for relevant `Future::Output` projection predicates. This corresponds to the situation that there was an `F: Fn*() -> T, T: Future<Output = U>` bound.[^deduce3]
-    * If there is no `Future` bound, we simply use a fresh infer var for the output. This corresponds to the case where one can pass an async closure to a combinator function like `Option::map`.[^deduce4]
+シグネチャを抽出するために、2つの状況を考慮します:
+* `AsyncFnOnce::Output`を持つ投影述語。これを使用して、クロージャの入力と出力型を抽出します。これは、`F: AsyncFn*() -> T`境界があった状況に対応します[^deduce2]。
+* `FnOnce::Output`を持つ投影述語。これを使用して入力を抽出します。出力については、関連する`Future::Output`投影述語を探すことで出力を推測しようとします。これは、`F: Fn*() -> T, T: Future<Output = U>`境界があった状況に対応します。[^deduce3]
+    * `Future`境界がない場合は、単に出力に新しい推論変数を使用します。これは、`Option::map`のようなコンビネータ関数に非同期クロージャを渡すことができる場合に対応します。[^deduce4]
 
 [^deduce1]: <https://github.com/rust-lang/rust/blob/5ca0e9fa9b2f92b463a0a2b0b34315e09c0b7236/compiler/rustc_hir_typeck/src/closure.rs#L345-L362>
 
@@ -141,65 +141,65 @@ To extract a signature, we consider two situations:
 
 [^deduce4]: <https://github.com/rust-lang/rust/blob/5ca0e9fa9b2f92b463a0a2b0b34315e09c0b7236/compiler/rustc_hir_typeck/src/closure.rs#L575-L590>
 
-We support the latter case simply to make it easier for users to simply drop-in `async || {}` syntax, even when they're calling an API that was designed before first-class `AsyncFn*` traits were available.
+後者のケースをサポートするのは、単に、ファーストクラスの`AsyncFn*`トレイトが利用可能になる前に設計されたAPIを呼び出す場合でも、ユーザーが`async || {}`構文を簡単にドロップインできるようにするためです。
 
-#### Calling a closure before its kind has been inferred
+#### その種類が推論される前にクロージャを呼び出す
 
-We defer[^call1] the computation of a coroutine-closure's "kind" (i.e. its maximum calling mode: `AsyncFnOnce`/`AsyncFnMut`/`AsyncFn`) until the end of typeck. However, since we want to be able to call that coroutine-closure before the end of typeck, we need to come up with the return type of the coroutine-closure before that.
+typeckの終わりまでコルーチンクロージャの「kind」(つまり、最大呼び出しモード: `AsyncFnOnce`/`AsyncFnMut`/`AsyncFn`)の計算を延期します[^call1]。ただし、typeckの終わりより前にそのコルーチンクロージャを呼び出せるようにしたいので、その前にコルーチンクロージャの戻り型を考え出す必要があります。
 
 [^call1]: <https://github.com/rust-lang/rust/blob/705cfe0e966399e061d64dd3661bfbc57553ed87/compiler/rustc_hir_typeck/src/callee.rs#L169-L210>
 
-Unlike regular closures, whose return type does not change depending on what `Fn*` trait we call it with, coroutine-closures *do* end up returning different coroutine types depending on the flavor of `AsyncFn*` trait used to call it. 
+戻り型がどの`Fn*`トレイトで呼び出されるかによって変わらない通常のクロージャとは異なり、コルーチンクロージャは、呼び出しに使用される`AsyncFn*`トレイトのフレーバーに応じて、実際に異なるコルーチン型を返します*。*
 
-Specifically, while the def-id of the returned coroutine does not change, the upvars[^call2] (which are either borrowed or moved from the parent coroutine-closure) and the coroutine-kind[^call3] are dependent on the calling mode.
+具体的には、返されるコルーチンのdef-idは変更されませんが、upvars[^call2](親のコルーチンクロージャから借用または移動される)とコルーチンkind[^call3]は呼び出しモードに依存します。
 
 [^call2]: <https://github.com/rust-lang/rust/blob/705cfe0e966399e061d64dd3661bfbc57553ed87/compiler/rustc_type_ir/src/ty_kind/closure.rs#L574-L576>
 
 [^call3]: <https://github.com/rust-lang/rust/blob/705cfe0e966399e061d64dd3661bfbc57553ed87/compiler/rustc_type_ir/src/ty_kind/closure.rs#L554-L563>
 
-We introduce a `AsyncFnKindHelper` trait which allows us to defer the question of "does this coroutine-closure support this calling mode"[^helper1] via a trait goal, and "what are the tupled upvars of this calling mode"[^helper2] via an associated type, which can be computed by appending the input types of the coroutine-closure to either the upvars or the "by ref" upvars computed during upvar analysis.
+`AsyncFnKindHelper`トレイトを導入します。これにより、「このコルーチンクロージャはこの呼び出しモードをサポートしていますか」[^helper1]という質問をトレイトゴールを介して延期でき、「この呼び出しモードのタプル化されたupvarsは何ですか」[^helper2]という質問を関連型を介して延期できます。これは、upvar分析中に計算された入力型をupvarsまたは「by ref」upvarsのいずれかに追加することで計算できます。
 
 [^helper1]: <https://github.com/rust-lang/rust/blob/7c7bb7dc017545db732f5cffec684bbaeae0a9a0/library/core/src/ops/async_function.rs#L135-L144>
 
 [^helper2]: <https://github.com/rust-lang/rust/blob/7c7bb7dc017545db732f5cffec684bbaeae0a9a0/library/core/src/ops/async_function.rs#L146-L154>
 
-#### Ok, so why?
+#### では、なぜ?
 
-This seems a bit roundabout and complex, and I admit that it is. But let's think of the "do nothing" alternative -- we could instead mark all `AsyncFn*` goals as ambiguous until upvar analysis, at which point we would know exactly what to put into the upvars of the coroutine we return. However, this is actually *very* detrimental to inference in the program, since it means that programs like this would not be valid:
+これは少し回りくどく複雑に見えます。そして、確かにそうです。しかし、「何もしない」代替案を考えてみましょう - 代わりに、upvar分析まですべての`AsyncFn*`ゴールを曖昧としてマークすることができます。その時点で、返すコルーチンのupvarsに正確に何を入れるかがわかります。しかし、これは実際にはプログラムの推論に*非常に*有害です。なぜなら、次のようなプログラムが有効でなくなるからです:
 
 ```rust,ignore
 let c = async || -> String { .. };
 let s = c().await;
-// ^^^ If we can't project `<{c} as AsyncFn>::call()` to a coroutine, then the `IntoFuture::into_future` call inside of the `.await` stalls, and the type of `s` is left unconstrained as an infer var.
+// ^^^ `<{c} as AsyncFn>::call()`をコルーチンに投影できない場合、`.await`内の`IntoFuture::into_future`呼び出しは停止し、`s`の型は推論変数として制約されないままになります。
 s.as_bytes();
-// ^^^ That means we can't call any methods on the awaited return of a coroutine-closure, like... at all!
+// ^^^ つまり、コルーチンクロージャの待機された戻り値に対してメソッドを呼び出すことができません...まったく!
 ```
 
-So *instead*, we use this alias (in this case, a projection: `AsyncFnKindHelper::Upvars<'env, ...>`) to delay the computation of the *tupled upvars* and give us something to put in its place, while still allowing us to return a `TyKind::Coroutine` (which is a rigid type) and we may successfully confirm the built-in traits we need (in our case, `Future`), since the `Future` implementation doesn't depend on the upvars at all.
+そのため、*代わりに*、このエイリアス(この場合、投影: `AsyncFnKindHelper::Upvars<'env, ...>`)を使用して*タプル化されたupvars*の計算を遅らせ、その場所に何かを配置できるようにしながら、引き続き`TyKind::Coroutine`(剛体型)を返すことができます。そして、ビルトイントレイト(この場合、`Future`)を正常に確認できます。`Future`実装はupvarsにまったく依存しないためです。
 
-### Upvar analysis
+### Upvar分析
 
-By and large, the upvar analysis for coroutine-closures and their child coroutines proceeds like normal upvar analysis. However, there are several interesting bits that happen to account for async closures' special natures:
+大部分において、コルーチンクロージャとその子コルーチンのupvar分析は、通常のupvar分析のように進行します。ただし、非同期クロージャの特殊な性質を考慮するために、いくつかの興味深い部分があります:
 
-#### Forcing all inputs to be captured
+#### すべての入力を強制的にキャプチャする
 
-Like async fn, all input arguments are captured. We explicitly force[^f1] all of these inputs to be captured by move so that the future coroutine returned by async closures does not depend on whether the input is *used* by the body or not, which would impart an interesting semver hazard.
+async fnのように、すべての入力引数がキャプチャされます。これらの入力すべてを明示的にmoveによってキャプチャするよう強制します[^f1]。これにより、非同期クロージャによって返される将来のコルーチンが、入力が本体で*使用*されているかどうかに依存しなくなります。これは興味深いsemver hazardをもたらす可能性があります。
 
 [^f1]: <https://github.com/rust-lang/rust/blob/7c7bb7dc017545db732f5cffec684bbaeae0a9a0/compiler/rustc_hir_typeck/src/upvar.rs#L250-L259>
 
-#### Computing the by-ref captures
+#### by-refキャプチャの計算
 
-For a coroutine-closure that supports `AsyncFn`/`AsyncFnMut`, we must also compute the relationship between the captures of the coroutine-closure and its child coroutine. Specifically, the coroutine-closure may `move` a upvar into its captures, but the coroutine may only borrow that upvar.
+`AsyncFn`/`AsyncFnMut`をサポートするコルーチンクロージャの場合、コルーチンクロージャのキャプチャとその子コルーチンの関係も計算する必要があります。具体的には、コルーチンクロージャがupvarを`move`してキャプチャする場合がありますが、コルーチンはそのupvarを借用するだけです。
 
-We compute the "`coroutine_captures_by_ref_ty`" by looking at all of the child coroutine's captures and comparing them to the corresponding capture of the parent coroutine-closure[^br1]. This `coroutine_captures_by_ref_ty` ends up being represented as a `for<'env> fn() -> captures...` type, with the additional binder lifetime representing the "`&self`" lifetime of calling `AsyncFn::async_call` or `AsyncFnMut::async_call_mut`. We instantiate that binder later when actually calling the methods.
+子コルーチンのすべてのキャプチャを調べ、対応する親コルーチンクロージャのキャプチャと比較することにより、「`coroutine_captures_by_ref_ty`」を計算します[^br1]。この`coroutine_captures_by_ref_ty`は、`for<'env> fn() -> captures...`型として表現されます。追加のバインダーライフタイムは、`AsyncFn::async_call`または`AsyncFnMut::async_call_mut`を呼び出す際の「`&self`」ライフタイムを表します。実際にメソッドを呼び出す際に、後でそのバインダーをインスタンス化します。
 
 [^br1]: <https://github.com/rust-lang/rust/blob/7c7bb7dc017545db732f5cffec684bbaeae0a9a0/compiler/rustc_hir_typeck/src/upvar.rs#L375-L471>
 
-Note that not every by-ref capture from the parent coroutine-closure results in a "lending" borrow. See the **Follow-up: When do async closures implement the regular `Fn*` traits?** section below for more details, since this intimately influences whether or not the coroutine-closure is allowed to implement the `Fn*` family of traits.
+親コルーチンクロージャからのすべてのby-refキャプチャが「レンディング」借用になるわけではないことに注意してください。詳細については、以下の**フォローアップ: 非同期クロージャが通常の`Fn*`トレイトを実装するのはいつですか?**セクションを参照してください。これは、コルーチンクロージャが`Fn*`トレイトファミリーを実装することが許可されるかどうかに密接に影響します。
 
-#### By-move body + `FnOnce` quirk
+#### By-move本体 + `FnOnce`の癖
 
-There are several situations where the closure upvar analysis ends up inferring upvars for the coroutine-closure's child coroutine that are too relaxed, and end up resulting in borrow-checker errors. This is best illustrated via examples. For example, given:
+クロージャのupvar分析が、コルーチンクロージャの子コルーチンに対して緩すぎるupvarsを推論し、最終的にborrow-checkerエラーになるいくつかの状況があります。これは例を通じて最もよく示されます。たとえば、次のように与えられた場合:
 
 ```rust
 fn force_fnonce<T: async FnOnce()>(t: T) -> T { t }
@@ -210,9 +210,9 @@ let c = force_fnonce(async move || {
 });
 ```
 
-`x` will be moved into the coroutine-closure, but the coroutine that is returned would only borrow `&x`. However, since `force_fnonce` forces the coroutine-closure to `AsyncFnOnce`, which is not *lending*, we must force the capture to happen by-move[^bm1].
+`x`はコルーチンクロージャに移動されますが、返されるコルーチンは`&x`を借用するだけです。ただし、`force_fnonce`はコルーチンクロージャを`AsyncFnOnce`に強制するため、これは*レンディング*ではありません。by-moveでキャプチャを強制する必要があります[^bm1]。
 
-Similarly:
+同様に:
 
 ```rust
 let x = String::new();
@@ -223,62 +223,62 @@ let c = async move || {
 };
 ```
 
-`x` will be moved into the coroutine-closure, but the coroutine that is returned would only borrow `&x`. However, since we also capture `y` and drop it, the coroutine-closure is forced to be `AsyncFnOnce`. We must also force the capture of `x` to happen by-move. To determine this situation in particular, since unlike the last example the coroutine-kind's closure-kind has not yet been constrained, we must analyze the body of the coroutine-closure to see if how all of the upvars are used, to determine if they've been used in a way that is "consuming" -- i.e. that would force it to `FnOnce`[^bm2].
+`x`はコルーチンクロージャに移動されますが、返されるコルーチンは`&x`を借用するだけです。ただし、`y`もキャプチャしてドロップするため、コルーチンクロージャは`AsyncFnOnce`に強制されます。`x`のキャプチャもby-moveで強制する必要があります。この特定の状況を判断するために、前の例とは異なり、コルーチンkindのclosure-kindがまだ制約されていないため、コルーチンクロージャの本体を分析して、すべてのupvarsがどのように使用されているかを確認し、「consuming」方法で使用されているかどうかを判断する必要があります - つまり、`FnOnce`に強制するかどうか[^bm2]。
 
 [^bm1]: <https://github.com/rust-lang/rust/blob/7c7bb7dc017545db732f5cffec684bbaeae0a9a0/compiler/rustc_hir_typeck/src/upvar.rs#L211-L248>
 
 [^bm2]: <https://github.com/rust-lang/rust/blob/7c7bb7dc017545db732f5cffec684bbaeae0a9a0/compiler/rustc_hir_typeck/src/upvar.rs#L532-L539>
 
-#### Follow-up: When do async closures implement the regular `Fn*` traits?
+#### フォローアップ: 非同期クロージャが通常の`Fn*`トレイトを実装するのはいつですか?
 
-Well, first of all, all async closures implement `FnOnce` since they can always be called *at least once*.
+まず第一に、すべての非同期クロージャは`FnOnce`を実装します。*少なくとも1回*は常に呼び出すことができるためです。
 
-For `Fn`/`FnMut`, the detailed answer involves answering a related question: is the coroutine-closure lending? Because if it is, then it cannot implement the non-lending `Fn`/`FnMut` traits.
+`Fn`/`FnMut`の場合、詳細な答えは関連する質問に答えることを含みます: コルーチンクロージャはレンディングですか?もしそうなら、非レンディングの`Fn`/`FnMut`トレイトを実装できません。
 
-Determining when the coroutine-closure must *lend* its upvars is implemented in the `should_reborrow_from_env_of_parent_coroutine_closure` helper function[^u1]. Specifically, this needs to happen in two places:
+コルーチンクロージャがそのupvarsを*貸し出す*必要がある場合を判断することは、`should_reborrow_from_env_of_parent_coroutine_closure`ヘルパー関数[^u1]で実装されています。具体的には、これは2つの場所で発生する必要があります:
 
 [^u1]: <https://github.com/rust-lang/rust/blob/7c7bb7dc017545db732f5cffec684bbaeae0a9a0/compiler/rustc_hir_typeck/src/upvar.rs#L1818-L1860>
 
-1.  Are we borrowing data owned by the parent closure? We can determine if that is the case by checking if the parent capture is by-move, EXCEPT if we apply a deref projection, which means we're reborrowing a reference that we captured by-move.
+1. 親クロージャが所有するデータを借用していますか?親キャプチャがby-moveであるかどうかをチェックすることで、これが当てはまるかどうかを判断できます。ただし、デリファレンス投影を適用する場合を除きます。これは、by-moveでキャプチャした参照を再借用していることを意味します。
 
 ```rust
-let x = &1i32; // Let's call this lifetime `'1`.
+let x = &1i32; // このライフタイムを`'1`と呼びましょう。
 let c = async move || {
     println!("{:?}", *x);
-    // Even though the inner coroutine borrows by ref, we're only capturing `*x`,
-    // not `x`, so the inner closure is allowed to reborrow the data for `'1`.
+    // 内部コルーチンはby-refで借用しますが、`*x`のみをキャプチャしています。
+    // `x`ではないため、内部クロージャは`'1`のデータを再借用することが許可されます。
 };
 ```
 
-2. If a coroutine is mutably borrowing from a parent capture, then that mutable borrow cannot live for longer than either the parent *or* the borrow that we have on the original upvar. Therefore we always need to borrow the child capture with the lifetime of the parent coroutine-closure's env.
+2. コルーチンが親キャプチャから可変的に借用している場合、その可変借用は親*または*元のupvarに対する借用よりも長く生きることはできません。したがって、常に親コルーチンクロージャのenvのライフタイムで子キャプチャを借用する必要があります。
 
 ```rust
 let mut x = 1i32;
 let c = async || {
     x = 1;
-    // The parent borrows `x` for some `&'1 mut i32`.
-    // However, when we call `c()`, we implicitly autoref for the signature of
-    // `AsyncFnMut::async_call_mut`. Let's call that lifetime `'call`. Since
-    // the maximum that `&'call mut &'1 mut i32` can be reborrowed is `&'call mut i32`,
-    // the inner coroutine should capture w/ the lifetime of the coroutine-closure.
+    // 親は`x`を何らかの`&'1 mut i32`で借用します。
+    // ただし、`c()`を呼び出すと、暗黙的に
+    // `AsyncFnMut::async_call_mut`のシグネチャに対して自動参照します。そのライフタイムを`'call`と呼びましょう。
+    // `&'call mut &'1 mut i32`が再借用できる最大値は`&'call mut i32`であるため、
+    // 内部コルーチンはコルーチンクロージャのライフタイムでキャプチャする必要があります。
 };
 ```
 
-If either of these cases apply, then we should capture the borrow with the lifetime of the parent coroutine-closure's env. Luckily, if this function is not correct, then the program is not unsound, since we still borrowck and validate the choices made from this function -- the only side-effect is that the user may receive unnecessary borrowck errors.
+これらのケースのいずれかが当てはまる場合、親コルーチンクロージャのenvのライフタイムで借用をキャプチャする必要があります。幸いなことに、この関数が正しくない場合でも、プログラムは健全ではありません。借用チェックを行い、この関数から行われた選択を検証するためです - 唯一の副作用は、ユーザーが不要なborrowckエラーを受け取る可能性があることです。
 
-### Instance resolution
+### インスタンス解決
 
-If a coroutine-closure has a closure-kind of `FnOnce`, then its `AsyncFnOnce::call_once` and `FnOnce::call_once` implementations resolve to the coroutine-closure's body[^res1], and the `Future::poll` of the coroutine that gets returned resolves to the body of the child closure.
+コルーチンクロージャのclosure-kindが`FnOnce`の場合、その`AsyncFnOnce::call_once`および`FnOnce::call_once`実装はコルーチンクロージャの本体に解決され[^res1]、返されるコルーチンの`Future::poll`は子クロージャの本体に解決されます。
 
 [^res1]: <https://github.com/rust-lang/rust/blob/705cfe0e966399e061d64dd3661bfbc57553ed87/compiler/rustc_ty_utils/src/instance.rs#L351>
 
-If a coroutine-closure has a closure-kind of `FnMut`/`Fn`, then the same applies to `AsyncFn` and the corresponding `Future` implementation of the coroutine that gets returned.[^res1] However, we use a MIR shim to generate the implementation of `AsyncFnOnce::call_once`/`FnOnce::call_once`[^res2], and `Fn::call`/`FnMut::call_mut` instances if they exist[^res3].
+コルーチンクロージャのclosure-kindが`FnMut`/`Fn`の場合、同じことが`AsyncFn`と返されるコルーチンの対応する`Future`実装に適用されます。[^res1]ただし、MIRシムを使用して`AsyncFnOnce::call_once`/`FnOnce::call_once`[^res2]の実装、および存在する場合は`Fn::call`/`FnMut::call_mut`インスタンス[^res3]を生成します。
 
 [^res2]: <https://github.com/rust-lang/rust/blob/705cfe0e966399e061d64dd3661bfbc57553ed87/compiler/rustc_ty_utils/src/instance.rs#L341-L349>
 
 [^res3]: <https://github.com/rust-lang/rust/blob/705cfe0e966399e061d64dd3661bfbc57553ed87/compiler/rustc_ty_utils/src/instance.rs#L312-L326>
 
-This is represented by the `ConstructCoroutineInClosureShim`[^i1]. The `receiver_by_ref` bool will be true if this is the instance of `Fn::call`/`FnMut::call_mut`.[^i2] The coroutine that all of these instances returns corresponds to the by-move body we will have synthesized by this point.[^i3]
+これは`ConstructCoroutineInClosureShim`[^i1]によって表されます。`receiver_by_ref` boolは、これが`Fn::call`/`FnMut::call_mut`のインスタンスである場合にtrueになります。[^i2]これらすべてのインスタンスが返すコルーチンは、この時点までに合成したby-move本体に対応します。[^i3]
 
 [^i1]: <https://github.com/rust-lang/rust/blob/705cfe0e966399e061d64dd3661bfbc57553ed87/compiler/rustc_middle/src/ty/instance.rs#L129-L134>
 
@@ -286,11 +286,11 @@ This is represented by the `ConstructCoroutineInClosureShim`[^i1]. The `receiver
 
 [^i3]: <https://github.com/rust-lang/rust/blob/07cbbdd69363da97075650e9be24b78af0bcdd23/compiler/rustc_middle/src/ty/instance.rs#L841>
 
-### Borrow-checking
+### 借用チェック
 
-It turns out that borrow-checking async closures is pretty straightforward. After adding a new `DefiningTy::CoroutineClosure`[^bck1] variant, and teaching borrowck how to generate the signature of the coroutine-closure[^bck2], borrowck proceeds totally fine.
+非同期クロージャの借用チェックは非常に簡単であることがわかりました。新しい`DefiningTy::CoroutineClosure`[^bck1]バリアントを追加し、borrowckにコルーチンクロージャのシグネチャを生成する方法を教えた後[^bck2]、borrowckは完全に正常に進行します。
 
-One thing to note is that we don't borrow-check the synthetic body we make for by-move coroutines, since by construction (and the validity of the by-ref coroutine body it was derived from) it must be valid.
+注意すべき点の1つは、by-moveコルーチン用に作成する合成本体を借用チェックしないことです。構築上(およびそれが派生したby-refコルーチン本体の妥当性から)、それは有効でなければならないためです。
 
 [^bck1]: <https://github.com/rust-lang/rust/blob/705cfe0e966399e061d64dd3661bfbc57553ed87/compiler/rustc_borrowck/src/universal_regions.rs#L110-L115>
 

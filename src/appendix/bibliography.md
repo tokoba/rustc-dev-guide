@@ -1,12 +1,10 @@
-# Rust Bibliography
+# Rust参考文献
 
-This is a reading list of material relevant to Rust. It includes prior
-research that has - at one time or another - influenced the design of
-Rust, as well as publications about Rust.
+これはRustに関連する資料の読書リストです。過去にRustの設計に影響を与えた研究や、Rustに関する出版物が含まれています。
 
-## Type system
+## 型システム
 
-* [Alias burying](https://dl.acm.org/doi/10.1002/spe.370) - We tried something similar and abandoned it.
+* [Alias burying](https://dl.acm.org/doi/10.1002/spe.370) - 似たようなことを試みて、断念しました。
 * [External uniqueness is unique enough](https://lirias.kuleuven.be/retrieve/35835)
 * [Macros that work together](https://www.cs.utah.edu/plt/publications/jfp12-draft-fcdf.pdf)
 * [Making ad-hoc polymorphism less ad hoc](https://dl.acm.org/doi/10.1145/75277.75283)
@@ -17,13 +15,13 @@ Rust, as well as publications about Rust.
 * [Traits: composable units of behavior](http://scg.unibe.ch/archive/papers/Scha03aTraits.pdf)
 * [Uniqueness and Reference Immutability for Safe Parallelism](https://research.microsoft.com/pubs/170528/msr-tr-2012-79.pdf)
 
-## Concurrency
+## 並行性
 
-* [A Java fork/join calamity](https://web.archive.org/web/20190904045322/http://www.coopsoft.com/ar/CalamityArticle.html) - critique of Java's fork/join library, particularly its application of work stealing to non-strict computation
+* [A Java fork/join calamity](https://web.archive.org/web/20190904045322/http://www.coopsoft.com/ar/CalamityArticle.html) - Javaのfork/joinライブラリの批評、特に非正格計算へのワークスティーリングの適用について
 * [Algorithms for scalable synchronization of shared-memory multiprocessors](https://www.cs.rochester.edu/u/scott/papers/1991_TOCS_synch.pdf)
 * [Balanced work stealing for time-sharing multicores](https://web.njit.edu/~dingxn/papers/BWS.pdf)
 * [Contention aware scheduling](https://www.blagodurov.net/files/a8-blagodurov.pdf)
-* [Dynamic circular work stealing deque](https://patents.google.com/patent/US7346753B2/en) - The Chase/Lev deque
+* [Dynamic circular work stealing deque](https://patents.google.com/patent/US7346753B2/en) - Chase/Lev deque
 * [Epoch-based reclamation](https://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-579.pdf).
 * [Language support for fast and reliable message passing in singularity OS](https://research.microsoft.com/pubs/67482/singsharp.pdf)
 * [Non-blocking steal-half work queues](https://www.cs.bgu.ac.il/%7Ehendlerd/papers/p280-hendler.pdf)
@@ -34,59 +32,52 @@ Rust, as well as publications about Rust.
 * [The data locality of work stealing](http://www.aladdin.cs.cmu.edu/papers/pdfs/y2000/locality_spaa00.pdf)
 * [Thread scheduling for multiprogramming multiprocessors](https://www.eecis.udel.edu/%7Ecavazos/cisc879-spring2008/papers/arora98thread.pdf)
 * [Three layer cake for shared-memory programming](https://dl.acm.org/doi/10.1145/1953611.1953616)
-* [Work-first and help-first scheduling policies for async-finish task parallelism](https://dl.acm.org/doi/10.1109/IPDPS.2009.5161079) - More general than fully-strict work stealing
+* [Work-first and help-first scheduling policies for async-finish task parallelism](https://dl.acm.org/doi/10.1109/IPDPS.2009.5161079) - 完全正格ワークスティーリングよりも一般的
 
-## Others
+## その他
 
 * [Composing High-Performance Memory Allocators](https://people.cs.umass.edu/~emery/pubs/berger-pldi2001.pdf)
 * [Crash-only software](https://www.usenix.org/legacy/events/hotos03/tech/full_papers/candea/candea.pdf)
 * [Reconsidering Custom Memory Allocation](https://people.cs.umass.edu/~emery/pubs/berger-oopsla2002.pdf)
 
-## Papers *about* Rust
+## Rust*に関する*論文
 
 * [GPU Programming in Rust: Implementing High Level Abstractions in a Systems
   Level
   Language](https://ieeexplore.ieee.org/document/6650903).
-  Early GPU work by Eric Holk.
+  Eric HolkによるGPU初期研究。
 * [Parallel closures: a new twist on an old
   idea](https://www.usenix.org/conference/hotpar12/parallel-closures-new-twist-old-idea)
-  - not exactly about Rust, but by nmatsakis
+  - Rustについての論文ではありませんが、nmatsakisによるもの
 * [Patina: A Formalization of the Rust Programming
   Language](https://dada.cs.washington.edu/research/tr/2015/03/UW-CSE-15-03-02.pdf).
-  Early formalization of a subset of the type system, by Eric Reed.
+  Eric Reedによる型システムの部分集合の初期形式化。
 * [Experience Report: Developing the Servo Web Browser Engine using
-  Rust](https://arxiv.org/abs/1505.07383). By Lars Bergstrom.
+  Rust](https://arxiv.org/abs/1505.07383). Lars Bergstromによる。
 * [Implementing a Generic Radix Trie in
-  Rust](https://michaelsproul.github.io/rust_radix_paper/rust-radix-sproul.pdf). Undergrad
-  paper by Michael Sproul.
+  Rust](https://michaelsproul.github.io/rust_radix_paper/rust-radix-sproul.pdf). Michael Sproulによる学部論文。
 * [Reenix: Implementing a Unix-Like Operating System in
-  Rust](https://scialex.github.io/reenix.pdf). Undergrad paper by Alex
-  Light.
+  Rust](https://scialex.github.io/reenix.pdf). Alex Lightによる学部論文。
 * [Evaluation of performance and productivity metrics of potential programming languages in the HPC environment](https://github.com/1wilkens/thesis-ba).
-  Bachelor's thesis by Florian Wilkens. Compares C, Go and Rust.
+  Florian Wilkensによる学士論文。C、Go、Rustを比較。
 * [Nom, a byte oriented, streaming, zero copy, parser combinators library
-  in Rust](http://spw15.langsec.org/papers/couprie-nom.pdf). By
-  Geoffroy Couprie, research for VLC.
+  in Rust](http://spw15.langsec.org/papers/couprie-nom.pdf). Geoffroy CouprieによるVLCのための研究。
 * [Graph-Based Higher-Order Intermediate
-  Representation](https://compilers.cs.uni-saarland.de/papers/lkh15_cgo.pdf). An
-  experimental IR implemented in Impala, a Rust-like language.
+  Representation](https://compilers.cs.uni-saarland.de/papers/lkh15_cgo.pdf). Rust風の言語Impalaで実装された実験的IR。
 * [Code Refinement of Stencil
-  Codes](https://compilers.cs.uni-saarland.de/papers/ppl14_web.pdf). Another
-  paper using Impala.
+  Codes](https://compilers.cs.uni-saarland.de/papers/ppl14_web.pdf). Impalaを使用した別の論文。
 * [Parallelization in Rust with fork-join and
-  friends](http://publications.lib.chalmers.se/records/fulltext/219016/219016.pdf). Linus
-  Farnstrand's master's thesis.
+  friends](http://publications.lib.chalmers.se/records/fulltext/219016/219016.pdf). Linus Farnstrandの修士論文。
 * [Session Types for
-  Rust](https://munksgaard.me/papers/laumann-munksgaard-larsen.pdf). Philip
-  Munksgaard's master's thesis. Research for Servo.
+  Rust](https://munksgaard.me/papers/laumann-munksgaard-larsen.pdf). Philip Munksgaardの修士論文。Servoのための研究。
 * [Ownership is Theft: Experiences Building an Embedded OS in Rust - Amit Levy, et. al.](https://amitlevy.com/papers/tock-plos2015.pdf)
-* [You can't spell trust without Rust](https://faultlore.com/blah/papers/thesis.pdf). Aria Beingessner's master's thesis.
+* [You can't spell trust without Rust](https://faultlore.com/blah/papers/thesis.pdf). Aria Beingessnerの修士論文。
 * [Rust-Bio: a fast and safe bioinformatics library](https://rust-bio.github.io/). Johannes Köster
-* [Safe, Correct, and Fast Low-Level Networking](https://csperkins.org/research/thesis-msci-clipsham.pdf). Robert Clipsham's master's thesis.
-* [Formalizing Rust traits](https://open.library.ubc.ca/cIRcle/collections/ubctheses/24/items/1.0220521). Jonatan Milewski's master's thesis.
+* [Safe, Correct, and Fast Low-Level Networking](https://csperkins.org/research/thesis-msci-clipsham.pdf). Robert Clipshamの修士論文。
+* [Formalizing Rust traits](https://open.library.ubc.ca/cIRcle/collections/ubctheses/24/items/1.0220521). Jonatan Milewskiの修士論文。
 * [Rust as a Language for High Performance GC Implementation](https://dl.acm.org/doi/pdf/10.1145/3241624.2926707)
-* [Simple Verification of Rust Programs via Functional Purification](https://github.com/Kha/electrolysis). Sebastian Ullrich's master's thesis.
-* [Writing parsers like it is 2017](http://spw17.langsec.org/papers/chifflier-parsing-in-2017.pdf) Pierre Chifflier and Geoffroy Couprie for the Langsec Workshop
+* [Simple Verification of Rust Programs via Functional Purification](https://github.com/Kha/electrolysis). Sebastian Ullrichの修士論文。
+* [Writing parsers like it is 2017](http://spw17.langsec.org/papers/chifflier-parsing-in-2017.pdf) Pierre ChifflierとGeoffroy CouprieによるLangsec Workshopでの発表
 * [The Case for Writing a Kernel in Rust](https://www.tockos.org/assets/papers/rust-kernel-apsys2017.pdf)
 * [RustBelt: Securing the Foundations of the Rust Programming Language](https://plv.mpi-sws.org/rustbelt/popl18/)
-* [Oxide: The Essence of Rust](https://arxiv.org/abs/1903.00982). By Aaron Weiss, Olek Gierczak, Daniel Patterson, Nicholas D. Matsakis, and Amal Ahmed.
+* [Oxide: The Essence of Rust](https://arxiv.org/abs/1903.00982). Aaron Weiss、Olek Gierczak、Daniel Patterson、Nicholas D. Matsakis、Amal Ahmedによる。

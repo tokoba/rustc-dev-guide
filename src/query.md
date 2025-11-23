@@ -1,54 +1,49 @@
-# Queries: demand-driven compilation
+# クエリ: デマンド駆動型コンパイル
 
-As described in [Overview of the compiler], the Rust compiler
-is still (as of <!-- date-check --> July 2021) transitioning from a
-traditional "pass-based" setup to a "demand-driven" system. The compiler query
-system is the key to rustc's demand-driven organization.
-The idea is pretty simple. Instead of entirely independent passes
-(parsing, type-checking, etc.), a set of function-like *queries*
-compute information about the input source. For example,
-there is a query called `type_of` that, given the [`DefId`] of
-some item, will compute the type of that item and return it to you.
+[コンパイラの概要]で説明されているように、Rustコンパイラは
+(<!-- date-check --> 2021年7月時点でも)従来の「パスベース」のセットアップから
+「デマンド駆動型」システムへの移行を続けています。コンパイラクエリ
+システムは、rustcのデマンド駆動型組織の鍵です。
+アイデアは非常にシンプルです。完全に独立したパス
+(パース、型チェックなど)の代わりに、関数のような*クエリ*のセットが
+入力ソースに関する情報を計算します。たとえば、
+何らかのアイテムの[`DefId`]が与えられると、そのアイテムの型を計算して
+返す`type_of`というクエリがあります。
 
 [`DefId`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/def_id/struct.DefId.html
-[Overview of the compiler]: overview.md#queries
+[コンパイラの概要]: overview.md#queries
 
-Query execution is *memoized*. The first time you invoke a
-query, it will go do the computation, but the next time, the result is
-returned from a hashtable. Moreover, query execution fits nicely into
-*incremental computation*; the idea is roughly that, when you invoke a
-query, the result *may* be returned to you by loading stored data
-from disk.[^incr-comp-detail]
+クエリの実行は*メモ化*されます。クエリを初めて呼び出すと、
+計算を実行しますが、次回はハッシュテーブルから結果が返されます。さらに、クエリの実行は
+*インクリメンタルコンピューテーション*にうまく適合します。アイデアは大まかに、クエリを呼び出すと、
+結果がディスクから保存されたデータをロードすることによって返される*可能性がある*ということです。[^incr-comp-detail]
 
-Eventually, we want the entire compiler
-control-flow to be query driven. There will effectively be one
-top-level query (`compile`) that will run compilation on a crate; this
-will in turn demand information about that crate, starting from the
-*end*.  For example:
+最終的には、コンパイラ全体の
+制御フローをクエリ駆動型にしたいと考えています。実質的に、クレートでコンパイルを実行する
+1つのトップレベルクエリ(`compile`)があり、これが順番にそのクレートに関する情報を要求し、
+*最後*から開始します。例えば:
 
-- The `compile` query might demand to get a list of codegen-units
-  (i.e. modules that need to be compiled by LLVM).
-- But computing the list of codegen-units would invoke some subquery
-  that returns the list of all modules defined in the Rust source.
-- That query in turn would invoke something asking for the HIR.
-- This keeps going further and further back until we wind up doing the
-  actual parsing.
+- `compile`クエリは、コード生成ユニットのリストを取得するように要求する可能性があります
+  (つまり、LLVMでコンパイルする必要があるモジュール)。
+- ただし、コード生成ユニットのリストを計算すると、Rustソースで定義されている
+  すべてのモジュールのリストを返すサブクエリが呼び出されます。
+- そのクエリは順番にHIRを要求する何かを呼び出します。
+- これは、実際にパースを実行するまでさらに遡り続けます。
 
-Although this vision is not fully realized, large sections of the
-compiler (for example, generating [MIR]) currently work exactly like this.
+このビジョンは完全には実現されていませんが、コンパイラの大部分
+(たとえば、[MIR]の生成)は現在、まさにこのように機能しています。
 
-[^incr-comp-detail]: The [Incremental compilation in detail] chapter gives a more
-in-depth description of what queries are and how they work.
-If you intend to write a query of your own, this is a good read.
+[^incr-comp-detail]: [インクリメンタルコンパイルの詳細]の章では、クエリとは何か、
+どのように機能するかについて、より詳細な説明を提供しています。
+独自のクエリを作成する場合は、これを読むことをお勧めします。
 
-[Incremental compilation in detail]: queries/incremental-compilation-in-detail.md
+[インクリメンタルコンパイルの詳細]: queries/incremental-compilation-in-detail.md
 [MIR]: mir/index.md
 
-## Invoking queries
+## クエリの呼び出し
 
-Invoking a query is simple. The [`TyCtxt`] ("type context") struct offers a method
-for each defined query. For example, to invoke the `type_of`
-query, you would just do this:
+クエリの呼び出しは簡単です。[`TyCtxt`](「型コンテキスト」)構造体は、定義された各クエリのメソッドを提供します。
+たとえば、`type_of`クエリを呼び出すには、次のようにします:
 
 ```rust,ignore
 let ty = tcx.type_of(some_def_id);
@@ -56,41 +51,36 @@ let ty = tcx.type_of(some_def_id);
 
 [`TyCtxt`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html
 
-## How the compiler executes a query
+## コンパイラがクエリを実行する方法
 
-So you may be wondering what happens when you invoke a query
-method. The answer is that, for each query, the compiler maintains a
-cache – if your query has already been executed, then, the answer is
-simple: we clone the return value out of the cache and return it
-(therefore, you should try to ensure that the return types of queries
-are cheaply cloneable; insert an `Rc` if necessary).
+では、クエリメソッドを呼び出すと何が起こるのか疑問に思うかもしれません。
+答えは、各クエリについて、コンパイラがキャッシュを維持するということです -- クエリが
+すでに実行されている場合、答えは簡単です: キャッシュから戻り値をクローンして返します
+(したがって、クエリの戻り値の型が安価にクローン可能であることを確認する必要があります。
+必要に応じて`Rc`を挿入してください)。
 
-### Providers
+### プロバイダー
 
-If, however, the query is *not* in the cache, then the compiler will
-call the corresponding **provider** function. A provider is a function
-implemented in a specific module and **manually registered** into the
-[`Providers`][providers_struct] struct during compiler initialization.
-The macro system generates the [`Providers`][providers_struct] struct,
-which acts as a function table for all query implementations, where each
-field is a function pointer to the actual provider.
+ただし、クエリがキャッシュに*ない*場合、コンパイラは対応する**プロバイダー**関数を呼び出します。
+プロバイダーは特定のモジュールで実装され、コンパイラの初期化中に
+[`Providers`][providers_struct]構造体に**手動で登録**される関数です。
+マクロシステムは[`Providers`][providers_struct]構造体を生成します。
+これは、すべてのクエリ実装の関数テーブルとして機能し、各フィールドは実際のプロバイダーへの関数ポインターです。
 
-**Note:** The `Providers` struct is generated by macros and acts as a function table for all query implementations.
-It is **not** a Rust trait, but a plain struct with function pointer fields.
+**注意:** `Providers`構造体はマクロによって生成され、すべてのクエリ実装の関数テーブルとして機能します。
+これはRustトレイトでは**なく**、関数ポインターフィールドを持つプレーンな構造体です。
 
-**Providers are defined per-crate.** The compiler maintains,
-internally, a table of providers for every crate, at least
-conceptually. Right now, there are really two sets: the providers for
-queries about the **local crate** (that is, the one being compiled)
-and providers for queries about **external crates** (that is,
-dependencies of the local crate). Note that what determines the crate
-that a query is targeting is not the *kind* of query, but the *key*.
-For example, when you invoke `tcx.type_of(def_id)`, that could be a
-local query or an external query, depending on what crate the `def_id`
-is referring to (see the [`self::keys::Key`][Key] trait for more
-information on how that works).
+**プロバイダーはクレートごとに定義されます。** コンパイラは内部的に、
+少なくとも概念的には、すべてのクレートのプロバイダーのテーブルを維持します。
+現在、実際には2つのセットがあります: **ローカルクレート**(つまり、コンパイル中のもの)に関する
+クエリのプロバイダーと、**外部クレート**(つまり、ローカルクレートの依存関係)に関する
+クエリのプロバイダーです。クエリがターゲットとするクレートを決定するのは、
+クエリの*種類*ではなく、*キー*であることに注意してください。
+たとえば、`tcx.type_of(def_id)`を呼び出すと、`def_id`が参照している
+クレートに応じて、ローカルクエリまたは外部クエリになる可能性があります
+(これがどのように機能するかの詳細については、[`self::keys::Key`][Key]トレートを参照してください)。
 
-Providers always have the same signature:
+プロバイダーは常に同じシグネチャを持ちます:
 
 ```rust,ignore
 fn provider<'tcx>(
@@ -101,41 +91,39 @@ fn provider<'tcx>(
 }
 ```
 
-Providers take two arguments: the `tcx` and the query key.
-They return the result of the query.
+プロバイダーは2つの引数を取ります: `tcx`とクエリキー。
+クエリの結果を返します。
 
-N.B. Most of the `rustc_*` crates only provide **local
-providers**. Almost all **extern providers** wind up going through the
-[`rustc_metadata` crate][rustc_metadata], which loads the information
-from the crate metadata. But in some cases there are crates that
-provide queries for *both* local and external crates, in which case
-they define both a `provide` and a `provide_extern` function, through
-[`wasm_import_module_map`][wasm_import_module_map], that `rustc_driver` can invoke.
+注意: ほとんどの`rustc_*`クレートは**ローカル
+プロバイダー**のみを提供します。ほとんどすべての**外部プロバイダー**は
+[`rustc_metadata`クレート][rustc_metadata]を経由し、クレートメタデータから情報をロードします。
+ただし、*ローカルと外部の両方*のクレートのクエリを提供するクレートもあります。
+その場合、`provide`と`provide_extern`関数の両方を定義し、
+[`wasm_import_module_map`][wasm_import_module_map]を通じて`rustc_driver`が呼び出すことができます。
 
 [rustc_metadata]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_metadata/index.html
 [wasm_import_module_map]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_codegen_ssa/back/symbol_export/fn.wasm_import_module_map.html
 
-### How providers are set up
+### プロバイダーのセットアップ方法
 
-When the tcx is created, it is given the providers by its creator using
-the [`Providers`][providers_struct] struct. This struct is generated by
-the macros here, but it is basically a big list of function pointers:
+tcxが作成されると、作成者は[`Providers`][providers_struct]構造体を使用してプロバイダーを提供します。
+この構造体はここのマクロによって生成されますが、基本的には関数ポインターの大きなリストです:
 
 [providers_struct]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/query/struct.Providers.html
 
 ```rust,ignore
 struct Providers {
     type_of: for<'tcx> fn(TyCtxt<'tcx>, DefId) -> Ty<'tcx>,
-    // ... one field for each query
+    // ... 各クエリに1つのフィールド
 }
 ```
 
-#### How are providers registered?
+#### プロバイダーはどのように登録されますか?
 
-The `Providers` struct is filled in during compiler initialization, mainly by the `rustc_driver` crate.  
-But the actual provider functions are implemented in various `rustc_*` crates (like `rustc_middle`, `rustc_hir_analysis`, etc).
+`Providers`構造体は、主に`rustc_driver`クレートによって、コンパイラの初期化中に入力されます。
+ただし、実際のプロバイダー関数は、様々な`rustc_*`クレート(`rustc_middle`、`rustc_hir_analysis`など)に実装されています。
 
-To register providers, each crate exposes a [`provide`][provide_fn] function that looks like this:
+プロバイダーを登録するために、各クレートは次のような[`provide`][provide_fn]関数を公開します:
 
 [provide_fn]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/hir/fn.provide.html
 
@@ -143,24 +131,24 @@ To register providers, each crate exposes a [`provide`][provide_fn] function tha
 pub fn provide(providers: &mut Providers) {
     *providers = Providers {
         type_of,
-        // ... add more providers here
+        // ... ここにさらにプロバイダーを追加
         ..*providers
     };
 }
 ```
 
-- This function takes a mutable reference to the `Providers` struct and sets the fields to point to the correct provider functions.
-- You can also assign fields individually, e.g. `providers.type_of = type_of;`.
+- この関数は`Providers`構造体への可変参照を受け取り、正しいプロバイダー関数を指すようにフィールドを設定します。
+- `providers.type_of = type_of;`のように、フィールドを個別に割り当てることもできます。
 
-#### Adding a new provider
+#### 新しいプロバイダーの追加
 
-Suppose you want to add a new query called `fubar`. You would:
+`fubar`という新しいクエリを追加したいとします。次のようにします:
 
-1. Implement the provider function:
+1. プロバイダー関数を実装します:
     ```rust,ignore
     fn fubar<'tcx>(tcx: TyCtxt<'tcx>, key: DefId) -> Fubar<'tcx> { ... }
     ```
-2. Register it in the `provide` function:
+2. `provide`関数に登録します:
     ```rust,ignore
     pub fn provide(providers: &mut Providers) {
         *providers = Providers {
@@ -172,27 +160,26 @@ Suppose you want to add a new query called `fubar`. You would:
 
 ---
 
-## Adding a new query
+## 新しいクエリの追加
 
-How do you add a new query?
-Defining a query takes place in two steps:
+新しいクエリをどのように追加しますか?
+クエリの定義は2つのステップで行われます:
 
-1. Declare the query name, its arguments and description.
-2. Supply query providers where needed.
+1. クエリ名、その引数、説明を宣言します。
+2. 必要に応じてクエリプロバイダーを提供します。
 
-To declare the query name and arguments, you simply add an entry to
-the big macro invocation in [`compiler/rustc_middle/src/query/mod.rs`][query-mod].
-Then you need to add a documentation comment to it with some _internal_ description.
-Then, provide the `desc` attribute which contains a _user-facing_ description of the query.
-The `desc` attribute is shown to the user in query cycles.
+クエリ名と引数を宣言するには、[`compiler/rustc_middle/src/query/mod.rs`][query-mod]の
+大きなマクロ呼び出しにエントリを追加するだけです。次に、いくつかの_内部_説明を含む
+ドキュメントコメントを追加する必要があります。次に、クエリの_ユーザー向け_説明を含む
+`desc`属性を提供します。`desc`属性はクエリサイクルでユーザーに表示されます。
 
-This looks something like:
+これは次のようになります:
 
 [query-mod]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/query/index.html
 
 ```rust,ignore
 rustc_queries! {
-    /// Records the type of every item.
+    /// すべてのアイテムの型を記録します。
     query type_of(key: DefId) -> Ty<'tcx> {
         cache_on_disk_if { key.is_local() }
         desc { |tcx| "computing the type of `{}`", tcx.def_path_str(key) }
@@ -201,66 +188,62 @@ rustc_queries! {
 }
 ```
 
-A query definition has the following form:
+クエリ定義は次のような形式です:
 
 ```rust,ignore
 query type_of(key: DefId) -> Ty<'tcx> { ... }
 ^^^^^ ^^^^^^^      ^^^^^     ^^^^^^^^   ^^^
 |     |            |         |          |
-|     |            |         |          query modifiers
-|     |            |         result type
-|     |            query key type
-|     name of query
-query keyword
+|     |            |         |          クエリ修飾子
+|     |            |         結果の型
+|     |            クエリキーの型
+|     クエリの名前
+queryキーワード
 ```
 
-Let's go over these elements one by one:
+これらの要素を1つずつ見ていきましょう:
 
-- **Query keyword:** indicates a start of a query definition.
-- **Name of query:** the name of the query method
-  (`tcx.type_of(..)`). Also used as the name of a struct
-  (`ty::queries::type_of`) that will be generated to represent
-  this query.
-- **Query key type:** the type of the argument to this query.
-  This type must implement the [`ty::query::keys::Key`][Key] trait, which
-  defines (for example) how to map it to a crate, and so forth.
-- **Result type of query:** the type produced by this query. This type
-  should (a) not use `RefCell` or other interior mutability and (b) be
-  cheaply cloneable. Interning or using `Rc` or `Arc` is recommended for
-  non-trivial data types.[^steal]
-- **Query modifiers:** various flags and options that customize how the
-  query is processed (mostly with respect to [incremental compilation][incrcomp]).
+- **Queryキーワード:** クエリ定義の開始を示します。
+- **クエリの名前:** クエリメソッドの名前
+  (`tcx.type_of(..)`)。また、このクエリを表すために生成される構造体
+  (`ty::queries::type_of`)の名前としても使用されます。
+- **クエリキーの型:** このクエリの引数の型。
+  この型は[`ty::query::keys::Key`][Key]トレートを実装する必要があります。
+  これは(たとえば)それをクレートにマッピングする方法などを定義します。
+- **クエリの結果の型:** このクエリによって生成される型。この型は
+  (a)`RefCell`または他の内部可変性を使用せず、(b)安価にクローン可能である必要があります。
+  重要でないデータ型には、インターンまたは`Rc`や`Arc`の使用が推奨されます。[^steal]
+- **クエリ修飾子:** クエリの処理方法をカスタマイズする様々なフラグとオプション
+  (主に[インクリメンタルコンパイル][incrcomp]に関して)。
 
 [Key]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/query/keys/trait.Key.html
 [incrcomp]: queries/incremental-compilation-in-detail.html#query-modifiers
 
-So, to add a query:
+したがって、クエリを追加するには:
 
-- Add an entry to `rustc_queries!` using the format above.
-- Link the provider by modifying the appropriate `provide` method;
-  or add a new one if needed and ensure that `rustc_driver` is invoking it.
+- 上記の形式を使用して`rustc_queries!`にエントリを追加します。
+- 適切な`provide`メソッドを変更してプロバイダーをリンクします。
+  必要に応じて新しいものを追加し、`rustc_driver`が呼び出していることを確認します。
 
-[^steal]: The one exception to those rules is the `ty::steal::Steal` type,
-which is used to cheaply modify MIR in place. See the definition
-of `Steal` for more details. New uses of `Steal` should **not** be
-added without alerting `@rust-lang/compiler`.
+[^steal]: これらのルールの唯一の例外は`ty::steal::Steal`型で、
+MIRをその場で安価に変更するために使用されます。詳細については`Steal`の定義を参照してください。
+`Steal`の新しい使用は、`@rust-lang/compiler`に警告することなく追加**しないでください**。
 
-## External links
+## 外部リンク
 
-Related design ideas, and tracking issues:
+関連する設計アイデアと追跡の問題:
 
-- Design document: [On-demand Rustc incremental design doc]
-- Tracking Issue: ["Red/Green" dependency tracking in compiler]
+- 設計ドキュメント: [On-demand Rustc incremental design doc]
+- 追跡の問題: [コンパイラにおける「Red/Green」依存関係追跡]
 
-More discussion and issues:
+さらなる議論と問題:
 
 - [GitHub issue #42633]
 - [Incremental Compilation Beta]
 - [Incremental Compilation Announcement]
 
 [On-demand Rustc incremental design doc]: https://github.com/nikomatsakis/rustc-on-demand-incremental-design-doc/blob/master/0000-rustc-on-demand-and-incremental.md
-["Red/Green" dependency tracking in compiler]: https://github.com/rust-lang/rust/issues/42293
+[コンパイラにおける「Red/Green」依存関係追跡]: https://github.com/rust-lang/rust/issues/42293
 [GitHub issue #42633]: https://github.com/rust-lang/rust/issues/42633
 [Incremental Compilation Beta]: https://internals.rust-lang.org/t/incremental-compilation-beta/4721
 [Incremental Compilation Announcement]: https://blog.rust-lang.org/2016/09/08/incremental.html
-

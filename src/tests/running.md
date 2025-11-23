@@ -1,20 +1,17 @@
-# Running tests
+# テストの実行
 
-You can run the entire test collection using `x`.
-But note that running the *entire* test collection is almost never what you want to do during local
-development because it takes a really long time.
-For local development, see the subsection after on how to run a subset of tests.
+`x` を使用してテストコレクション全体を実行できます。
+ただし、*全体*のテストコレクションを実行することは、ローカル開発中にはほとんど望ましくありません。非常に時間がかかるためです。
+ローカル開発では、テストのサブセットを実行する方法について次のサブセクションを参照してください。
 
 <div class="warning">
 
-Running plain `./x test` will build the stage 1 compiler and then run the whole test suite.
-This not only includes `tests/`, but also `library/`, `compiler/`,
-`src/tools/` package tests and more.
+単純な `./x test` を実行すると、stage 1 コンパイラをビルドしてからテストスイート全体を実行します。
+これには `tests/` だけでなく、`library/`、`compiler/`、
+`src/tools/` のパッケージテストなども含まれます。
 
-You usually only want to run a subset of the test suites (or even a smaller set
-of tests than that) which you expect will exercise your changes.
-PR CI exercises a subset of test collections, and merge queue CI will exercise all of the test
-collection.
+通常は、変更が適用されることが期待されるテストスイートのサブセット（またはそれよりもさらに小さなテストセット）のみを実行したいはずです。
+PR CI はテストコレクションのサブセットを実行し、マージキュー CI はすべてのテストコレクションを実行します。
 
 </div>
 
@@ -22,250 +19,232 @@ collection.
 ./x test
 ```
 
-The test results are cached and previously successful tests are `ignored` during testing.
-The stdout/stderr contents as well as a timestamp file for every test
-can be found under `build/<target-tuple>/test/` for the given
-`<target-tuple>`. To force-rerun a test (e.g. in case the test runner fails to
-notice a change) you can use the `--force-rerun` CLI option.
+テスト結果はキャッシュされ、以前に成功したテストはテスト時に `ignored` となります。
+すべてのテストの stdout/stderr の内容とタイムスタンプファイルは、
+指定された `<target-tuple>` の `build/<target-tuple>/test/` の下にあります。テストを強制的に再実行するには（例えば、テストランナーが変更に気付かない場合）、`--force-rerun` CLI オプションを使用できます。
 
-> **Note on requirements of external dependencies**
+> **外部依存性の要件に関する注意**
 >
-> Some test suites may require external dependencies. This is especially true of
-> debuginfo tests. Some debuginfo tests require a Python-enabled gdb. You can
-> test if your gdb install supports Python by using the `python` command from
-> within gdb. Once invoked you can type some Python code (e.g. `print("hi")`)
-> followed by return and then `CTRL+D` to execute it. If you are building gdb
-> from source, you will need to configure with
-> `--with-python=<path-to-python-binary>`.
+> 一部のテストスイートは外部依存性を必要とする場合があります。これは特に
+> debuginfo テストに当てはまります。一部の debuginfo テストは Python 対応の gdb を必要とします。
+> gdb のインストールが Python をサポートしているかどうかは、gdb 内から `python` コマンドを使用してテストできます。
+> 起動したら、いくつかの Python コード（例：`print("hi")`）を入力し、
+> return を押してから `CTRL+D` を押して実行します。gdb をソースからビルドしている場合は、
+> `--with-python=<path-to-python-binary>` で構成する必要があります。
 
-## Running a subset of the test suites
+## テストスイートのサブセットを実行
 
-When working on a specific PR, you will usually want to run a smaller set of tests.
-For example, a good "smoke test" that can be used after modifying rustc
-to see if things are generally working correctly would be to exercise the `ui`
-test suite ([`tests/ui`]):
+特定の PR で作業しているときは、通常、より小さなテストセットを実行したいでしょう。
+例えば、rustc を変更した後に使用できる良い「スモークテスト」として、
+一般的に正しく動作しているかを確認するために `ui` テストスイート（[`tests/ui`]）を実行するのが良いでしょう：
 
 ```text
 ./x test tests/ui
 ```
 
-Of course, the choice of test suites is somewhat arbitrary, and may not suit the task you are doing.
-For example, if you are hacking on debuginfo, you may be better off with the debuginfo test suite:
+もちろん、テストスイートの選択は多少恣意的であり、行っているタスクに適さない場合があります。
+例えば、debuginfo をハッキングしている場合は、debuginfo テストスイートを使用する方が良いでしょう：
 
 ```text
 ./x test tests/debuginfo
 ```
 
-If you only need to test a specific subdirectory of tests for any given test
-suite, you can pass that directory as a filter to `./x test`:
+任意のテストスイートの特定のサブディレクトリのテストのみをテストする必要がある場合は、
+そのディレクトリをフィルタとして `./x test` に渡すことができます：
 
 ```text
 ./x test tests/ui/const-generics
 ```
 
-> **Note for MSYS2**
+> **MSYS2 に関する注意**
 >
-> On MSYS2 the paths seem to be strange and `./x test` neither recognizes
-> `tests/ui/const-generics` nor `tests\ui\const-generics`. In that case, you can
-> workaround it by using e.g. `./x test ui
-> --test-args="tests/ui/const-generics"`.
+> MSYS2 ではパスが奇妙に見え、`./x test` は
+> `tests/ui/const-generics` も `tests\ui\const-generics` も認識しません。その場合は、
+> `./x test ui
+> --test-args="tests/ui/const-generics"` などを使用して回避できます。
 
-Likewise, you can test a single file by passing its path:
+同様に、パスを渡すことで単一のファイルをテストできます：
 
 ```text
 ./x test tests/ui/const-generics/const-test.rs
 ```
 
-`x` doesn't support running a single tool test by passing its path yet.
-You'll have to use the `--test-args` argument as described
-[below](#running-an-individual-test).
+`x` はパスを渡すことで単一のツールテストを実行することをまだサポートしていません。
+[以下](#running-an-individual-test)で説明する `--test-args` 引数を使用する必要があります。
 
 ```text
 ./x test src/tools/miri --test-args tests/fail/uninit/padding-enum.rs
 ```
 
-### Run only the tidy script
+### tidy スクリプトのみを実行
 
 ```text
 ./x test tidy
 ```
 
-### Run tests on the standard library
+### 標準ライブラリでテストを実行
 
 ```text
 ./x test --stage 0 library/std
 ```
 
-Note that this only runs tests on `std`;
-if you want to test `core` or other crates, you have to specify those explicitly.
+これは `std` のテストのみを実行することに注意してください。
+`core` や他のクレートをテストしたい場合は、それらを明示的に指定する必要があります。
 
-### Run the tidy script and tests on the standard library
+### tidy スクリプトと標準ライブラリのテストを実行
 
 ```text
 ./x test --stage 0 tidy library/std
 ```
 
-### Run tests on the standard library using a stage 1 compiler
+### stage 1 コンパイラを使用して標準ライブラリでテストを実行
 
 ```text
 ./x test --stage 1 library/std
 ```
 
-By listing which test suites you want to run,
-you avoid having to run tests for components you did not change at all.
+実行したいテストスイートをリストすることで、
+まったく変更しなかったコンポーネントのテストを実行することを避けられます。
 
 <div class="warning">
 
-Note that bors only runs the tests with the full stage 2 build;
-therefore, while the tests **usually** work fine with stage 1, there are some limitations.
+bors は完全な stage 2 ビルドでのみテストを実行することに注意してください。
+したがって、テストは通常 stage 1 で正常に動作しますが、いくつかの制限があります。
 
 </div>
 
-### Run all tests using a stage 2 compiler
+### stage 2 コンパイラを使用してすべてのテストを実行
 
 ```text
 ./x test --stage 2
 ```
 
 <div class="warning">
-You almost never need to do this;
-CI will run these tests for you.
+これを行う必要はほとんどありません。
+CI があなたのためにこれらのテストを実行します。
 </div>
 
-## Run unit tests on the compiler/library
+## コンパイラ/ライブラリでユニットテストを実行
 
-You may want to run unit tests on a specific file with following:
+特定のファイルでユニットテストを実行したい場合があります：
 
 ```text
 ./x test compiler/rustc_data_structures/src/thin_vec/tests.rs
 ```
 
-But unfortunately, it's impossible.
-You should invoke the following instead:
+しかし残念ながら、これは不可能です。
+代わりに次を呼び出す必要があります：
 
 ```text
 ./x test compiler/rustc_data_structures/ --test-args thin_vec
 ```
 
-## Running an individual test
+## 個別のテストを実行
 
-Another common thing that people want to do is to run an **individual test**,
-often the test they are trying to fix.
-As mentioned earlier, you may pass the
-full file path to achieve this, or alternatively one may invoke `x` with the `--test-args` option:
+人々がよく行いたいもう1つの一般的なことは、**個別のテスト**を実行することです。
+多くの場合、修正しようとしているテストです。
+前述のように、完全なファイルパスを渡してこれを実現できます。または、`--test-args` オプションを指定して `x` を呼び出すこともできます：
 
 ```text
 ./x test tests/ui --test-args issue-1234
 ```
 
-Under the hood, the test runner invokes the standard Rust test runner (the same
-one you get with `#[test]`), so this command would wind up filtering for tests
-that include "issue-1234" in the name.
-Thus, `--test-args` is a good way to run a collection of related tests.
+内部的には、テストランナーは標準的な Rust テストランナー（`#[test]` で得られるものと同じ）を呼び出すため、このコマンドは名前に「issue-1234」を含むテストをフィルタリングします。
+したがって、`--test-args` は関連するテストのコレクションを実行する良い方法です。
 
-## Passing arguments to `rustc` when running tests
+## テスト実行時に `rustc` に引数を渡す
 
-It can sometimes be useful to run some tests with specific compiler arguments,
-without using `RUSTFLAGS` (during development of unstable features, with `-Z` flags, for example).
+テストを実行するときに特定のコンパイラ引数を指定すると便利な場合があります。
+`RUSTFLAGS` を使用せずに（例えば、不安定な機能の開発中に `-Z` フラグを使用する場合など）。
 
-This can be done with `./x test`'s `--compiletest-rustc-args` option, to pass
-additional arguments to the compiler when building the tests.
+これは `./x test` の `--compiletest-rustc-args` オプションで行うことができ、
+テストをビルドするときにコンパイラに追加の引数を渡すことができます。
 
-## Editing and updating the reference files
+## リファレンスファイルの編集と更新
 
-If you have changed the compiler's output intentionally, or you are making a new
-test, you can pass `--bless` to the test subcommand.
+コンパイラの出力を意図的に変更した場合、または新しいテストを作成している場合は、
+test サブコマンドに `--bless` を渡すことができます。
 
-As an example, if some tests in `tests/ui` are failing, you can run this command:
+例として、`tests/ui` の一部のテストが失敗している場合、このコマンドを実行できます：
 
 ```text
 ./x test tests/ui --bless
 ```
 
-It automatically adjusts the `.stderr`, `.stdout`, or `.fixed` files of all `test/ui` tests.
-Of course you can also target just specific tests with the `--test-args your_test_name` flag,
-just like when running the tests without the `--bless` flag.
+これにより、すべての `test/ui` テストの `.stderr`、`.stdout`、または `.fixed` ファイルが自動的に調整されます。
+もちろん、`--bless` フラグなしでテストを実行するときと同様に、`--test-args your_test_name` フラグで特定のテストのみをターゲットにすることもできます。
 
-## Configuring test running
+## テスト実行の設定
 
-There are a few options for running tests:
+テスト実行にはいくつかのオプションがあります：
 
-* `bootstrap.toml` has the `rust.verbose-tests` option. If `false`, each test will
-  print a single dot (the default).
-  If `true`, the name of every test will be printed.
-  This is equivalent to the `--quiet` option in the [Rust test
-  harness](https://doc.rust-lang.org/rustc/tests/).
-* The environment variable `RUST_TEST_THREADS` can be set to the number of
-  concurrent threads to use for testing.
+* `bootstrap.toml` には `rust.verbose-tests` オプションがあります。`false` の場合、各テストは
+  単一のドットを出力します（デフォルト）。
+  `true` の場合、すべてのテストの名前が出力されます。
+  これは [Rust テストハーネス](https://doc.rust-lang.org/rustc/tests/) の `--quiet` オプションと同等です。
+* 環境変数 `RUST_TEST_THREADS` は、
+  テストに使用する同時スレッド数に設定できます。
 
-## Passing `--pass $mode`
+## `--pass $mode` を渡す
 
-Pass UI tests now have three modes, `check-pass`, `build-pass` and `run-pass`.
-When `--pass $mode` is passed, these tests will be forced to run under the given
-`$mode` unless the directive `//@ ignore-pass` exists in the test file.
-For example, you can run all the tests in `tests/ui` as `check-pass`:
+Pass UI テストには現在、`check-pass`、`build-pass`、`run-pass` の3つのモードがあります。
+`--pass $mode` を渡すと、これらのテストは、テストファイルに `//@ ignore-pass` ディレクティブが存在しない限り、指定された `$mode` で実行されるように強制されます。
+例えば、`tests/ui` のすべてのテストを `check-pass` として実行できます：
 
 ```text
 ./x test tests/ui --pass check
 ```
 
-By passing `--pass $mode`, you can reduce the testing time.
-For each mode, please see [Controlling pass/fail
-expectations](ui.md#controlling-passfail-expectations).
+`--pass $mode` を渡すことで、テスト時間を短縮できます。
+各モードについては、[pass/fail 期待値の制御](ui.md#controlling-passfail-expectations) を参照してください。
 
-## Running tests with different "compare modes"
+## 異なる「比較モード」でテストを実行
 
-UI tests may have different output depending on certain "modes" that the compiler is in.
-For example, when using the Polonius mode, a test `foo.rs` will
-first look for expected output in `foo.polonius.stderr`, falling back to the
-usual `foo.stderr` if not found.
-The following will run the UI test suite in Polonius mode:
+UI テストは、コンパイラが置かれている特定の「モード」によって異なる出力を持つ場合があります。
+例えば、Polonius モードを使用する場合、テスト `foo.rs` は
+まず `foo.polonius.stderr` で期待される出力を探し、見つからない場合は
+通常の `foo.stderr` にフォールバックします。
+次のコマンドは Polonius モードで UI テストスイートを実行します：
 
 ```text
 ./x test tests/ui --compare-mode=polonius
 ```
 
-See [Compare modes](compiletest.md#compare-modes) for more details.
+詳細については、[比較モード](compiletest.md#compare-modes) を参照してください。
 
-## Running tests manually
+## テストを手動で実行
 
-Sometimes it's easier and faster to just run the test by hand.
-Most tests are just `.rs` files, so after [creating a rustup
-toolchain](../building/how-to-build-and-run.md#creating-a-rustup-toolchain), you
-can do something like:
+場合によっては、テストを手動で実行する方が簡単で高速です。
+ほとんどのテストは単なる `.rs` ファイルなので、[rustup ツールチェーンを作成](../building/how-to-build-and-run.md#creating-a-rustup-toolchain)した後、次のようなことができます：
 
 ```text
 rustc +stage1 tests/ui/issue-1234.rs
 ```
 
-This is much faster, but doesn't always work.
-For example, some tests include
-directives that specify specific compiler flags, or which rely on other crates,
-and they may not run the same without those options.
+これははるかに高速ですが、常に機能するとは限りません。
+例えば、一部のテストには特定のコンパイラフラグを指定するディレクティブが含まれていたり、他のクレートに依存していたりするため、
+これらのオプションなしでは同じように実行されない場合があります。
 
-## Running tests on a remote machine
+## リモートマシンでテストを実行
 
-Tests may be run on a remote machine (e.g. to test builds for a different
-architecture).
-This is done using `remote-test-client` on the build machine to
-send test programs to `remote-test-server` running on the remote machine.
-`remote-test-server` executes the test programs and sends the results back to the build machine.
-`remote-test-server` provides *unauthenticated remote code
-execution* so be careful where it is used.
+テストはリモートマシンで実行できます（例：異なるアーキテクチャのビルドをテストするため）。
+これは、ビルドマシンで `remote-test-client` を使用してテストプログラムをリモートマシンで実行されている `remote-test-server` に送信することによって行われます。
+`remote-test-server` はテストプログラムを実行し、結果をビルドマシンに送り返します。
+`remote-test-server` は*認証されていないリモートコード実行*を提供するため、使用場所には注意してください。
 
-To do this, first build `remote-test-server` for the remote machine
-(using RISC-V as an example):
+これを行うには、まずリモートマシン用の `remote-test-server` をビルドします
+（RISC-V を例として使用）：
 
 ```text
 ./x build src/tools/remote-test-server --target riscv64gc-unknown-linux-gnu
 ```
 
-The binary will be created at `./build/host/stage2-tools/$TARGET_ARCH/release/remote-test-server`.
-Copy this over to the remote machine.
+バイナリは `./build/host/stage2-tools/$TARGET_ARCH/release/remote-test-server` に作成されます。
+これをリモートマシンにコピーします。
 
-On the remote machine, run the `remote-test-server` with the `--bind
-0.0.0.0:12345` flag (and optionally `--verbose` flag).
-Output should look like this:
+リモートマシンで、`--bind
+0.0.0.0:12345` フラグ（およびオプションで `--verbose` フラグ）を使用して `remote-test-server` を実行します。
+出力は次のようになります：
 
 ```console
 $ ./remote-test-server --verbose --bind 0.0.0.0:12345
@@ -273,14 +252,12 @@ starting test server
 listening on 0.0.0.0:12345!
 ```
 
-Note that binding the server to 0.0.0.0 will allow all hosts able to reach your
-machine to execute arbitrary code on your machine.
-We strongly recommend either
-setting up a firewall to block external access to port 12345, or to use a more
-restrictive IP address when binding.
+サーバーを 0.0.0.0 にバインドすると、マシンに到達できるすべてのホストがマシン上で任意のコードを実行できることに注意してください。
+ポート 12345 への外部アクセスをブロックするファイアウォールを設定するか、
+バインド時により制限的な IP アドレスを使用することを強くお勧めします。
 
-You can test if the `remote-test-server` is working by connecting to it and sending `ping\n`.
-It should reply `pong`:
+`remote-test-server` が動作しているかどうかは、接続して `ping\n` を送信することでテストできます。
+`pong` と応答するはずです：
 
 ```console
 $ nc $REMOTE_IP 12345
@@ -288,17 +265,15 @@ ping
 pong
 ```
 
-To run tests using the remote runner, set the `TEST_DEVICE_ADDR` environment
-variable then use `x` as usual.
-For example, to run `ui` tests for a RISC-V machine with the IP address `1.2.3.4` use
+リモートランナーを使用してテストを実行するには、`TEST_DEVICE_ADDR` 環境変数を設定してから、通常どおり `x` を使用します。
+例えば、IP アドレス `1.2.3.4` の RISC-V マシンの `ui` テストを実行するには、次を使用します：
 
 ```text
 export TEST_DEVICE_ADDR="1.2.3.4:12345"
 ./x test tests/ui --target riscv64gc-unknown-linux-gnu
 ```
 
-If `remote-test-server` was run with the verbose flag, output on the test
-machine may look something like
+`remote-test-server` が verbose フラグ付きで実行された場合、テストマシンでの出力は次のようになります：
 
 ```text
 [...]
@@ -317,57 +292,55 @@ run "/tmp/work/test1018/a"
 [...]
 ```
 
-Tests are built on the machine running `x` not on the remote machine.
-Tests which fail to build unexpectedly (or `ui` tests producing incorrect build
-output) may fail without ever running on the remote machine.
+テストは `x` を実行しているマシンでビルドされ、リモートマシンではビルドされません。
+予期せずビルドに失敗したテスト（または不正なビルド出力を生成する `ui` テスト）は、リモートマシンで実行されることなく失敗する可能性があります。
 
-## Testing on emulators
+## エミュレータでのテスト
 
-Some platforms are tested via an emulator for architectures that aren't readily available.
-For architectures where the standard library is well supported and
-the host operating system supports TCP/IP networking, see the above instructions
-for testing on a remote machine (in this case the remote machine is emulated).
+一部のプラットフォームは、容易に利用できないアーキテクチャのエミュレータを介してテストされます。
+標準ライブラリが十分にサポートされており、
+ホストオペレーティングシステムが TCP/IP ネットワーキングをサポートしているアーキテクチャの場合、リモートマシンでのテストに関する上記の手順を参照してください（この場合、リモートマシンはエミュレートされています）。
 
-There is also a set of tools for orchestrating running the tests within the emulator.
-Platforms such as `arm-android` and `arm-unknown-linux-gnueabihf` are
-set up to automatically run the tests under emulation on GitHub Actions.
-The following will take a look at how a target's tests are run under emulation.
+エミュレータ内でテストを実行するためのツールのセットもあります。
+`arm-android` や `arm-unknown-linux-gnueabihf` などのプラットフォームは、
+GitHub Actions でエミュレーション下でテストを自動的に実行するように設定されています。
+以下では、ターゲットのテストがエミュレーション下でどのように実行されるかを見ていきます。
 
-The Docker image for [armhf-gnu] includes [QEMU] to emulate the ARM CPU architecture.
-Included in the Rust tree are the tools [remote-test-client] and
-[remote-test-server] which are programs for sending test programs and libraries
-to the emulator, and running the tests within the emulator, and reading the results.
-The Docker image is set up to launch `remote-test-server` and the
-build tools use `remote-test-client` to communicate with the server to
-coordinate running tests (see [src/bootstrap/src/core/build_steps/test.rs]).
+[armhf-gnu] 用の Docker イメージには、ARM CPU アーキテクチャをエミュレートする [QEMU] が含まれています。
+Rust ツリーには、テストプログラムとライブラリをエミュレータに送信し、
+エミュレータ内でテストを実行し、結果を読み取るためのプログラムである [remote-test-client] と
+[remote-test-server] というツールが含まれています。
+Docker イメージは `remote-test-server` を起動するように設定されており、
+ビルドツールは `remote-test-client` を使用してサーバーと通信し、
+テストの実行を調整します（[src/bootstrap/src/core/build_steps/test.rs] を参照）。
 
-To run on the iOS/tvOS/watchOS/visionOS simulator, we can similarly treat it as a "remote" machine.
-A curious detail here is that the network is shared between
-the simulator instance and the host macOS, so we can use the local loopback address `127.0.0.1`.
-Something like the following should work:
+iOS/tvOS/watchOS/visionOS シミュレータで実行するには、同様に「リモート」マシンとして扱うことができます。
+ここで興味深い詳細は、ネットワークがシミュレータインスタンスとホスト macOS の間で共有されているため、
+ローカルループバックアドレス `127.0.0.1` を使用できることです。
+次のような感じで動作するはずです：
 
 ```sh
-# Build the test server for the iOS simulator:
+# iOS シミュレータ用のテストサーバーをビルド：
 ./x build src/tools/remote-test-server --target aarch64-apple-ios-sim
 
-# If you already have a simulator instance open, copy the device UUID from:
+# 既にシミュレータインスタンスが開いている場合は、次からデバイス UUID をコピー：
 xcrun simctl list devices booted
 UDID=01234567-89AB-CDEF-0123-456789ABCDEF
 
-# Alternatively, create and boot a new simulator instance:
+# または、新しいシミュレータインスタンスを作成して起動：
 xcrun simctl list runtimes
 xcrun simctl list devicetypes
 UDID=$(xcrun simctl create $CHOSEN_DEVICE_TYPE $CHOSEN_RUNTIME)
 xcrun simctl boot $UDID
-# See https://nshipster.com/simctl/ for details.
+# 詳細は https://nshipster.com/simctl/ を参照してください。
 
-# Spawn the runner on port 12345:
+# ポート 12345 でランナーを生成：
 xcrun simctl spawn $UDID ./build/host/stage2-tools/aarch64-apple-ios-sim/release/remote-test-server -v --bind 127.0.0.1:12345
 
-# In a new terminal, run tests via the runner:
+# 新しいターミナルで、ランナー経由でテストを実行：
 export TEST_DEVICE_ADDR="127.0.0.1:12345"
 ./x test --host='' --target aarch64-apple-ios-sim --skip tests/debuginfo
-# FIXME(madsmtm): Allow debuginfo tests to work (maybe needs `.dSYM` folder to be copied to the target?).
+# FIXME(madsmtm): debuginfo テストが動作するようにする（`.dSYM` フォルダをターゲットにコピーする必要がある可能性があります）。
 ```
 
 [armhf-gnu]: https://github.com/rust-lang/rust/tree/HEAD/src/ci/docker/host-x86_64/armhf-gnu/Dockerfile
@@ -376,26 +349,26 @@ export TEST_DEVICE_ADDR="127.0.0.1:12345"
 [remote-test-server]: https://github.com/rust-lang/rust/tree/HEAD/src/tools/remote-test-server
 [src/bootstrap/src/core/build_steps/test.rs]: https://github.com/rust-lang/rust/blob/HEAD/src/bootstrap/src/core/build_steps/test.rs
 
-## Testing tests on wasi (wasm32-wasip1)
+## wasi (wasm32-wasip1) でテストをテストする
 
-Some tests are specific to wasm targets.
-To run theste tests, you have to pass `--target wasm32-wasip1` to `x test`.
-Additionally, you need the wasi sdk.
-Follow the install instructions from the [wasi sdk repository] to get a sysroot on your computer.
-On the [wasm32-wasip1 target support page] a minimum version is specified that your sdk must be able to build.
-Some cmake commands that take a while and give a lot of very concerning c++ warnings...
-Then, in `bootstrap.toml`, point to the sysroot like so:
+一部のテストは wasm ターゲットに固有です。
+これらのテストを実行するには、`x test` に `--target wasm32-wasip1` を渡す必要があります。
+さらに、wasi sdk が必要です。
+[wasi sdk リポジトリ] からインストール手順に従って、コンピュータに sysroot を取得してください。
+[wasm32-wasip1 ターゲットサポートページ] には、sdk がビルドできる必要がある最小バージョンが指定されています。
+時間がかかり、多くの非常に懸念される c++ 警告を出すいくつかの cmake コマンド...
+次に、`bootstrap.toml` で次のように sysroot を指定します：
 
 ```toml
 [target.wasm32-wasip1]
 wasi-root = "<wasi-sdk location>/build/sysroot/install/share/wasi-sysroot"
 ```
 
-In my case I git-cloned it next to my rust folder, so it was `../wasi-sdk/build/....`
-Now, tests should just run, you don't have to set up anything else.
+私の場合、rust フォルダの隣に git clone したので、`../wasi-sdk/build/....` でした。
+これで、テストは実行されるはずです。他に何も設定する必要はありません。
 
-[wasi sdk repository]: https://github.com/WebAssembly/wasi-sdk
-[wasm32-wasip1 target support page]: https://github.com/rust-lang/rust/blob/HEAD/src/doc/rustc/src/platform-support/wasm32-wasip1.md#building-the-target.
+[wasi sdk リポジトリ]: https://github.com/WebAssembly/wasi-sdk
+[wasm32-wasip1 ターゲットサポートページ]: https://github.com/rust-lang/rust/blob/HEAD/src/doc/rustc/src/platform-support/wasm32-wasip1.md#building-the-target.
 
 
 [`tests/ui`]: https://github.com/rust-lang/rust/tree/HEAD/tests/ui

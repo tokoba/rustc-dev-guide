@@ -1,192 +1,115 @@
-# Stability attributes
+# 安定性属性
 
-This section is about the stability attributes and schemes that allow stable
-APIs to use unstable APIs internally in the rustc standard library.
+このセクションは、rustc標準ライブラリで安定したAPIが内部で不安定なAPIを使用できるようにする安定性属性とスキームに関するものです。
 
-**NOTE**: this section is for *library* features, not *language* features. For instructions on
-stabilizing a language feature see [Stabilizing Features](./stabilization_guide.md).
+**注意**：このセクションは*ライブラリ*機能についてであり、*言語*機能についてではありません。言語機能の安定化の手順については、[機能の安定化](./stabilization_guide.md)を参照してください。
 
 ## unstable
 
-The `#[unstable(feature = "foo", issue = "1234", reason = "lorem ipsum")]`
-attribute explicitly marks an item as unstable. Items that are marked as
-"unstable" cannot be used without a corresponding `#![feature]` attribute on
-the crate, even on a nightly compiler. This restriction only applies across
-crate boundaries, unstable items may be used within the crate that defines
-them.
+`#[unstable(feature = "foo", issue = "1234", reason = "lorem ipsum")]`属性は、アイテムを明示的に不安定としてマークします。「不安定」としてマークされたアイテムは、nightlyコンパイラであっても、対応する`#![feature]`属性をクレートに付けずに使用することはできません。この制限はクレート境界を越える場合にのみ適用され、不安定なアイテムはそれらを定義するクレート内で使用できます。
 
-The `issue` field specifies the associated GitHub [issue number]. This field is
-required and all unstable features should have an associated tracking issue. In
-rare cases where there is no sensible value `issue = "none"` is used.
+`issue`フィールドは、関連するGitHubの[issue番号]を指定します。このフィールドは必須であり、すべての不安定な機能には関連する追跡issueがあるべきです。適切な値がない稀なケースでは、`issue = "none"`が使用されます。
 
-The `unstable` attribute infects all sub-items, where the attribute doesn't
-have to be reapplied. So if you apply this to a module, all items in the module
-will be unstable.
+`unstable`属性はすべてのサブアイテムに感染し、属性を再適用する必要はありません。したがって、これをモジュールに適用すると、モジュール内のすべてのアイテムが不安定になります。
 
-You can make specific sub-items stable by using the `#[stable]` attribute on
-them. The stability scheme works similarly to how `pub` works. You can have
-public functions of nonpublic modules and you can have stable functions in
-unstable modules or vice versa.
+`#[stable]`属性を使用することで、特定のサブアイテムを安定にすることができます。安定性スキームは`pub`の動作と同様に機能します。非公開モジュールの公開関数を持つことができ、不安定なモジュールの安定した関数を持つことができます（逆も同様）。
 
-Previously, due to a [rustc bug], stable items inside unstable modules were
-available to stable code in that location.
-As of <!-- date-check --> September 2024, items with [accidentally stabilized
-paths] are marked with the `#[rustc_allowed_through_unstable_modules]` attribute
-to prevent code dependent on those paths from breaking. Do *not* add this attribute
-to any more items unless that is needed to avoid breaking changes.
+以前は、[rustcのバグ][rustc bug]により、不安定なモジュール内の安定したアイテムがその場所で安定したコードから利用可能でした。<!-- date-check --> 2024年9月の時点で、[偶発的に安定化されたパス][accidentally stabilized paths]を持つアイテムは、それらのパスに依存するコードを壊さないように`#[rustc_allowed_through_unstable_modules]`属性でマークされています。破壊的変更を避けるために必要な場合を除き、この属性をこれ以上のアイテムに追加*しないで*ください。
 
-The `unstable` attribute may also have the `soft` value, which makes it a
-future-incompatible deny-by-default lint instead of a hard error. This is used
-by the `bench` attribute which was accidentally accepted in the past. This
-prevents breaking dependencies by leveraging Cargo's lint capping.
+`unstable`属性は`soft`値も持つことができ、これはハードエラーではなく、将来的な非互換性を示すデフォルトで拒否されるlintになります。これは、誤って過去に受け入れられた`bench`属性で使用されています。これにより、Cargoのlintキャップを活用して依存関係を壊さないようにします。
 
-[issue number]: https://github.com/rust-lang/rust/issues
+[issue番号]: https://github.com/rust-lang/rust/issues
 [rustc bug]: https://github.com/rust-lang/rust/issues/15702
 [accidentally stabilized paths]: https://github.com/rust-lang/rust/issues/113387
 
 ## stable
-The `#[stable(feature = "foo", since = "1.420.69")]` attribute explicitly
-marks an item as stabilized. Note that stable functions may use unstable things in their body.
+`#[stable(feature = "foo", since = "1.420.69")]`属性は、アイテムを明示的に安定化としてマークします。安定した関数は本体で不安定なものを使用できることに注意してください。
 
 ## rustc_const_unstable
 
-The `#[rustc_const_unstable(feature = "foo", issue = "1234", reason = "lorem
-ipsum")]` has the same interface as the `unstable` attribute. It is used to mark
-`const fn` as having their constness be unstable. This is only needed in rare cases:
-- If a `const fn` makes use of unstable language features or intrinsics.
-  (The compiler will tell you to add the attribute if you run into this.)
-- If a `const fn` is `#[stable]` but not yet intended to be const-stable.
-- To change the feature gate that is required to call a const-unstable intrinsic.
+`#[rustc_const_unstable(feature = "foo", issue = "1234", reason = "lorem ipsum")]`は`unstable`属性と同じインターフェースを持っています。これは、`const fn`の定数性が不安定であることをマークするために使用されます。これは稀なケースでのみ必要です：
+- `const fn`が不安定な言語機能やintrinsicを使用する場合。（コンパイラはこれに遭遇した場合、属性を追加するように指示します。）
+- `const fn`が`#[stable]`であるが、まだconst-stableにする意図がない場合。
+- const-unstableなintrinsicを呼び出すために必要な機能ゲートを変更する場合。
 
-Const-stability differs from regular stability in that it is *recursive*: a
-`#[rustc_const_unstable(...)]` function cannot even be indirectly called from stable code. This is
-to avoid accidentally leaking unstable compiler implementation artifacts to stable code or locking
-us into the accidental quirks of an incomplete implementation. See the rustc_const_stable_indirect
-and rustc_allow_const_fn_unstable attributes below for how to fine-tune this check.
+Const-stabilityは通常の安定性とは異なり、*再帰的*です：`#[rustc_const_unstable(...)]`関数は、安定したコードから間接的にも呼び出すことができません。これは、不安定なコンパイラの実装の詳細が誤って安定したコードに漏れることや、不完全な実装の偶発的な癖に私たちを閉じ込めることを避けるためです。このチェックを微調整する方法については、下記のrustc_const_stable_indirectおよびrustc_allow_const_fn_unstable属性を参照してください。
 
 ## rustc_const_stable
 
-The `#[rustc_const_stable(feature = "foo", since = "1.420.69")]` attribute explicitly marks
-a `const fn` as having its constness be `stable`.
+`#[rustc_const_stable(feature = "foo", since = "1.420.69")]`属性は、`const fn`の定数性が`stable`であることを明示的にマークします。
 
 ## rustc_const_stable_indirect
 
-The `#[rustc_const_stable_indirect]` attribute can be added to a `#[rustc_const_unstable(...)]`
-function to make it callable from `#[rustc_const_stable(...)]` functions. This indicates that the
-function is ready for stable in terms of its implementation (i.e., it doesn't use any unstable
-compiler features); the only reason it is not const-stable yet are API concerns.
+`#[rustc_const_stable_indirect]`属性は、`#[rustc_const_unstable(...)]`関数に追加して、`#[rustc_const_stable(...)]`関数から呼び出し可能にすることができます。これは、関数がその実装の観点から安定化の準備ができていることを示します（つまり、不安定なコンパイラ機能を使用していない）。まだconst-stableでない唯一の理由はAPIの懸念です。
 
-This should also be added to lang items for which const-calls are synthesized in the compiler, to
-ensure those calls do not bypass recursive const stability rules.
+これは、const-callsがコンパイラで合成される言語アイテムにも追加する必要があります。これにより、これらの呼び出しが再帰的const安定性ルールをバイパスしないことを保証します。
 
 ## rustc_intrinsic_const_stable_indirect
 
-On an intrinsic, this attribute marks the intrinsic as "ready to be used by public stable functions".
-If the intrinsic has a `rustc_const_unstable` attribute, it should be removed.
-**Adding this attribute to an intrinsic requires t-lang and wg-const-eval approval!**
+intrinsicでは、この属性はintrinsicを「公開された安定した関数で使用する準備ができている」とマークします。intrinsicに`rustc_const_unstable`属性がある場合は、削除する必要があります。**intrinsicにこの属性を追加するには、t-langとwg-const-evalの承認が必要です！**
 
 ## rustc_default_body_unstable
 
-The `#[rustc_default_body_unstable(feature = "foo", issue = "1234", reason =
-"lorem ipsum")]` attribute has the same interface as the `unstable` attribute.
-It is used to mark the default implementation for an item within a trait as
-unstable.
-A trait with a default-body-unstable item can be implemented stably by providing
-an explicit body for any such item, or the default body can be used by enabling
-its corresponding `#![feature]`.
+`#[rustc_default_body_unstable(feature = "foo", issue = "1234", reason = "lorem ipsum")]`属性は`unstable`属性と同じインターフェースを持っています。これは、トレイト内のアイテムのデフォルト実装を不安定としてマークするために使用されます。default-body-unstableなアイテムを持つトレイトは、そのようなアイテムに対して明示的な本体を提供することで安定的に実装できます。または、対応する`#![feature]`を有効にすることでデフォルトの本体を使用できます。
 
-## Stabilizing a library feature
+## ライブラリ機能の安定化
 
-To stabilize a feature, follow these steps:
+機能を安定化するには、次の手順に従ってください：
 
-1. Ask a **@T-libs-api** member to start an FCP on the tracking issue and wait for
-   the FCP to complete (with `disposition-merge`).
-2. Change `#[unstable(...)]` to `#[stable(since = "CURRENT_RUSTC_VERSION")]`.
-3. Remove `#![feature(...)]` from any test or doc-test for this API. If the feature is used in the
-   compiler or tools, remove it from there as well.
-4. If this is a `const fn`, add `#[rustc_const_stable(since = "CURRENT_RUSTC_VERSION")]`.
-   Alternatively, if this is not supposed to be const-stabilized yet,
-   add `#[rustc_const_unstable(...)]` for some new feature gate (with a new tracking issue).
-5. Open a PR against `rust-lang/rust`.
-   - Add the appropriate labels: `@rustbot modify labels: +T-libs-api`.
-   - Link to the tracking issue and say "Closes #XXXXX".
+1. **@T-libs-api**メンバーに追跡issueでFCPを開始してもらい、FCPが完了するまで待ちます（`disposition-merge`で）。
+2. `#[unstable(...)]`を`#[stable(since = "CURRENT_RUSTC_VERSION")]`に変更します。
+3. このAPIのテストやdoc-testから`#![feature(...)]`を削除します。機能がコンパイラやツールで使用されている場合は、そこからも削除します。
+4. これが`const fn`の場合、`#[rustc_const_stable(since = "CURRENT_RUSTC_VERSION")]`を追加します。または、これがまだconst-stabilizedされない場合は、新しい機能ゲート（新しい追跡issueで）のために`#[rustc_const_unstable(...)]`を追加します。
+5. `rust-lang/rust`に対してPRを開きます。
+   - 適切なラベルを追加します：`@rustbot modify labels: +T-libs-api`。
+   - 追跡issueにリンクして「Closes #XXXXX」と記述します。
 
-You can see an example of stabilizing a feature with
-[tracking issue #81656 with FCP](https://github.com/rust-lang/rust/issues/81656)
-and the associated
-[implementation PR #84642](https://github.com/rust-lang/rust/pull/84642).
+機能を安定化する例として、[FCPを伴う追跡issue #81656](https://github.com/rust-lang/rust/issues/81656)と関連する[実装PR #84642](https://github.com/rust-lang/rust/pull/84642)を参照できます。
 
 ## allow_internal_unstable
 
-Macros and compiler desugarings expose their bodies to the call
-site. To work around not being able to use unstable things in the standard
-library's macros, there's the `#[allow_internal_unstable(feature1, feature2)]`
-attribute that allows the given features to be used in stable macros.
+マクロとコンパイラのdesugarは、その本体を呼び出し側に公開します。標準ライブラリのマクロで不安定なものを使用できないことを回避するために、`#[allow_internal_unstable(feature1, feature2)]`属性があり、安定したマクロで指定された機能を使用できるようにします。
 
-Note that if a macro is used in const context and generates a call to a
-`#[rustc_const_unstable(...)]` function, that will *still* be rejected even with
-`allow_internal_unstable`. Add `#[rustc_const_stable_indirect]` to the function to ensure the macro
-cannot accidentally bypass the recursive const stability checks.
+マクロがconst contextで使用され、`#[rustc_const_unstable(...)]`関数への呼び出しを生成する場合、`allow_internal_unstable`があっても*依然として*拒否されることに注意してください。マクロが誤って再帰的const安定性チェックをバイパスできないようにするために、関数に`#[rustc_const_stable_indirect]`を追加してください。
 
 ## rustc_allow_const_fn_unstable
 
-As explained above, no unstable const features are allowed inside stable `const fn`, not even
-indirectly.
+上記で説明したように、安定した`const fn`内では不安定なconst機能は許可されません。間接的にも許可されません。
 
-However, sometimes we do know that a feature will get stabilized, just not when, or there is a
-stable (but e.g. runtime-slow) workaround, so we could always fall back to some stable version if we
-scrapped the unstable feature. In those cases, the `[rustc_allow_const_fn_unstable(feature1,
-feature2)]` attribute can be used to allow some unstable features in the body of a stable (or
-indirectly stable) `const fn`.
+ただし、時々、機能が安定化されることはわかっているが、いつかはわからない場合や、安定した（しかし実行時に遅い）回避策があるため、不安定な機能を廃止した場合には常に安定したバージョンにフォールバックできる場合があります。そのような場合、`[rustc_allow_const_fn_unstable(feature1, feature2)]`属性を使用して、安定した（または間接的に安定した）`const fn`の本体で一部の不安定な機能を許可できます。
 
-You also need to take care to uphold the `const fn` invariant that calling it at runtime and
-compile-time needs to behave the same (see also [this blog post][blog]). This means that you
-may not create a `const fn` that e.g. transmutes a memory address to an integer,
-because the addresses of things are nondeterministic and often unknown at
-compile-time.
+また、ランタイムとコンパイル時に呼び出すことが同じ動作をする必要があるという`const fn`の不変条件を守る注意も必要です（[このブログ記事][blog]も参照）。これは、たとえばメモリアドレスを整数に変換する`const fn`を作成してはならないことを意味します。なぜなら、アドレスは非決定的であり、コンパイル時には不明であることが多いからです。
 
-**Always ping @rust-lang/wg-const-eval if you are adding more
-`rustc_allow_const_fn_unstable` attributes to any `const fn`.**
+**より多くの`rustc_allow_const_fn_unstable`属性を任意の`const fn`に追加する場合は、常に@rust-lang/wg-const-evalにpingしてください。**
 
 ## staged_api
 
-Any crate that uses the `stable` or `unstable` attributes must include the
-`#![feature(staged_api)]` attribute on the crate.
+`stable`または`unstable`属性を使用するすべてのクレートには、クレートに`#![feature(staged_api)]`属性を含める必要があります。
 
 ## deprecated
 
-Deprecations in the standard library are nearly identical to deprecations in
-user code. When `#[deprecated]` is used on an item, it must also have a `stable`
-or `unstable `attribute.
+標準ライブラリの非推奨は、ユーザーコードの非推奨とほぼ同じです。`#[deprecated]`がアイテムに使用される場合、`stable`または`unstable`属性も必要です。
 
-`deprecated` has the following form:
+`deprecated`の形式は次のとおりです：
 
 ```rust,ignore
 #[deprecated(
     since = "1.38.0",
-    note = "explanation for deprecation",
+    note = "非推奨の理由の説明",
     suggestion = "other_function"
 )]
 ```
 
-The `suggestion` field is optional. If given, it should be a string that can be
-used as a machine-applicable suggestion to correct the warning. This is
-typically used when the identifier is renamed, but no other significant changes
-are necessary. When the `suggestion` field is used, you need to have
-`#![feature(deprecated_suggestion)]` at the crate root.
+`suggestion`フィールドはオプションです。指定された場合、警告を修正するためのマシン適用可能な提案として使用できる文字列である必要があります。これは通常、識別子が名前変更されたが、他の重要な変更が必要ない場合に使用されます。`suggestion`フィールドが使用される場合、クレートルートに`#![feature(deprecated_suggestion)]`が必要です。
 
-Another difference from user code is that the `since` field is actually checked
-against the current version of `rustc`. If `since` is in a future version, then
-the `deprecated_in_future` lint is triggered which is default `allow`, but most
-of the standard library raises it to a warning with
-`#![warn(deprecated_in_future)]`.
+ユーザーコードとのもう1つの違いは、`since`フィールドが実際に現在のバージョンの`rustc`に対してチェックされることです。`since`が将来のバージョンにある場合、`deprecated_in_future` lintがトリガーされます。これはデフォルトで`allow`ですが、標準ライブラリのほとんどは`#![warn(deprecated_in_future)]`で警告に引き上げます。
 
 ## unstable_feature_bound
-The `#[unstable_feature_bound(foo)]` attribute can be used together with `#[unstable]` attribute to mark an `impl` of stable type and stable trait as unstable. In std/core, an item annotated with `#[unstable_feature_bound(foo)]` can only be used by another item that is also annotated with `#[unstable_feature_bound(foo)]`. Outside of std/core, using an item with `#[unstable_feature_bound(foo)]` requires the feature to be enabled with `#![feature(foo)]` attribute on the crate.
+`#[unstable_feature_bound(foo)]`属性は、`#[unstable]`属性と一緒に使用して、安定した型と安定したトレイトの`impl`を不安定としてマークできます。std/coreでは、`#[unstable_feature_bound(foo)]`で注釈されたアイテムは、同じく`#[unstable_feature_bound(foo)]`で注釈された別のアイテムによってのみ使用できます。std/core外では、`#[unstable_feature_bound(foo)]`を持つアイテムを使用するには、クレートに`#![feature(foo)]`属性で機能を有効にする必要があります。
 
-Currently, the items that can be annotated with `#[unstable_feature_bound]` are:
+現在、`#[unstable_feature_bound]`で注釈できるアイテムは次のとおりです：
 - `impl`
-- free function
-- trait
+- 自由関数
+- トレイト
 
 [blog]: https://www.ralfj.de/blog/2018/07/19/const.html

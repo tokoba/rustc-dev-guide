@@ -1,11 +1,6 @@
-# Universal regions
+# 全称領域
 
-"Universal regions" is the name that the code uses to refer to "named
-lifetimes" -- e.g., lifetime parameters and `'static`. The name
-derives from the fact that such lifetimes are "universally quantified"
-(i.e., we must make sure the code is true for all values of those
-lifetimes). It is worth spending a bit of discussing how lifetime
-parameters are handled during region inference. Consider this example:
+「全称領域」は、コードが「名前付きライフタイム」を参照するために使用する名前です -- 例えば、ライフタイムパラメータと `'static`。名前は、そのようなライフタイムが「全称量化されている」という事実に由来します（つまり、それらのライフタイムのすべての値に対してコードが真であることを確認する必要があります）。領域推論中にライフタイムパラメータがどのように処理されるかについて少し議論する価値があります。次の例を考えてみましょう:
 
 ```rust,ignore
 fn foo<'a, 'b>(x: &'a u32, y: &'b u32) -> &'b u32 {
@@ -13,84 +8,47 @@ fn foo<'a, 'b>(x: &'a u32, y: &'b u32) -> &'b u32 {
 }
 ```
 
-This example is intended not to compile, because we are returning `x`,
-which has type `&'a u32`, but our signature promises that we will
-return a `&'b u32` value. But how are lifetimes like `'a` and `'b`
-integrated into region inference, and how this error wind up being
-detected?
+この例はコンパイルされることを意図していません。なぜなら、`x` を返していますが、これは型 `&'a u32` を持っていますが、シグネチャは `&'b u32` 値を返すことを約束しているからです。しかし、`'a` や `'b` のようなライフタイムが領域推論にどのように統合され、このエラーがどのように検出されるのでしょうか？
 
-## Universal regions and their relationships to one another
+## 全称領域とそれらの相互関係
 
-Early on in region inference, one of the first things we do is to
-construct a [`UniversalRegions`] struct. This struct tracks the
-various universal regions in scope on a particular function.  We also
-create a [`UniversalRegionRelations`] struct, which tracks their
-relationships to one another. So if you have e.g. `where 'a: 'b`, then
-the [`UniversalRegionRelations`] struct would track that `'a: 'b` is
-known to hold (which could be tested with the [`outlives`] function).
+領域推論の早い段階で、最初に行うことの 1 つは、[`UniversalRegions`] 構造体を構築することです。この構造体は、特定の関数のスコープ内にある様々な全称領域を追跡します。また、[`UniversalRegionRelations`] 構造体も作成します。これは、それらの相互関係を追跡します。したがって、例えば `where 'a: 'b` がある場合、[`UniversalRegionRelations`] 構造体は `'a: 'b` が成立することが知られていることを追跡します（これは [`outlives`] 関数でテストできます）。
 
 [`UniversalRegions`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/universal_regions/struct.UniversalRegions.html
 [`UniversalRegionRelations`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/type_check/free_region_relations/struct.UniversalRegionRelations.html
 [`outlives`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/type_check/free_region_relations/struct.UniversalRegionRelations.html#method.outlives
 
-## Everything is a region variable
+## すべてが領域変数です
 
-One important aspect of how NLL region inference works is that **all
-lifetimes** are represented as numbered variables. This means that the
-only variant of [`region_kind::RegionKind`] that we use is the [`ReVar`]
-variant. These region variables are broken into two major categories,
-based on their index:
+NLL 領域推論の動作の重要な側面の 1 つは、**すべてのライフタイム**が番号付き変数として表現されることです。これは、使用する [`region_kind::RegionKind`] の唯一のバリアントが [`ReVar`] バリアントであることを意味します。これらの領域変数は、インデックスに基づいて 2 つの主要なカテゴリに分類されます:
 
 [`region_kind::RegionKind`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_type_ir/region_kind/enum.RegionKind.html
 [`ReVar`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_type_ir/region_kind/enum.RegionKind.html#variant.ReVar
 
-- 0..N: universal regions -- the ones we are discussing here. In this
-  case, the code must be correct with respect to any value of those
-  variables that meets the declared relationships.
-- N..M: existential regions -- inference variables where the region
-  inferencer is tasked with finding *some* suitable value.
+- 0..N: 全称領域 -- ここで議論しているもの。この場合、コードは、宣言された関係を満たす変数のすべての値に対して正しくなければなりません。
+- N..M: 存在領域 -- 領域推論器が*いくつかの*適切な値を見つけるタスクを負う推論変数。
 
-In fact, the universal regions can be further subdivided based on
-where they were brought into scope (see the [`RegionClassification`]
-type). These subdivisions are not important for the topics discussed
-here, but become important when we consider [closure constraint
-propagation](./closure_constraints.html), so we discuss them there.
+実際、全称領域は、スコープに持ち込まれた場所に基づいてさらに細分化できます（[`RegionClassification`] 型を参照）。これらの細分化は、ここで議論されているトピックには重要ではありませんが、[クロージャ制約伝播](./closure_constraints.html) を考慮するときに重要になるため、そこで議論します。
 
 [`RegionClassification`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/universal_regions/enum.RegionClassification.html#variant.Local
 
-## Universal lifetimes as the elements of a region's value
+## 領域の値の要素としての全称ライフタイム
 
-As noted previously, the value that we infer for each region is a set
-`{E}`. The elements of this set can be points in the control-flow
-graph, but they can also be an element `end('a)` corresponding to each
-universal lifetime `'a`. If the value for some region `R0` includes
-`end('a`), then this implies that `R0` must extend until the end of `'a`
-in the caller.
+前述のように、各領域に対して推論する値は集合 `{E}` です。この集合の要素は、制御フローグラフ内のポイントである可能性がありますが、各全称ライフタイム `'a` に対応する要素 `end('a)` である可能性もあります。ある領域 `R0` の値に `end('a)` が含まれている場合、これは `R0` が呼び出し元の `'a` の終わりまで拡張しなければならないことを意味します。
 
-## The "value" of a universal region
+## 全称領域の「値」
 
-During region inference, we compute a value for each universal region
-in the same way as we compute values for other regions. This value
-represents, effectively, the **lower bound** on that universal region
--- the things that it must outlive. We now describe how we use this
-value to check for errors.
+領域推論中、他の領域の値を計算するのと同じ方法で、各全称領域の値を計算します。この値は、効果的に、その全称領域の**下限** -- それが生存しなければならないものを表します。この値を使用してエラーをチェックする方法について説明します。
 
-## Liveness and universal regions
+## 生存性と全称領域
 
-All universal regions have an initial liveness constraint that
-includes the entire function body. This is because lifetime parameters
-are defined in the caller and must include the entirety of the
-function call that invokes this particular function. In addition, each
-universal region `'a` includes itself (that is, `end('a)`) in its
-liveness constraint (i.e., `'a` must extend until the end of
-itself). In the code, these liveness constraints are setup in
-[`init_free_and_bound_regions`].
+すべての全称領域には、関数本体全体を含む初期生存性制約があります。これは、ライフタイムパラメータが呼び出し元で定義され、この特定の関数を呼び出す関数呼び出し全体を含まなければならないためです。さらに、各全称領域 `'a` は、その生存性制約に自分自身（つまり、`end('a)`）を含みます（つまり、`'a` は自分自身の終わりまで拡張しなければなりません）。コードでは、これらの生存性制約は [`init_free_and_bound_regions`] で設定されます。
 
 [`init_free_and_bound_regions`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#method.init_free_and_bound_regions
 
-## Propagating outlives constraints for universal regions
+## 全称領域の outlives 制約の伝播
 
-So, consider the first example of this section:
+では、このセクションの最初の例を考えてみましょう:
 
 ```rust,ignore
 fn foo<'a, 'b>(x: &'a u32, y: &'b u32) -> &'b u32 {
@@ -98,28 +56,18 @@ fn foo<'a, 'b>(x: &'a u32, y: &'b u32) -> &'b u32 {
 }
 ```
 
-Here, returning `x` requires that `&'a u32 <: &'b u32`, which gives
-rise to an outlives constraint `'a: 'b`. Combined with our default liveness
-constraints we get:
+ここで、`x` を返すには `&'a u32 <: &'b u32` が必要で、これは outlives 制約 `'a: 'b` を引き起こします。デフォルトの生存性制約と組み合わせると、次のようになります:
 
 ```txt
-'a live at {B, end('a)} // B represents the "function body"
+'a live at {B, end('a)} // B は「関数本体」を表します
 'b live at {B, end('b)}
 'a: 'b
 ```
 
-When we process the `'a: 'b` constraint, therefore, we will add
-`end('b)` into the value for `'a`, resulting in a final value of `{B,
-end('a), end('b)}`.
+`'a: 'b` 制約を処理するとき、`end('b)` を `'a` の値に追加するため、`'a` の最終値は `{B, end('a), end('b)}` になります。
 
-## Detecting errors
+## エラーの検出
 
-Once we have finished constraint propagation, we then enforce a
-constraint that if some universal region `'a` includes an element
-`end('b)`, then `'a: 'b` must be declared in the function's bounds. If
-not, as in our example, that is an error. This check is done in the
-[`check_universal_regions`] function, which simply iterates over all
-universal regions, inspects their final value, and tests against the
-declared [`UniversalRegionRelations`].
+制約伝播が終了したら、ある全称領域 `'a` に要素 `end('b)` が含まれている場合、`'a: 'b` が関数の境界で宣言されている必要があるという制約を強制します。そうでない場合、この例のように、それはエラーです。このチェックは [`check_universal_regions`] 関数で行われ、すべての全称領域を反復し、その最終値を検査し、宣言された [`UniversalRegionRelations`] に対してテストします。
 
 [`check_universal_regions`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#method.check_universal_regions

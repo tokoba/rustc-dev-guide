@@ -1,51 +1,44 @@
-# Specialization
+# 特殊化
 
-**TODO**: where does Chalk fit in? Should we mention/discuss it here?
+**TODO**：Chalk はどこに適合しますか？ここで言及/議論すべきですか？
 
-Defined in the `specialize` module.
+`specialize` モジュールで定義されています。
 
-The basic strategy is to build up a *specialization graph* during
-coherence checking (coherence checking looks for [overlapping impls](../coherence.md)). 
-Insertion into the graph locates the right place
-to put an impl in the specialization hierarchy; if there is no right
-place (due to partial overlap but no containment), you get an overlap
-error. Specialization is consulted when selecting an impl (of course),
-and the graph is consulted when propagating defaults down the
-specialization hierarchy.
+基本的な戦略は、コヒーレンスチェック中に*特殊化グラフ*を構築することです
+（コヒーレンスチェックは[重複する impl](../coherence.md)を探します）。
+グラフへの挿入は、特殊化階層内に impl を配置する適切な場所を見つけます。
+適切な場所がない場合（部分的な重複があるが包含がない場合）、重複エラーが
+発生します。特殊化は impl を選択する際に相談され（もちろん）、グラフは
+デフォルトを特殊化階層に伝播する際に相談されます。
 
-You might expect that the specialization graph would be used during
-selection – i.e. when actually performing specialization. This is
-not done for two reasons:
+特殊化グラフが選択中に使用されることを期待するかもしれません - つまり、
+実際に特殊化を実行するときです。これは2つの理由で行われません：
 
-- It's merely an optimization: given a set of candidates that apply,
-  we can determine the most specialized one by comparing them directly
-  for specialization, rather than consulting the graph. Given that we
-  also cache the results of selection, the benefit of this
-  optimization is questionable.
+- それは単なる最適化です：適用される候補のセットが与えられると、
+  グラフを参照するのではなく、特殊化のために直接比較することによって、
+  最も特殊化されたものを決定できます。選択の結果もキャッシュするため、
+  この最適化の利点は疑問です。
 
-- To build the specialization graph in the first place, we need to use
-  selection (because we need to determine whether one impl specializes
-  another). Dealing with this reentrancy would require some additional
-  mode switch for selection. Given that there seems to be no strong
-  reason to use the graph anyway, we stick with a simpler approach in
-  selection, and use the graph only for propagating default
-  implementations.
+- 最初に特殊化グラフを構築するには、選択を使用する必要があります
+  （1つの impl が別の impl を特殊化するかどうかを判断する必要があるため）。
+  この再入性を処理するには、選択のための追加のモード切り替えが必要になります。
+  グラフを使用する強い理由がないように思われるため、選択ではよりシンプルな
+  アプローチを使用し、デフォルト実装の伝播にのみグラフを使用します。
 
-Trait impl selection can succeed even when multiple impls can apply,
-as long as they are part of the same specialization family. In that
-case, it returns a *single* impl on success – this is the most
-specialized impl *known* to apply. However, if there are any inference
-variables in play, the returned impl may not be the actual impl we
-will use at codegen time. Thus, we take special care to avoid projecting
-associated types unless either (1) the associated type does not use
-`default` and thus cannot be overridden or (2) all input types are
-known concretely.
+トレイト impl 選択は、複数の impl が適用できる場合でも成功できます。
+同じ特殊化ファミリーの一部である限りです。その場合、成功時に*単一*の
+impl を返します - これは適用されることが*知られている*最も特殊化された
+impl です。ただし、推論変数が関与している場合、返される impl は
+コード生成時に実際に使用する impl ではない可能性があります。したがって、
+(1) 関連型が `default` を使用せず、したがってオーバーライドできない場合、
+または (2) すべての入力型が具体的に知られている場合を除き、関連型を
+投影しないように特別な注意を払います。
 
-## Additional Resources
+## 追加リソース
 
-[This talk][talk] by @sunjay may be useful. Keep in mind that the talk only
-gives a broad overview of the problem and the solution (it was presented about
-halfway through @sunjay's work). Also, it was given in June 2018, and some
-things may have changed by the time you watch it.
+@sunjay による[このトーク][talk]が役立つかもしれません。トークは問題と
+解決策の広範な概要のみを提供することに注意してください（@sunjay の作業の
+約半分の時点で発表されました）。また、2018年6月に発表されたもので、
+視聴時には一部が変更されている可能性があります。
 
 [talk]: https://www.youtube.com/watch?v=rZqS4bLPL24

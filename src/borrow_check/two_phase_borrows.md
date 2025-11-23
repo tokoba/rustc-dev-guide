@@ -1,41 +1,36 @@
-# Two-phase borrows
+# 二相借用
 
-Two-phase borrows are a more permissive version of mutable borrows that allow
-nested method calls such as `vec.push(vec.len())`. Such borrows first act as
-shared borrows in a "reservation" phase and can later be "activated" into a
-full mutable borrow.
+二相借用は、`vec.push(vec.len())` のようなネストされたメソッド呼び出しを可能にする、より許容的なバージョンの可変借用です。そのような借用は、最初に「予約」フェーズで共有借用として機能し、後で完全な可変借用に「アクティブ化」できます。
 
-Only certain implicit mutable borrows can be two-phase, any `&mut` or `ref mut`
-in the source code is never a two-phase borrow. The cases where we generate a
-two-phase borrow are:
+特定の暗黙的な可変借用のみが二相にできます。ソースコード内の `&mut` または `ref mut` は決して二相借用ではありません。二相借用を生成するケースは次のとおりです:
 
-1. The autoref borrow when calling a method with a mutable reference receiver.
-2. A mutable reborrow in function arguments.
-3. The implicit mutable borrow in an overloaded compound assignment operator.
+1. 可変参照レシーバーでメソッドを呼び出すときの autoref 借用。
+2. 関数引数での可変再借用。
+3. オーバーロードされた複合代入演算子での暗黙的な可変借用。
 
-To give some examples:
+いくつかの例を示します:
 
 ```rust,edition2018
-// In the source code
+// ソースコード内
 
-// Case 1:
+// ケース 1:
 let mut v = Vec::new();
 v.push(v.len());
 let r = &mut Vec::new();
 r.push(r.len());
 
-// Case 2:
+// ケース 2:
 std::mem::replace(r, vec![1, r.len()]);
 
-// Case 3:
+// ケース 3:
 let mut x = std::num::Wrapping(2);
 x += x;
 ```
 
-Expanding these enough to show the two-phase borrows:
+二相借用を表示するのに十分に展開します:
 
 ```rust,ignore
-// Case 1:
+// ケース 1:
 let mut v = Vec::new();
 let temp1 = &two_phase v;
 let temp2 = v.len();
@@ -45,56 +40,42 @@ let temp3 = &two_phase *r;
 let temp4 = r.len();
 Vec::push(temp3, temp4);
 
-// Case 2:
+// ケース 2:
 let temp5 = &two_phase *r;
 let temp6 = vec![1, r.len()];
 std::mem::replace(temp5, temp6);
 
-// Case 3:
+// ケース 3:
 let mut x = std::num::Wrapping(2);
 let temp7 = &two_phase x;
 let temp8 = x;
 std::ops::AddAssign::add_assign(temp7, temp8);
 ```
 
-Whether a borrow can be two-phase is tracked by a flag on the [`AutoBorrow`]
-after type checking, which is then [converted] to a [`BorrowKind`] during MIR
-construction.
+借用が二相になることができるかどうかは、型チェック後の [`AutoBorrow`] のフラグで追跡され、その後 MIR 構築中に [`BorrowKind`] に[変換]されます。
 
-Each two-phase borrow is assigned to a temporary that is only used once. As
-such we can define:
+各二相借用は、1 回だけ使用される一時変数に割り当てられます。したがって、次のように定義できます:
 
-* The point where the temporary is assigned to is called the *reservation*
-  point of the two-phase borrow.
-* The point where the temporary is used, which is effectively always a
-  function call, is called the *activation* point.
+* 一時変数が割り当てられるポイントは、二相借用の*予約*ポイントと呼ばれます。
+* 一時変数が使用されるポイント（実質的に常に関数呼び出し）は、*アクティブ化*ポイントと呼ばれます。
 
-The activation points are found using the [`GatherBorrows`] visitor. The
-[`BorrowData`] then holds both the reservation and activation points for the
-borrow.
+アクティブ化ポイントは [`GatherBorrows`] ビジターを使用して見つけられます。[`BorrowData`] は、借用の予約とアクティブ化ポイントの両方を保持します。
 
 [`AutoBorrow`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/adjustment/enum.AutoBorrow.html
-[converted]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_build/thir/cx/expr/trait.ToBorrowKind.html#method.to_borrow_kind
+[変換]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_mir_build/thir/cx/expr/trait.ToBorrowKind.html#method.to_borrow_kind
 [`BorrowKind`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/mir/enum.BorrowKind.html
 [`GatherBorrows`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/borrow_set/struct.GatherBorrows.html
 [`BorrowData`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/borrow_set/struct.BorrowData.html
 
-## Checking two-phase borrows
+## 二相借用のチェック
 
-Two-phase borrows are treated as if they were mutable borrows with the
-following exceptions:
+二相借用は、次の例外を除いて、可変借用であるかのように扱われます:
 
-1. At every location in the MIR we [check] if any two-phase borrows are
-   activated at this location. If a live two phase borrow is activated at a
-   location, then we check that there are no borrows that conflict with the
-   two-phase borrow.
-2. At the reservation point we error if there are conflicting live *mutable*
-   borrows. And lint if there are any conflicting shared borrows.
-3. Between the reservation and the activation point, the two-phase borrow acts
-   as a shared borrow. We determine (in [`is_active`]) if we're at such a point
-   by using the [`Dominators`] for the MIR graph.
-4. After the activation point, the two-phase borrow acts as a mutable borrow.
+1. MIR 内のすべての位置で、この位置でアクティブ化される二相借用があるかどうかを[チェック]します。生きている二相借用が位置でアクティブ化される場合、二相借用と競合する借用がないことをチェックします。
+2. 予約ポイントで、競合する生きている*可変*借用がある場合はエラーになります。競合する共有借用がある場合は lint します。
+3. 予約とアクティブ化ポイントの間、二相借用は共有借用として機能します。MIR グラフの [`Dominators`] を使用して、そのようなポイントにいるかどうかを（[`is_active`] で）判断します。
+4. アクティブ化ポイントの後、二相借用は可変借用として機能します。
 
-[check]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/struct.MirBorrowckCtxt.html#method.check_activations
+[チェック]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/struct.MirBorrowckCtxt.html#method.check_activations
 [`Dominators`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_data_structures/graph/dominators/struct.Dominators.html
 [`is_active`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/path_utils/fn.is_active.html

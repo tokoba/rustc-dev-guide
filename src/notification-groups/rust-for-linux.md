@@ -1,23 +1,15 @@
-# Rust for Linux notification group
+# Rust for Linux通知グループ
 
-**Github Label:** [A-rust-for-linux] <br>
-**Ping command:** `@rustbot ping rfl`
+**Githubラベル:** [A-rust-for-linux] <br>
+**Pingコマンド:** `@rustbot ping rfl`
 
 [A-rust-for-linux]: https://github.com/rust-lang/rust/labels/A-rust-for-linux
 
-This list will be used to notify [Rust for Linux (RfL)][rfl] maintainers
-when the compiler or the standard library changes in a way that would
-break Rust for Linux, since it depends on several unstable flags
-and features. The RfL maintainers should then ideally provide support
-for resolving the breakage or decide to temporarily accept the breakage
-and unblock CI by temporarily removing the RfL CI jobs.
+このリストは、コンパイラまたは標準ライブラリがRust for Linuxを破壊する方法で変更された場合に、[Rust for Linux (RfL)][rfl]メンテナーに通知するために使用されます。RfLは複数の不安定なフラグと機能に依存しているためです。その後、RfLメンテナーは理想的には破壊の解決をサポートするか、一時的に破壊を受け入れ、RfL CIジョブを一時的に削除してCIのブロックを解除することを決定する必要があります。
 
-The group also has an associated Zulip channel ([`#rust-for-linux`])
-where people can go to ask questions and discuss topics related to Rust
-for Linux.
+グループには関連するZulipチャンネル（[`#rust-for-linux`]）もあり、そこで質問を投げかけたり、Rust for Linuxに関連するトピックについて議論したりできます。
 
-If you are interested in participating, please sign up for the
-Rust for Linux group on [Zulip][`#rust-for-linux`]!
+参加に興味がある方は、[Zulip][`#rust-for-linux`]でRust for Linuxグループにサインアップしてください！
 
 [rfl]: https://rust-for-linux.com/
 [`#rust-for-linux`]: https://rust-lang.zulipchat.com/#narrow/stream/425075-rust-for-linux

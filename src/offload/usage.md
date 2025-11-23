@@ -1,7 +1,7 @@
-# Usage
+# 使用方法
 
-This feature is work-in-progress, and not ready for usage. The instructions here are for contributors, or people interested in following the latest progress.
-We currently work on launching the following Rust kernel on the GPU. To follow along, copy it to a `src/lib.rs` file.
+この機能は作業中であり、使用の準備ができていません。ここでの手順は、貢献者または最新の進捗状況をフォローすることに興味がある人向けです。
+現在、次のRustカーネルをGPU上で起動する作業を行っています。フォローするには、これを`src/lib.rs`ファイルにコピーしてください。
 
 ```rust
 #![feature(abi_gpu_kernel)]
@@ -65,23 +65,23 @@ pub extern "gpu-kernel" fn kernel_1(x: *mut [f64; 256]) {
 }
 ```
 
-## Compile instructions
-It is important to use a clang compiler build on the same llvm as rustc. Just calling clang without the full path will likely use your system clang, which probably will be incompatible. So either substitute clang/lld invocations below with absolute path, or set your `PATH` accordingly.
+## コンパイル手順
+rustcと同じllvm上でビルドされたclangコンパイラを使用することが重要です。フルパスなしでclangを呼び出すだけでは、おそらくシステムのclangが使用され、互換性がない可能性があります。したがって、以下のclang/lld呼び出しを絶対パスで置き換えるか、`PATH`を適切に設定してください。
 
-First we generate the host (cpu) code. The first build is just to compile libc, take note of the hashed path. Then we call rustc directly to build our host code, while providing the libc artifact to rustc.
+まず、ホスト（CPU）コードを生成します。最初のビルドは単にlibcをコンパイルするためのもので、ハッシュ化されたパスに注意してください。次に、libcアーティファクトをrustcに提供しながら、rustcを直接呼び出してホストコードをビルドします。
 ```
 cargo +offload build -r -v
 rustc +offload --edition 2024 src/lib.rs -g --crate-type cdylib -C opt-level=3 -C panic=abort -C lto=fat -L dependency=/absolute_path_to/target/release/deps --extern libc=/absolute_path_to/target/release/deps/liblibc-<HASH>.rlib --emit=llvm-bc,llvm-ir  -Zoffload=Enable -Zunstable-options
 ```
 
-Now we generate the device code. Replace the target-cpu with the right code for your gpu.
+次に、デバイスコードを生成します。target-cpuを自分のGPUに適したコードに置き換えてください。
 ```
 RUSTFLAGS="-Ctarget-cpu=gfx90a --emit=llvm-bc,llvm-ir -Zoffload=Enable -Zunstable-options" cargo +offload build -Zunstable-options -r -v --target amdgcn-amd-amdhsa -Zbuild-std=core
 ```
 
-Now find the `<libname>.ll` under target/amdgcn-amd-amdhsa folder and copy it to a device.ll file (or adjust the file names below).
-If you work on an NVIDIA or Intel gpu, please adjust the names acordingly and open an issue to share your results (either if you succeed or fail).
-First we compile our .ll files (good for manual inspections) to .bc files and clean up leftover artifacts. The cleanup is important, otherwise caching might interfere on following runs.
+次に、target/amdgcn-amd-amdhsaフォルダの下にある`<libname>.ll`を見つけて、device.llファイルにコピーします（または以下のファイル名を調整してください）。
+NVIDIAまたはIntel GPUで作業している場合は、名前を適切に調整し、結果（成功または失敗）を共有するためにissueを開いてください。
+まず、.llファイル（手動検査に適しています）を.bcファイルにコンパイルし、残ったアーティファクトをクリーンアップします。クリーンアップは重要です。そうしないと、キャッシングが次の実行時に干渉する可能性があります。
 ```
 opt lib.ll -o lib.bc
 opt device.ll -o device.bc
@@ -99,12 +99,12 @@ rm bare.amdgcn.gfx90a.img*
 "clang-linker-wrapper" "--should-extract=gfx90a" "--device-compiler=amdgcn-amd-amdhsa=-g" "--device-compiler=amdgcn-amd-amdhsa=-save-temps=cwd" "--device-linker=amdgcn-amd-amdhsa=-lompdevice" "--host-triple=x86_64-unknown-linux-gnu" "--save-temps" "--linker-path=/ABSOlUTE_PATH_TO/rust/build/x86_64-unknown-linux-gnu/lld/bin/ld.lld" "--hash-style=gnu" "--eh-frame-hdr" "-m" "elf_x86_64" "-pie" "-dynamic-linker" "/lib64/ld-linux-x86-64.so.2" "-o" "bare" "/lib/../lib64/Scrt1.o" "/lib/../lib64/crti.o" "/ABSOLUTE_PATH_TO/crtbeginS.o" "-L/ABSOLUTE_PATH_TO/rust/build/x86_64-unknown-linux-gnu/llvm/bin/../lib/x86_64-unknown-linux-gnu" "-L/ABSOLUTE_PATH_TO/rust/build/x86_64-unknown-linux-gnu/llvm/lib/clang/21/lib/x86_64-unknown-linux-gnu" "-L/lib/../lib64" "-L/usr/lib64" "-L/lib" "-L/usr/lib" "host.o" "-lstdc++" "-lm" "-lomp" "-lomptarget" "-L/ABSOLUTE_PATH_TO/rust/build/x86_64-unknown-linux-gnu/llvm/lib" "-lgcc_s" "-lgcc" "-lpthread" "-lc" "-lgcc_s" "-lgcc" "/ABSOLUTE_PATH_TO/crtendS.o" "/lib/../lib64/crtn.o"
 ```
 
-Especially for the last command I recommend to not fix the paths, but rather just re-generate them by copying a bare-mode openmp example and compiling it with your clang. By adding `-###` to your clang invocation, you can see the invidual steps.
+特に最後のコマンドについては、パスを修正するのではなく、bareモードのOpenMP例をコピーして、自分のclangでコンパイルすることで再生成することをお勧めします。clang呼び出しに`-###`を追加することで、個々のステップを確認できます。
 ```
 myclang++ -fuse-ld=lld -O3 -fopenmp  -fopenmp-offload-mandatory --offload-arch=gfx90a omp_bare.cpp -o main -###
 ```
 
-In the final step, you can now run your binary
+最後のステップでは、バイナリを実行できます
 
 ```
 ./main
@@ -113,7 +113,7 @@ The first element is NOT zero 21.000000
 The second element is  0.000000
 ```
 
-To receive more information about the memory transfer, you can enable info printing with
+メモリ転送に関する詳細情報を受け取るには、情報出力を有効にできます
 ```
 LIBOMPTARGET_INFO=-1  ./main
 ```

@@ -1,3 +1,3 @@
-# Feature Gate Checking
+# フィーチャーゲートチェック
 
-**TODO**: this chapter [#1158](https://github.com/rust-lang/rustc-dev-guide/issues/1158)
+**TODO**: この章 [#1158](https://github.com/rust-lang/rustc-dev-guide/issues/1158)

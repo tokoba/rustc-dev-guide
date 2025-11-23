@@ -1,57 +1,36 @@
-# Effects and const condition checking
+# エフェクトとconst条件チェック
 
-## The `HostEffect` predicate
+## `HostEffect` 述語
 
-[`HostEffectPredicate`]s are a kind of predicate from `~const Tr` or `const Tr`
-bounds. It has a trait reference, and a `constness` which could be `Maybe` or
-`Const` depending on the bound. Because `~const Tr`, or rather `Maybe` bounds
-apply differently based on whichever contexts they are in, they have different
-behavior than normal bounds. Where normal trait bounds on a function such as
-`T: Tr` are collected within the [`predicates_of`] query to be proven when a
-function is called and to be assumed within the function, bounds such as
-`T: ~const Tr` will behave as a normal trait bound and add `T: Tr` to the result
-from `predicates_of`, but also adds a `HostEffectPredicate` to the
-[`const_conditions`] query.
+[`HostEffectPredicate`] は、`~const Tr` または `const Tr` 境界からの述語の一種です。トレイト参照と、境界に応じて `Maybe` または `Const` になる `constness` を持っています。`~const Tr`、すなわち `Maybe` 境界は、それらが存在するコンテキストに応じて異なる適用をされるため、通常の境界とは異なる動作をします。関数上の `T: Tr` のような通常のトレイト境界は、関数が呼び出されたときに証明され、関数内で仮定されるために [`predicates_of`] クエリ内で収集されますが、`T: ~const Tr` のような境界は通常のトレイト境界として動作し、`predicates_of` の結果に `T: Tr` を追加しますが、[`const_conditions`] クエリにも `HostEffectPredicate` を追加します。
 
-On the other hand, `T: const Tr` bounds do not change meaning across contexts,
-therefore they will result in `HostEffect(T: Tr, const)` being added to
-`predicates_of`, and not `const_conditions`.
+一方、`T: const Tr` 境界はコンテキスト間で意味が変わらないため、`predicates_of` に `HostEffect(T: Tr, const)` が追加され、`const_conditions` には追加されません。
 
 [`HostEffectPredicate`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_type_ir/predicate/struct.HostEffectPredicate.html
 [`predicates_of`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html#method.predicates_of
 [`const_conditions`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html#method.const_conditions
 
-## The `const_conditions` query
+## `const_conditions` クエリ
 
-`predicates_of` represents a set of predicates that need to be proven to use an
-item. For example, to use `foo` in the example below:
+`predicates_of` は、アイテムを使用するために証明する必要がある述語のセットを表します。例えば、以下の例で `foo` を使用するには：
 
 ```rust
 fn foo<T>() where T: Default {}
 ```
 
-We must be able to prove that `T` implements `Default`. In a similar vein,
-`const_conditions` represents a set of predicates that need to be proven to use
-an item *in const contexts*. If we adjust the example above to use `const` trait
-bounds:
+`T` が `Default` を実装していることを証明できなければなりません。同様に、`const_conditions` は、アイテムを *const コンテキストで* 使用するために証明する必要がある述語のセットを表します。上記の例を `const` トレイト境界を使用するように調整すると：
 
 ```rust
 const fn foo<T>() where T: ~const Default {}
 ```
 
-Then `foo` would get a `HostEffect(T: Default, maybe)` in the `const_conditions`
-query, suggesting that in order to call `foo` from const contexts, one must
-prove that `T` has a const implementation of `Default`.
+この場合、`foo` は `const_conditions` クエリに `HostEffect(T: Default, maybe)` を取得します。これは、const コンテキストから `foo` を呼び出すためには、`T` が `Default` の const 実装を持っていることを証明する必要があることを示唆しています。
 
-## Enforcement of `const_conditions`
+## `const_conditions` の強制
 
-`const_conditions` are currently checked in various places. 
+`const_conditions` は現在、さまざまな場所でチェックされています。
 
-Every call in HIR from a const context (which includes `const fn` and `const`
-items) will check that `const_conditions` of the function we are calling hold.
-This is done in [`FnCtxt::enforce_context_effects`]. Note that we don't check
-if the function is only referred to but not called, as the following code needs
-to compile:
+const コンテキスト（`const fn` と `const` アイテムを含む）からの HIR 内のすべての呼び出しは、呼び出している関数の `const_conditions` が成立することをチェックします。これは [`FnCtxt::enforce_context_effects`] で行われます。関数が参照されているだけで呼び出されていない場合はチェックしないことに注意してください。次のコードをコンパイルする必要があるためです：
 
 ```rust
 const fn hi<T: ~const Default>() -> T {
@@ -60,27 +39,21 @@ const fn hi<T: ~const Default>() -> T {
 const X: fn() -> u32 = hi::<u32>;
 ```
 
-For a trait `impl` to be well-formed, we must be able to prove the
-`const_conditions` of the trait from the `impl`'s environment. This is checked
-in [`wfcheck::check_impl`].
+トレイト `impl` が well-formed であるためには、`impl` の環境からトレイトの `const_conditions` を証明できなければなりません。これは [`wfcheck::check_impl`] でチェックされます。
 
-Here's an example:
+以下に例を示します：
 
 ```rust
 const trait Bar {}
 const trait Foo: ~const Bar {}
-// `const_conditions` contains `HostEffect(Self: Bar, maybe)`
+// `const_conditions` には `HostEffect(Self: Bar, maybe)` が含まれます
 
 impl const Bar for () {}
 impl const Foo for () {}
-// ^ here we check `const_conditions` for the impl to be well-formed
+// ^ ここで impl が well-formed であるために `const_conditions` をチェックします
 ```
 
-Methods of trait impls must not have stricter bounds than the method of the
-trait that they are implementing. To check that the methods are compatible, a
-hybrid environment is constructed with the predicates of the `impl` plus the
-predicates of the trait method, and we attempt to prove the predicates of the
-impl method. We do the same for `const_conditions`:
+トレイト impl のメソッドは、実装しているトレイトのメソッドよりも厳しい境界を持ってはいけません。メソッドが互換性があるかをチェックするために、`impl` の述語とトレイトメソッドの述語を組み合わせたハイブリッド環境が構築され、impl メソッドの述語を証明しようとします。`const_conditions` についても同じことを行います：
 
 ```rust
 const trait Foo {
@@ -89,19 +62,15 @@ const trait Foo {
 
 impl<T: ~const Clone> Foo for Vec<T> {
     fn hi<T: ~const PartialEq>();
-    // ^ we can't prove `T: ~const PartialEq` given `T: ~const Clone` and
-    // `T: ~const Default`, therefore we know that the method on the impl
-    // is stricter than the method on the trait.
+    // ^ `T: ~const Clone` と `T: ~const Default` が与えられても
+    // `T: ~const PartialEq` を証明できないため、impl のメソッドが
+    // トレイトのメソッドよりも厳しいことがわかります。
 }
 ```
 
-These checks are done in [`compare_method_predicate_entailment`]. A similar
-function that does the same check for associated types is called
-[`compare_type_predicate_entailment`]. Both of these need to consider
-`const_conditions` when in const contexts.
+これらのチェックは [`compare_method_predicate_entailment`] で行われます。関連型について同じチェックを行う類似の関数は [`compare_type_predicate_entailment`] と呼ばれます。これらは両方とも、const コンテキストにあるときに `const_conditions` を考慮する必要があります。
 
-In MIR, as part of const checking, `const_conditions` of items that are called
-are revalidated again in [`Checker::revalidate_conditional_constness`].
+MIR では、const チェックの一部として、呼び出されるアイテムの `const_conditions` が [`Checker::revalidate_conditional_constness`] で再検証されます。
 
 [`compare_method_predicate_entailment`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir_analysis/check/compare_impl_item/fn.compare_method_predicate_entailment.html
 [`compare_type_predicate_entailment`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir_analysis/check/compare_impl_item/fn.compare_type_predicate_entailment.html
@@ -109,48 +78,35 @@ are revalidated again in [`Checker::revalidate_conditional_constness`].
 [`wfcheck::check_impl`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir_analysis/check/wfcheck/fn.check_impl.html
 [`Checker::revalidate_conditional_constness`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_const_eval/check_consts/check/struct.Checker.html#method.revalidate_conditional_constness
 
-## `explicit_implied_const_bounds` on associated types and traits
+## 関連型とトレイトの `explicit_implied_const_bounds`
 
-Bounds on associated types, opaque types, and supertraits such as
+関連型、opaque 型、スーパートレイトの境界、例えば：
 ```rust
 trait Foo: ~const PartialEq {
     type X: ~const PartialEq;
 }
 
 fn foo() -> impl ~const PartialEq {
-    // ^ unimplemented syntax
+    // ^ 未実装の構文
 }
 ```
 
-Have their bounds represented differently. Unlike `const_conditions` which need
-to be proved for callers, and can be assumed inside the definition (e.g. trait
-bounds on functions), these bounds need to be proved at definition (at the impl,
-or when returning the opaque) but can be assumed for callers. The non-const
-equivalent of these bounds are called [`explicit_item_bounds`].
+これらの境界は異なる方法で表現されます。呼び出し元に対して証明する必要があり、定義内で仮定できる `const_conditions`（例：関数のトレイト境界）とは異なり、これらの境界は定義時に証明する必要があります（impl で、または opaque を返すときに）が、呼び出し元に対して仮定できます。これらの境界の非 const 版は [`explicit_item_bounds`] と呼ばれます。
 
-These bounds are checked in [`compare_impl_item::check_type_bounds`] for HIR
-typeck, [`evaluate_host_effect_from_item_bounds`] in the old solver and
-[`consider_additional_alias_assumptions`] in the new solver.
+これらの境界は、HIR 型チェックでは [`compare_impl_item::check_type_bounds`]、古いソルバーでは [`evaluate_host_effect_from_item_bounds`]、新しいソルバーでは [`consider_additional_alias_assumptions`] でチェックされます。
 
 [`explicit_item_bounds`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_middle/ty/struct.TyCtxt.html#method.explicit_item_bounds
 [`compare_impl_item::check_type_bounds`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir_analysis/check/compare_impl_item/fn.check_type_bounds.html
 [`evaluate_host_effect_from_item_bounds`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_trait_selection/traits/effects/fn.evaluate_host_effect_from_item_bounds.html
 [`consider_additional_alias_assumptions`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_next_trait_solver/solve/assembly/trait.GoalKind.html#tymethod.consider_additional_alias_assumptions
 
-## Proving `HostEffectPredicate`s
+## `HostEffectPredicate` の証明
 
-`HostEffectPredicate`s are implemented both in the [old solver] and the [new
-trait solver]. In general, we can prove a `HostEffect` predicate when either of
-these conditions are met:
+`HostEffectPredicate` は[旧ソルバー][old solver]と[新しいトレイトソルバー][new trait solver]の両方で実装されています。一般的に、以下の条件のいずれかが満たされる場合、`HostEffect` 述語を証明できます：
 
-* The predicate can be assumed from caller bounds;
-* The type has a `const` `impl` for the trait, *and* that const conditions on
-the impl holds, *and* that the `explicit_implied_const_bounds` on the trait
-holds; or
-* The type has a built-in implementation for the trait in const contexts. For
-example, `Fn` may be implemented by function items if their const conditions
-are satisfied, or `Destruct` is implemented in const contexts if the type can
-be dropped at compile time.
+* 述語が呼び出し元の境界から仮定できる場合
+* 型がトレイトの `const` `impl` を持っており、*かつ* impl の const 条件が成立し、*かつ* トレイトの `explicit_implied_const_bounds` が成立する場合、または
+* 型が const コンテキストでトレイトのビルトイン実装を持っている場合。例えば、`Fn` は const 条件が満たされている場合に関数アイテムによって実装される可能性があり、`Destruct` はコンパイル時に型がドロップできる場合に const コンテキストで実装されます。
 
 [old solver]: https://doc.rust-lang.org/nightly/nightly-rustc/src/rustc_trait_selection/traits/effects.rs.html
 [new trait solver]: https://doc.rust-lang.org/nightly/nightly-rustc/src/rustc_next_trait_solver/solve/effect_goals.rs.html

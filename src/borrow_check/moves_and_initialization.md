@@ -1,50 +1,36 @@
-# Tracking moves and initialization
+# 移動と初期化の追跡
 
-Part of the borrow checker's job is to track which variables are
-"initialized" at any given point in time -- this also requires
-figuring out where moves occur and tracking those.
+borrow checker の仕事の一部は、任意の時点でどの変数が「初期化されている」かを追跡することです -- これには、移動が発生する場所を把握し、それらを追跡することも必要です。
 
-## Initialization and moves
+## 初期化と移動
 
-From a user's perspective, initialization -- giving a variable some
-value -- and moves -- transferring ownership to another place -- might
-seem like distinct topics. Indeed, our borrow checker error messages
-often talk about them differently. But **within the borrow checker**,
-they are not nearly as separate. Roughly speaking, the borrow checker
-tracks the set of "initialized places" at any point in the source
-code. Assigning to a previously uninitialized local variable adds it
-to that set; moving from a local variable removes it from that set.
+ユーザーの視点からは、初期化 -- 変数に値を与えること -- と移動 -- 所有権を別の場所に転送すること -- は異なるトピックに見えるかもしれません。実際、borrow checker のエラーメッセージは、それらについて異なる言い方をすることがよくあります。しかし、**borrow checker 内部**では、それらはほとんど分離されていません。大まかに言えば、borrow checker はソースコードの任意の時点で「初期化された場所」のセットを追跡します。以前に初期化されていないローカル変数に代入すると、そのセットに追加されます; ローカル変数から移動すると、そのセットから削除されます。
 
-Consider this example:
+次の例を考えてみましょう:
 
 ```rust,ignore
 fn foo() {
     let a: Vec<u32>;
-    
-    // a is not initialized yet
-    
+
+    // a はまだ初期化されていません
+
     a = vec![22];
-    
-    // a is initialized here
-    
-    std::mem::drop(a); // a is moved here
-    
-    // a is no longer initialized here
+
+    // a はここで初期化されています
+
+    std::mem::drop(a); // a はここで移動されます
+
+    // a はここではもう初期化されていません
 
     let l = a.len(); //~ ERROR
 }
 ```
 
-Here you can see that `a` starts off as uninitialized; once it is
-assigned, it becomes initialized. But when `drop(a)` is called, that
-moves `a` into the call, and hence it becomes uninitialized again.
+ここでは、`a` が初期化されていない状態から始まることがわかります; 代入されると、初期化されます。しかし、`drop(a)` が呼び出されると、それは `a` を呼び出しに移動するため、再び初期化されていない状態になります。
 
-## Subsections
+## サブセクション
 
-To make it easier to peruse, this section is broken into a number of
-subsections:
+見やすくするために、このセクションはいくつかのサブセクションに分かれています:
 
-- [Move paths](./moves_and_initialization/move_paths.html) the
-  *move path* concept that we use to track which local variables (or parts of
-  local variables, in some cases) are initialized.
-- TODO *Rest not yet written* =)
+- [Move paths](./moves_and_initialization/move_paths.html) 初期化されているローカル変数（または場合によってはローカル変数の一部）を追跡するために使用する*move path*の概念。
+- TODO *残りはまだ書かれていません* =)

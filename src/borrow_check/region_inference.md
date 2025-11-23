@@ -1,38 +1,18 @@
-# Region inference (NLL)
+# 領域推論 (NLL)
 
-The MIR-based region checking code is located in [the `rustc_mir::borrow_check`
-module][nll].
+MIR ベースの領域チェックコードは [the `rustc_mir::borrow_check` モジュール][nll] にあります。
 
 [nll]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/index.html
 
-The MIR-based region analysis consists of two major functions:
+MIR ベースの領域分析は、2 つの主要な関数で構成されています:
 
-- [`replace_regions_in_mir`], invoked first, has two jobs:
-  - First, it finds the set of regions that appear within the
-    signature of the function (e.g., `'a` in `fn foo<'a>(&'a u32) {
-    ... }`). These are called the "universal" or "free" regions – in
-    particular, they are the regions that [appear free][fvb] in the
-    function body.
-  - Second, it replaces all the regions from the function body with
-    fresh inference variables. This is because (presently) those
-    regions are the results of lexical region inference and hence are
-    not of much interest. The intention is that – eventually – they
-    will be "erased regions" (i.e., no information at all), since we
-    won't be doing lexical region inference at all.
-- [`compute_regions`], invoked second: this is given as argument the
-  results of move analysis. It has the job of computing values for all
-  the inference variables that `replace_regions_in_mir` introduced.
-  - To do that, it first runs the [MIR type checker]. This is
-    basically a normal type-checker but specialized to MIR, which is
-    much simpler than full Rust, of course. Running the MIR type
-    checker will however create various [constraints][cp] between region
-    variables, indicating their potential values and relationships to
-    one another.
-  - After this, we perform [constraint propagation][cp] by creating a
-    [`RegionInferenceContext`] and invoking its [`solve`]
-    method.
-  - The [NLL RFC] also includes fairly thorough (and hopefully readable)
-    coverage.
+- [`replace_regions_in_mir`]。最初に呼び出され、2 つの仕事があります:
+  - 第一に、関数のシグネチャ内に現れる領域のセットを見つけます（例えば、`fn foo<'a>(&'a u32) { ... }` の `'a`）。これらは「全称」または「自由」領域と呼ばれます -- 特に、関数本体で[自由に現れる][fvb]領域です。
+  - 第二に、関数本体のすべての領域を新しい推論変数に置き換えます。これは、（現在）それらの領域が字句的領域推論の結果であり、あまり興味深くないためです。意図は -- 最終的には -- それらが「消去された領域」（つまり、情報がまったくない）になることです。なぜなら、字句的領域推論をまったく行わないためです。
+- [`compute_regions`]。2 番目に呼び出されます: これは移動分析の結果を引数として与えられます。`replace_regions_in_mir` が導入したすべての推論変数の値を計算する仕事があります。
+  - そのために、最初に [MIR type checker] を実行します。これは基本的には通常の型チェッカーですが、MIR に特化しています。もちろん、MIR は完全な Rust よりもはるかに単純です。MIR 型チェッカーを実行すると、領域変数間の様々な[制約][cp]が作成され、それらの潜在的な値と相互の関係を示します。
+  - この後、[`RegionInferenceContext`] を作成し、その [`solve`] メソッドを呼び出すことで、[制約伝播][cp]を実行します。
+  - [NLL RFC] も、かなり徹底的で（願わくば）読みやすいカバレッジを含んでいます。
 
 [cp]: ./region_inference/constraint_propagation.md
 [fvb]: ../appendix/background.md#free-vs-bound
@@ -43,16 +23,11 @@ The MIR-based region analysis consists of two major functions:
 [NLL RFC]: https://rust-lang.github.io/rfcs/2094-nll.html
 [MIR type checker]: ./type_check.md
 
-## Universal regions
+## 全称領域
 
-The [`UniversalRegions`] type represents a collection of _universal_ regions
-corresponding to some MIR `DefId`. It is constructed in
-[`replace_regions_in_mir`] when we replace all regions with fresh inference
-variables. [`UniversalRegions`] contains indices for all the free regions in
-the given MIR along with any relationships that are _known_ to hold between
-them (e.g. implied bounds, where clauses, etc.).
+[`UniversalRegions`] 型は、ある MIR `DefId` に対応する_全称_領域のコレクションを表します。これは [`replace_regions_in_mir`] でインスタンス化され、すべての領域を新しい推論変数に置き換えるときに構築されます。[`UniversalRegions`] には、与えられた MIR 内のすべての自由領域のインデックスと、それらの間で保持されることが_既知_の関係（例えば、暗黙の境界、where 句など）が含まれます。
 
-For example, given the MIR for the following function:
+例えば、次の関数の MIR が与えられた場合:
 
 ```rust
 fn foo<'a>(x: &'a u32) {
@@ -60,83 +35,46 @@ fn foo<'a>(x: &'a u32) {
 }
 ```
 
-we would create a universal region for `'a` and one for `'static`. There may
-also be some complications for handling closures, but we will ignore those for
-the moment.
+`'a` の全称領域と `'static` の全称領域を作成します。クロージャを処理するための複雑さもあるかもしれませんが、今のところそれらは無視します。
 
-TODO: write about _how_ these regions are computed.
+TODO: これらの領域が_どのように_計算されるかについて書く。
 
 [`UniversalRegions`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/universal_regions/struct.UniversalRegions.html
 
 <a id="region-variables"></a>
 
-## Region variables
+## 領域変数
 
-The value of a region can be thought of as a **set**. This set contains all
-points in the MIR where the region is valid along with any regions that are
-outlived by this region (e.g. if `'a: 'b`, then `end('b)` is in the set for
-`'a`); we call the domain of this set a `RegionElement`. In the code, the value
-for all regions is maintained in [the `rustc_borrowck::region_infer` module][ri].
-For each region we maintain a set storing what elements are present in its value (to make this
-efficient, we give each kind of element an index, the `RegionElementIndex`, and
-use sparse bitsets).
+領域の値は**集合**と考えることができます。この集合には、領域が有効な MIR 内のすべてのポイントと、この領域によって生存される領域が含まれます（例えば、`'a: 'b` の場合、`end('b)` は `'a` の集合に含まれます）; この集合のドメインを `RegionElement` と呼びます。コードでは、すべての領域の値は [the `rustc_borrowck::region_infer` モジュール][ri] で維持されます。
+各領域について、その値に存在する要素を格納する集合を維持します（これを効率的にするために、各種の要素にインデックス `RegionElementIndex` を与え、スパース bitsets を使用します）。
 
 [ri]: https://github.com/rust-lang/rust/tree/HEAD/compiler/rustc_borrowck/src/region_infer
 
-The kinds of region elements are as follows:
+領域要素の種類は次のとおりです:
 
-- Each **[`location`]** in the MIR control-flow graph: a location is just
-  the pair of a basic block and an index. This identifies the point
-  **on entry** to the statement with that index (or the terminator, if
-  the index is equal to `statements.len()`).
-- There is an element `end('a)` for each universal region `'a`,
-  corresponding to some portion of the caller's (or caller's caller,
-  etc) control-flow graph.
-- Similarly, there is an element denoted `end('static)` corresponding
-  to the remainder of program execution after this function returns.
-- There is an element `!1` for each placeholder region `!1`. This
-  corresponds (intuitively) to some unknown set of other elements –
-  for details on placeholders, see the section
-  [placeholders and universes](region_inference/placeholders_and_universes.md).
+- MIR 制御フローグラフ内の各**[`location`]**: location は基本ブロックとインデックスのペアです。これは、そのインデックスを持つステートメント（またはインデックスが `statements.len()` に等しい場合はターミネータ）への**エントリ時**のポイントを識別します。
+- 各全称領域 `'a` に対して要素 `end('a)` があり、呼び出し元（または呼び出し元の呼び出し元など）の制御フローグラフの一部に対応します。
+- 同様に、この関数が返った後のプログラム実行の残りに対応する要素 `end('static)` があります。
+- 各プレースホルダー領域 `!1` に対して要素 `!1` があります。これは（直感的に）他の要素の未知の集合に対応します -- プレースホルダーの詳細については、セクション [placeholders and universes](region_inference/placeholders_and_universes.md) を参照してください。
 
-## Constraints
+## 制約
 
-Before we can infer the value of regions, we need to collect
-constraints on the regions. The full set of constraints is described
-in [the section on constraint propagation][cp], but the two most
-common sorts of constraints are:
+領域の値を推論する前に、領域に関する制約を収集する必要があります。完全な制約セットは [制約伝播に関するセクション][cp] で説明されていますが、最も一般的な制約の 2 種類は次のとおりです:
 
-1. Outlives constraints. These are constraints that one region outlives another
-   (e.g. `'a: 'b`). Outlives constraints are generated by the [MIR type
-   checker].
-2. Liveness constraints. Each region needs to be live at points where it can be
-   used.
+1. Outlives 制約。これらは、ある領域が別の領域よりも長く生存する制約です（例えば、`'a: 'b`）。Outlives 制約は [MIR type checker] によって生成されます。
+2. 生存性制約。各領域は、使用できるポイントで生きている必要があります。
 
-## Inference Overview
+## 推論の概要
 
-So how do we compute the contents of a region? This process is called _region
-inference_. The high-level idea is pretty simple, but there are some details we
-need to take care of.
+では、領域の内容をどのように計算するのでしょうか？このプロセスを_領域推論_と呼びます。高レベルのアイデアはかなりシンプルですが、いくつかの詳細に注意する必要があります。
 
-Here is the high-level idea: we start off each region with the MIR locations we
-know must be in it from the liveness constraints. From there, we use all of the
-outlives constraints computed from the type checker to _propagate_ the
-constraints: for each region `'a`, if `'a: 'b`, then we add all elements of
-`'b` to `'a`, including `end('b)`. This all happens in
-[`propagate_constraints`].
+高レベルのアイデア: 生存性制約から必ず含まれる必要がある MIR の位置で各領域を開始します。そこから、型チェッカーから計算されたすべての outlives 制約を使用して、制約を_伝播_します: 各領域 `'a` について、`'a: 'b` の場合、`'b` のすべての要素を `'a` に追加します。`end('b)` も含みます。これはすべて [`propagate_constraints`] で行われます。
 
-Then, we will check for errors. We first check that type tests are satisfied by
-calling [`check_type_tests`]. This checks constraints like `T: 'a`. Second, we
-check that universal regions are not "too big". This is done by calling
-[`check_universal_regions`]. This checks that for each region `'a` if `'a`
-contains the element `end('b)`, then we must already know that `'a: 'b` holds
-(e.g. from a where clause). If we don't already know this, that is an error...
-well, almost. There is some special handling for closures that we will discuss
-later.
+次に、エラーをチェックします。最初に [`check_type_tests`] を呼び出して、型テストが満たされていることをチェックします。これは `T: 'a` のような制約をチェックします。次に、全称領域が「大きすぎない」ことをチェックします。これは [`check_universal_regions`] を呼び出すことで行われます。これは、各領域 `'a` について、`'a` に要素 `end('b)` が含まれている場合、`'a: 'b` が既に成立していることを知っている必要があることをチェックします（例えば、where 句から）。これを既に知らない場合、それはエラーです...まあ、ほぼです。クロージャに対するいくつかの特別な処理があり、後で説明します。
 
-### Example
+### 例
 
-Consider the following example:
+次の例を考えてみましょう:
 
 ```rust,ignore
 fn foo<'a, 'b>(x: &'a usize) -> &'b usize {
@@ -144,12 +82,9 @@ fn foo<'a, 'b>(x: &'a usize) -> &'b usize {
 }
 ```
 
-Clearly, this should not compile because we don't know if `'a` outlives `'b`
-(if it doesn't then the return value could be a dangling reference).
+明らかに、これは `'a` が `'b` より長く生存するかどうかがわからないため、コンパイルされるべきではありません（そうでない場合、戻り値は dangling 参照になる可能性があります）。
 
-Let's back up a bit. We need to introduce some free inference variables (as is
-done in [`replace_regions_in_mir`]). This example doesn't use the exact regions
-produced, but it (hopefully) is enough to get the idea across.
+少し戻りましょう。いくつかの自由推論変数を導入する必要があります（[`replace_regions_in_mir`] で行われるように）。この例では生成される正確な領域を使用していませんが、（願わくば）アイデアを伝えるのに十分です。
 
 ```rust,ignore
 fn foo<'a, 'b>(x: &'a /* '#1 */ usize) -> &'b /* '#3 */ usize {
@@ -157,62 +92,46 @@ fn foo<'a, 'b>(x: &'a /* '#1 */ usize) -> &'b /* '#3 */ usize {
 }
 ```
 
-Some notation: `'#1`, `'#3`, and `'#2` represent the universal regions for the
-argument, return value, and the expression `x`, respectively. Additionally, I
-will call the location of the expression `x` `L1`.
+いくつかの記法: `'#1`、`'#3`、`'#2` は、引数、戻り値、式 `x` の全称領域を表します。さらに、式 `x` の位置を `L1` と呼びます。
 
-So now we can use the liveness constraints to get the following starting points:
+したがって、生存性制約を使用して次の開始点を取得できます:
 
-Region  | Contents
+領域  | 内容
 --------|----------
 '#1     |
 '#2     | `L1`
 '#3     | `L1`
 
-Now we use the outlives constraints to expand each region. Specifically, we
-know that `'#2: '#3` ...
+次に、outlives 制約を使用して各領域を拡張します。具体的には、`'#2: '#3` がわかっているので...
 
-Region  | Contents
+領域  | 内容
 --------|----------
 '#1     | `L1`
-'#2     | `L1, end('#3) // add contents of '#3 and end('#3)`
+'#2     | `L1, end('#3) // '#3 の内容と end('#3) を追加`
 '#3     | `L1`
 
-... and `'#1: '#2`, so ...
+... および `'#1: '#2` なので ...
 
-Region  | Contents
+領域  | 内容
 --------|----------
-'#1     | `L1, end('#2), end('#3) // add contents of '#2 and end('#2)`
+'#1     | `L1, end('#2), end('#3) // '#2 の内容と end('#2) を追加`
 '#2     | `L1, end('#3)`
 '#3     | `L1`
 
-Now, we need to check that no regions were too big (we don't have any type
-tests to check in this case). Notice that `'#1` now contains `end('#3)`, but
-we have no `where` clause or implied bound to say that `'a: 'b`... that's an
-error!
+次に、領域が大きすぎないかをチェックする必要があります（この場合、チェックする型テストはありません）。`'#1` には `end('#3)` が含まれていますが、`'a: 'b` を言う `where` 句や暗黙の境界がありません...それはエラーです！
 
-### Some details
+### いくつかの詳細
 
-The [`RegionInferenceContext`] type contains all of the information needed to
-do inference, including the universal regions from [`replace_regions_in_mir`] and
-the constraints computed for each region. It is constructed just after we
-compute the liveness constraints.
+[`RegionInferenceContext`] 型には、推論を行うために必要なすべての情報が含まれています。これには、[`replace_regions_in_mir`] からの全称領域と、各領域に対して計算される制約が含まれます。これは、生存性制約を計算した直後に構築されます。
 
-Here are some of the fields of the struct:
+構造体のいくつかのフィールドは次のとおりです:
 
-- [`constraints`]: contains all the outlives constraints.
-- [`liveness_constraints`]: contains all the liveness constraints.
-- [`universal_regions`]: contains the `UniversalRegions` returned by
-  [`replace_regions_in_mir`].
-- [`universal_region_relations`]: contains relations known to be true about
-  universal regions. For example, if we have a where clause that `'a: 'b`, that
-  relation is assumed to be true while borrow checking the implementation (it
-  is checked at the caller), so `universal_region_relations` would contain `'a:
-  'b`.
-- [`type_tests`]: contains some constraints on types that we must check after
-  inference (e.g. `T: 'a`).
-- [`closure_bounds_mapping`]: used for propagating region constraints from
-  closures back out to the creator of the closure.
+- [`constraints`]: すべての outlives 制約が含まれます。
+- [`liveness_constraints`]: すべての生存性制約が含まれます。
+- [`universal_regions`]: [`replace_regions_in_mir`] によって返される `UniversalRegions` が含まれます。
+- [`universal_region_relations`]: 全称領域について真であることが知られている関係が含まれます。例えば、`'a: 'b` という where 句がある場合、その関係は実装の borrow check 中に真であると仮定されます（呼び出し元でチェックされます）。したがって、`universal_region_relations` には `'a: 'b` が含まれます。
+- [`type_tests`]: 推論後にチェックする必要がある型に関するいくつかの制約が含まれます（例えば、`T: 'a`）。
+- [`closure_bounds_mapping`]: クロージャからクロージャの作成者に領域制約を伝播するために使用されます。
 
 [`constraints`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#structfield.constraints
 [`liveness_constraints`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#structfield.liveness_constraints
@@ -222,12 +141,9 @@ Here are some of the fields of the struct:
 [`type_tests`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#structfield.type_tests
 [`closure_bounds_mapping`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#structfield.closure_bounds_mapping
 
-TODO: should we discuss any of the others fields? What about the SCCs?
+TODO: 他のフィールドについて議論する必要がありますか？SCC についてはどうですか？
 
-Ok, now that we have constructed a `RegionInferenceContext`, we can do
-inference. This is done by calling the [`solve`] method on the context. This
-is where we call [`propagate_constraints`] and then check the resulting type
-tests and universal regions, as discussed above.
+さて、`RegionInferenceContext` を構築したので、推論を行うことができます。これは、コンテキストで [`solve`] メソッドを呼び出すことで行われます。これは、上記で議論したように、[`propagate_constraints`] を呼び出し、結果の型テストと全称領域をチェックする場所です。
 
 [`propagate_constraints`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#method.propagate_constraints
 [`check_type_tests`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#method.check_type_tests

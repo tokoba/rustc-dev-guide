@@ -1,28 +1,27 @@
-# Caching and subtle considerations therewith
+# キャッシュとそれに伴う微妙な考慮事項
 
-In general, we attempt to cache the results of trait selection.  This
-is a somewhat complex process. Part of the reason for this is that we
-want to be able to cache results even when all the types in the trait
-reference are not fully known. In that case, it may happen that the
-trait selection process is also influencing type variables, so we have
-to be able to not only cache the *result* of the selection process,
-but *replay* its effects on the type variables.
+一般に、トレイト選択の結果をキャッシュすることを試みます。これは
+やや複雑なプロセスです。その理由の一部は、トレイト参照内の
+すべての型が完全に判明していない場合でも、結果をキャッシュできるように
+したいからです。その場合、トレイト選択プロセスも型変数に影響を与えている
+可能性があるため、選択プロセスの*結果*だけでなく、型変数への
+その*影響を再現*できる必要があります。
 
-## An example
+## 例
 
-The high-level idea of how the cache works is that we first replace
-all unbound inference variables with placeholder versions. Therefore,
-if we had a trait reference `usize : Foo<$t>`, where `$t` is an unbound
-inference variable, we might replace it with `usize : Foo<$0>`, where
-`$0` is a placeholder type. We would then look this up in the cache.
+キャッシュがどのように動作するかの高レベルなアイデアは、まず
+すべての未束縛の推論変数をプレースホルダーバージョンに置き換える
+ことです。したがって、トレイト参照 `usize : Foo<$t>` があり、`$t` が未束縛の
+推論変数である場合、それを `usize : Foo<$0>` に置き換えることができます。ここで
+`$0` はプレースホルダー型です。その後、これをキャッシュで検索します。
 
-If we found a hit, the hit would tell us the immediate next step to
-take in the selection process (e.g. apply impl #22, or apply where
-clause `X : Foo<Y>`).
+ヒットが見つかった場合、ヒットは選択プロセスで次に取るべき
+ステップを教えてくれます（例：impl #22 を適用する、または
+where 句 `X : Foo<Y>` を適用する）。
 
-On the other hand, if there is no hit, we need to go through the [selection
-process] from scratch. Suppose, we come to the conclusion that the only
-possible impl is this one, with def-id 22:
+一方、ヒットがない場合は、[選択プロセス]を最初から実行する
+必要があります。例えば、次の唯一可能な impl が def-id 22 の
+ものであるという結論に達したとします：
 
 [selection process]: ./resolution.html#selection
 
@@ -30,36 +29,36 @@ possible impl is this one, with def-id 22:
 impl Foo<isize> for usize { ... } // Impl #22
 ```
 
-We would then record in the cache `usize : Foo<$0> => ImplCandidate(22)`. Next
-we would [confirm] `ImplCandidate(22)`, which would (as a side-effect) unify
-`$t` with `isize`.
+次に、キャッシュに `usize : Foo<$0> => ImplCandidate(22)` を記録します。次に
+`ImplCandidate(22)` を[確認]し、それが（副作用として）`$t` を
+`isize` に単一化します。
 
 [confirm]: ./resolution.html#confirmation
 
-Now, at some later time, we might come along and see a `usize :
-Foo<$u>`. When replaced with a placeholder, this would yield `usize : Foo<$0>`, just as
-before, and hence the cache lookup would succeed, yielding
-`ImplCandidate(22)`. We would confirm `ImplCandidate(22)` which would
-(as a side-effect) unify `$u` with `isize`.
+さて、後でいつか、`usize : Foo<$u>` を見かけることがあります。プレースホルダーに
+置き換えると、これは以前と同じように `usize : Foo<$0>` になり、
+したがってキャッシュ検索は成功し、`ImplCandidate(22)` が得られます。
+`ImplCandidate(22)` を確認すると、（副作用として）`$u` が `isize` に
+単一化されます。
 
-## Where clauses and the local vs global cache
+## Where 句とローカルキャッシュ vs グローバルキャッシュ
 
-One subtle interaction is that the results of trait lookup will vary
-depending on what where clauses are in scope. Therefore, we actually
-have *two* caches, a local and a global cache. The local cache is
-attached to the [`ParamEnv`], and the global cache attached to the
-[`tcx`]. We use the local cache whenever the result might depend on the
-where clauses that are in scope. The determination of which cache to
-use is done by the method `pick_candidate_cache` in `select.rs`. At
-the moment, we use a very simple, conservative rule: if there are any
-where-clauses in scope, then we use the local cache.  We used to try
-and draw finer-grained distinctions, but that led to a series of
-annoying and weird bugs like [#22019] and [#18290]. This simple rule seems
-to be pretty clearly safe and also still retains a very high hit rate
-(~95% when compiling rustc).
+微妙な相互作用の1つは、トレイト検索の結果がスコープ内にある
+where 句によって変わることです。したがって、実際には*2つ*のキャッシュ、
+ローカルとグローバルのキャッシュがあります。ローカルキャッシュは
+[`ParamEnv`] に、グローバルキャッシュは [`tcx`] に添付されています。
+結果がスコープ内の where 句に依存する可能性がある場合は常に、
+ローカルキャッシュを使用します。どのキャッシュを使用するかの決定は、
+`select.rs` の `pick_candidate_cache` メソッドによって行われます。
+現時点では、非常にシンプルで保守的なルールを使用しています：スコープ内に
+where 句がある場合は、ローカルキャッシュを使用します。以前は
+より細かい区別を試みていましたが、それは [#22019] や [#18290] のような
+一連の厄介で奇妙なバグにつながりました。このシンプルなルールは
+非常に明確に安全であり、非常に高いヒット率（rustc をコンパイルするときに
+約95%）を維持しているようです。
 
-**TODO**: it looks like `pick_candidate_cache` no longer exists. In
-general, is this section still accurate at all?
+**TODO**: `pick_candidate_cache` はもう存在しないようです。一般的に、
+このセクションはまだ正確ですか？
 
 [`ParamEnv`]: ../typing_parameter_envs.html
 [`tcx`]: ../ty.html

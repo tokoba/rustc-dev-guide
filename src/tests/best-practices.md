@@ -1,202 +1,145 @@
-# Best practices for writing tests
+# テストを書くためのベストプラクティス
 
-This chapter describes best practices related to authoring and modifying tests.
-We want to make sure the tests we author are easy to understand and modify, even
-several years later, without needing to consult the original author and perform
-a bunch of git archeology.
+この章では、テストの作成と変更に関連するベストプラクティスについて説明します。元の作成者に相談したり、大量のgitの考古学を行うことなく、数年後でも理解しやすく変更しやすいテストを作成したいと考えています。
 
-It's good practice to review the test that you authored by pretending that you
-are a different contributor who is looking at the test that failed several years
-later without much context (this also helps yourself even a few days or months
-later!). Then ask yourself: how can I make my life and their lives easier?
+作成したテストを、数年後に失敗したテストを見ている別のコントリビューターであるふりをしてレビューするのは良い習慣です（これは数日または数ヶ月後の自分自身にも役立ちます！）。そして、自分自身に問いかけてください：どうすれば自分と彼らの生活を楽にできるでしょうか？
 
-To help put this into perspective, let's start with an aside on how to write a
-test that makes the life of another contributor as hard as possible.
+これを見通しに入れるために、別のコントリビューターの生活をできるだけ困難にするテストを書く方法についての余談から始めましょう。
 
-> **Aside: Simple Test Sabotage Field Manual**
+> **余談：シンプルなテストサボタージュ・フィールドマニュアル**
 >
-> To make the life of another contributor as hard as possible, one might:
+> 別のコントリビューターの生活をできるだけ困難にするには、次のようにします：
 >
-> - Name the test after an issue number alone without any other context, e.g.
->   `issue-123456.rs`.
-> - Have no comments at all on what the test is trying to exercise, no links to
->   relevant context.
-> - Include a test that is massive (that can otherwise be minimized) and
->   contains non-essential pieces which distracts from the core thing the test
->   is actually trying to test.
-> - Include a bunch of unrelated syntax errors and other errors which are not
->   critical to what the test is trying to check.
-> - Weirdly format the snippets.
-> - Include a bunch of unused and unrelated features.
-> - Have e.g. `ignore-windows` [compiletest directives] but don't offer any
->   explanation as to *why* they are needed.
+> - テストを問題番号だけで命名し、他のコンテキストを含めない。例：`issue-123456.rs`。
+> - テストが何を実行しようとしているのか、関連するコンテキストへのリンクについてのコメントを一切持たない。
+> - 大規模な（他の方法で最小化できる）テストを含め、テストが実際にテストしようとしているコアなものから気を散らす非本質的な部分を含める。
+> - テストがチェックしようとしているものにとって重要でない、無関係な構文エラーやその他のエラーの束を含める。
+> - スニペットを奇妙にフォーマットする。
+> - 使用されていない無関係な機能の束を含める。
+> - 例えば`ignore-windows`のような[compiletestディレクティブ]を持っているが、*なぜ*それらが必要なのかについての説明を提供しない。
 
-## Test naming
+## テストの命名
 
-Make it easy for the reader to immediately understand what the test is
-exercising, instead of having to type in the issue number and dig through github
-search for what the test is trying to exercise. This has an additional benefit
-of making the test possible to be filtered via `--test-args` as a collection of
-related tests.
+テストが何を実行しようとしているかを読者がすぐに理解できるようにし、問題番号を入力してgithub検索を掘り下げてテストが何を実行しようとしているかを調べる必要がないようにします。これには、`--test-args`を介して関連するテストのコレクションとしてフィルタリングできるようにするという追加の利点があります。
 
-- Name the test after what it's trying to exercise or prevent regressions of.
-- Keep it concise.
-- Avoid using issue numbers alone as test names.
-- Avoid starting the test name with `issue-xxxxx` prefix as it degrades
-  auto-completion.
+- テストを、それが実行しようとしていること、または回帰を防止しようとしていることにちなんで命名してください。
+- 簡潔にしてください。
+- テスト名として問題番号だけを使用しないでください。
+- テスト名を`issue-xxxxx`プレフィックスで始めないでください。オートコンプリートが劣化します。
 
-> **Avoid using only issue numbers as test names**
+> **テスト名として問題番号だけを使用しないでください**
 >
-> Prefer including them as links or `#123456` in test comments instead. Or if it
-> makes sense to include the issue number, also include brief keywords like
-> `macro-external-span-ice-123956.rs`.
+> 代わりに、テストコメントにリンクまたは`#123456`として含めることを好みます。または、問題番号を含めることが理にかなっている場合は、`macro-external-span-ice-123956.rs`のような簡単なキーワードも含めてください。
 >
 > ```text
-> tests/ui/typeck/issue-123456.rs                              // bad
-> tests/ui/typeck/issue-123456-asm-macro-external-span-ice.rs  // bad (for tab completion)
-> tests/ui/typeck/asm-macro-external-span-ice-123456.rs        // good
-> tests/ui/typeck/asm-macro-external-span-ice.rs               // good
+> tests/ui/typeck/issue-123456.rs                              // 悪い
+> tests/ui/typeck/issue-123456-asm-macro-external-span-ice.rs  // 悪い（タブ補完のため）
+> tests/ui/typeck/asm-macro-external-span-ice-123456.rs        // 良い
+> tests/ui/typeck/asm-macro-external-span-ice.rs               // 良い
 > ```
 >
-> `issue-123456.rs` does not tell you immediately anything about what the test
-> is actually exercising meaning you need to do additional searching. Including
-> the issue number in the test name as a prefix makes tab completion less useful
-> (if you `ls` a test directory and get a bunch of `issue-xxxxx` prefixes). We
-> can link to the issue in a test comment.
+> `issue-123456.rs`は、テストが実際に何を実行しているかについて即座に何も教えてくれないため、追加の検索を行う必要があります。テスト名にプレフィックスとして問題番号を含めると、タブ補完の有用性が低下します（テストディレクトリを`ls`して、たくさんの`issue-xxxxx`プレフィックスを取得する場合）。テストコメントで問題にリンクできます。
 >
 > ```rs
-> //! Check that `asm!` macro including nested macros that come from external
-> //! crates do not lead to a codepoint boundary assertion ICE.
+> //! `asm!`マクロが外部クレートから来るネストされたマクロを含む場合、
+> //! コードポイント境界アサーションICEにつながらないことを確認してください。
 > //!
-> //! Regression test for <https://github.com/rust-lang/rust/issues/123456>.
+> //! <https://github.com/rust-lang/rust/issues/123456>の回帰テスト。
 > ```
 >
-> One exception to this rule is [crash tests]: there it is canonical that
-> tests are named only after issue numbers because its purpose is to track
-> snippets from which issues no longer ICE/crash, and they would either be
-> removed or converted into proper ui/other tests in the fix PRs.
+> このルールの1つの例外は、[クラッシュテスト]です：その目的は、もはやICE/クラッシュしない問題からのスニペットを追跡することであり、修正PRで適切なui/他のテストに削除または変換されるため、問題番号のみにちなんでテストに名前を付けることが標準です。
 
-## Test organization
+## テストの整理
 
-- For most test suites, try to find a semantically meaningful subdirectory to
-  home the test.
-    - E.g. for an implementation of RFC 2093 specifically, we can group a
-      collection of tests under `tests/ui/rfc-2093-infer-outlives/`. For the
-      directory name, include what the RFC is about.
-- For the [`run-make`]/`run-make-support` test suites, each `rmake.rs` must
-  be contained within an immediate subdirectory under `tests/run-make/` or
-  `tests/run-make-cargo/` respectively. Further nesting is not presently
-  supported. Avoid using _only_ an issue number for the test name as well.
+- ほとんどのテストスイートについて、テストをホームする意味的に意味のあるサブディレクトリを見つけるようにしてください。
+    - 例えば、RFC 2093の実装特有のものについては、`tests/ui/rfc-2093-infer-outlives/`の下にテストのコレクションをグループ化できます。ディレクトリ名には、RFCが何についてのものかを含めてください。
+- [`run-make`]/`run-make-support`テストスイートの場合、各`rmake.rs`は`tests/run-make/`または`tests/run-make-cargo/`の直下のサブディレクトリ内に含まれている必要があります。さらなるネストは現在サポートされていません。テスト名として問題番号_のみ_を使用することも避けてください。
 
-## Test descriptions
+## テストの説明
 
-To help other contributors understand what the test is about if their changes
-lead to the test failing, we should make sure a test has sufficient docs about
-its intent/purpose, links to relevant context (incl. issue numbers or other
-discussions) and possibly relevant resources (e.g. can be helpful to link to
-Win32 APIs for specific behavior).
+変更がテストの失敗につながった場合に他のコントリビューターがテストが何についてのものかを理解できるようにするために、テストがその意図/目的、関連するコンテキストへのリンク（問題番号やその他のディスカッションを含む）、および可能性のある関連リソース（例えば、特定の動作のWin32 APIにリンクすることが役立つ場合があります）について十分なドキュメントを持っていることを確認する必要があります。
 
-**Synopsis of a test with good comments**
+**良いコメントを持つテストの概要**
 
 ```rust,ignore
-//! Brief summary of what the test is exercising.
-//! Example: Regression test for #123456: make sure coverage attribute don't ICE
-//!     when applied to non-items.
+//! テストが実行しているものの簡単な要約。
+//! 例：#123456の回帰テスト：カバレッジ属性が非アイテムに適用されたときに
+//!     ICEしないことを確認してください。
 //!
-//! Optional: Remarks on related tests/issues, external APIs/tools, crash
-//!     mechanism, how it's fixed, FIXMEs, limitations, etc.
-//! Example: This test is like `tests/attrs/linkage.rs`, but this test is
-//!     specifically checking `#[coverage]` which exercises a different code
-//!     path. The ICE was triggered during attribute validation when we tried
-//!     to construct a `def_path_str` but only emitted the diagnostic when the
-//!     platform is windows, causing an ICE on unix.
+//! オプション：関連するテスト/問題、外部API/ツール、クラッシュ
+//!     メカニズム、修正方法、FIXME、制限などに関する備考。
+//! 例：このテストは`tests/attrs/linkage.rs`のようなものですが、このテストは
+//!     特に`#[coverage]`をチェックしており、異なるコード
+//!     パスを実行します。ICEは、属性検証中に
+//!     `def_path_str`を構築しようとしたときにトリガーされましたが、プラット
+//!     フォームがwindowsの場合にのみ診断を発行し、unixでICEを引き起こしました。
 //!
-//! Links to relevant issues and discussions. Examples below:
-//! Regression test for <https://github.com/rust-lang/rust/issues/123456>.
-//! See also <https://github.com/rust-lang/rust/issues/101345>.
-//! See discussion at <https://rust-lang.zulipchat.com/#narrow/stream/131828-t-compiler/topic/123456-example-topic>.
-//! See [`clone(2)`].
+//! 関連する問題とディスカッションへのリンク。以下は例です：
+//! <https://github.com/rust-lang/rust/issues/123456>の回帰テスト。
+//! <https://github.com/rust-lang/rust/issues/101345>も参照してください。
+//! <https://rust-lang.zulipchat.com/#narrow/stream/131828-t-compiler/topic/123456-example-topic>でのディスカッションを参照してください。
+//! [`clone(2)`]を参照してください。
 //!
 //! [`clone(2)`]: https://man7.org/linux/man-pages/man2/clone.2.html
 
 //@ ignore-windows
-// Reason: (why is this test ignored for windows? why not specifically
-// windows-gnu or windows-msvc?)
+// 理由：（このテストがwindowsで無視される理由は？具体的に
+// windows-gnuまたはwindows-msvcではないのはなぜですか？）
 
-// Optional: Summary of test cases: What positive cases are checked?
-// What negative cases are checked? Any specific quirks?
+// オプション：テストケースの要約：どのようなポジティブケースがチェックされていますか？
+// どのようなネガティブケースがチェックされていますか？特定の癖はありますか？
 
 fn main() {
     #[coverage]
     //~^ ERROR coverage attribute can only be applied to function items.
     let _ = {
-        // Comment highlighting something that deserves reader attention.
+        // 読者の注意に値するものを強調するコメント。
         fn foo() {}
     };
 }
 ```
 
-For how much context/explanation is needed, it is up to the author and
-reviewer's discretion. A good rule of thumb is non-trivial things exercised in
-the test deserves some explanation to help other contributors to understand.
-This may include remarks on:
+どの程度のコンテキスト/説明が必要かは、作成者とレビュアーの裁量次第です。良い経験則は、テストで実行される自明でないものは、他のコントリビューターが理解するのに役立つ何らかの説明に値するということです。これには次のような備考が含まれる場合があります：
 
-- How an ICE can get triggered if it's quite elaborate.
-- Related issues and tests (e.g. this test is like another test but is kept
-  separate because...).
-- Platform-specific behaviors.
-- Behavior of external dependencies and APIs: syscalls, linkers, tools,
-  environments and the likes.
+- ICEがかなり複雑な場合、どのようにトリガーされるか。
+- 関連する問題とテスト（例：このテストは別のテストのようなものですが、...という理由で別々に保たれています）。
+- プラットフォーム固有の動作。
+- 外部依存関係とAPIの動作：syscall、リンカー、ツール、環境など。
 
-## Test content
+## テストの内容
 
-- Try to make sure the test is as minimal as possible.
-- Minimize non-critical code and especially minimize unnecessary syntax and type
-  errors which can clutter stderr snapshots.
-- Where possible, use semantically meaningful names (e.g. `fn
-  bare_coverage_attributes() {}`).
+- テストをできるだけ最小限にするようにしてください。
+- 重要でないコードを最小限にし、特にstderrスナップショットを雑然とさせる可能性のある不要な構文エラーや型エラーを最小限にしてください。
+- 可能な限り、意味的に意味のある名前を使用してください（例：`fn bare_coverage_attributes() {}`）。
 
-## Flaky tests
+## 不安定なテスト
 
-All tests need to strive to be reproducible and reliable. Flaky tests are the
-worst kind of tests, arguably even worse than not having the test in the first
-place.
+すべてのテストは、再現可能で信頼性があるように努める必要があります。不安定なテストは最悪の種類のテストであり、最初からテストを持たないよりも間違いなく悪いです。
 
-- Flaky tests can fail in completely unrelated PRs which can confuse other
-  contributors and waste their time trying to figure out if test failure is
-  related.
-- Flaky tests provide no useful information from its test results other than
-  it's flaky and not reliable: if a test passed but it's flakey, did I just get
-  lucky? if a test is flakey but it failed, was it just spurious?
-- Flaky tests degrade confidence in the whole test suite. If a test suite can
-  randomly spuriously fail due to flaky tests, did the whole test suite pass or
-  did I just get lucky/unlucky?
-- Flaky tests can randomly fail in full CI, wasting previous full CI resources.
+- 不安定なテストは、完全に無関係なPRで失敗する可能性があり、他のコントリビューターを混乱させ、テストの失敗が関連しているかどうかを把握しようとして時間を無駄にする可能性があります。
+- 不安定なテストは、不安定で信頼できないこと以外に、テスト結果から有用な情報を提供しません：テストが合格したが不安定な場合、運が良かっただけですか？テストが不安定だが失敗した場合、単に偽陽性でしたか？
+- 不安定なテストは、テストスイート全体への信頼を低下させます。テストスイートが不安定なテストのためにランダムに偽陽性で失敗する可能性がある場合、テストスイート全体が合格したのか、それとも運が良かった/悪かっただけですか？
+- 不安定なテストは、完全なCIでランダムに失敗し、貴重な完全なCIリソースを無駄にする可能性があります。
 
-## Compiletest directives
+## Compiletestディレクティブ
 
-See [compiletest directives] for a listing of directives.
+ディレクティブのリストについては、[compiletestディレクティブ]を参照してください。
 
-- For `ignore-*`/`needs-*`/`only-*` directives, unless extremely obvious,
-  provide a brief remark on why the directive is needed. E.g. `"//@ ignore-wasi
-  (wasi codegens the main symbol differently)"`.
-- When using `//@ ignore-auxiliary`, specify the corresponding main test files,
-  e.g. ``//@ ignore-auxiliary (used by `./foo.rs`)``.
+- `ignore-*`/`needs-*`/`only-*`ディレクティブの場合、非常に明白でない限り、ディレクティブが必要な理由について簡単な備考を提供してください。例：`"//@ ignore-wasi (wasi codegens the main symbol differently)"`。
+- `//@ ignore-auxiliary`を使用する場合は、対応するメインテストファイルを指定してください。例：``//@ ignore-auxiliary (used by `./foo.rs`)``。
 
-## FileCheck best practices
+## FileCheckのベストプラクティス
 
-See [LLVM FileCheck guide][FileCheck] for details.
+詳細については、[LLVM FileCheckガイド][FileCheck]を参照してください。
 
-- Avoid matching on specific register numbers or basic block numbers unless
-  they're special or critical for the test. Consider using patterns to match
-  them where suitable.
+- 特別または重要でない限り、特定のレジスタ番号または基本ブロック番号に一致しないでください。適切な場合はパターンを使用してそれらに一致することを検討してください。
 
 > **TODO**
 >
-> Pending concrete advice.
+> 具体的なアドバイスを待っています。
 
 [compiletest]: ./compiletest.md
-[compiletest directives]: ./directives.md
+[compiletestディレクティブ]: ./directives.md
 [`run-make`]: ./compiletest.md#run-make-tests
 [FileCheck]: https://llvm.org/docs/CommandGuide/FileCheck.html
-[crash tests]: ./compiletest.md#crash-tests
+[クラッシュテスト]: ./compiletest.md#crash-tests

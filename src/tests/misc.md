@@ -1,38 +1,32 @@
-# Miscellaneous testing-related info
+# その他のテスト関連情報
 
-## `RUSTC_BOOTSTRAP` and stability
+## `RUSTC_BOOTSTRAP` と安定性
 
 <!-- date-check: Nov 2024 -->
 
-This is a bootstrap/compiler implementation detail, but it can also be useful
-for testing:
+これはブートストラップ/コンパイラ実装の詳細ですが、テストにも役立ちます：
 
-- `RUSTC_BOOTSTRAP=1` will "cheat" and bypass usual stability checking, allowing
-  you to use unstable features and cli flags on a stable `rustc`.
-- `RUSTC_BOOTSTRAP=-1` will force a given `rustc` to pretend it is a stable
-  compiler, even if it's actually a nightly `rustc`. This is useful because some
-  behaviors of the compiler (e.g. diagnostics) can differ depending on whether
-  the compiler is nightly or not.
+- `RUSTC_BOOTSTRAP=1` は通常の安定性チェックを「迂回」し、安定版 `rustc` で不安定な機能や CLI フラグを使用できるようにします。
+- `RUSTC_BOOTSTRAP=-1` は、実際には nightly `rustc` であっても、指定された `rustc` に安定版コンパイラであるかのように振る舞わせます。これは、コンパイラの一部の振る舞い（例：診断）がコンパイラが nightly かどうかによって異なる場合があるため有用です。
 
-In `ui` tests and other test suites that support `//@ rustc-env`, you can specify
+`//@ rustc-env` をサポートする `ui` テストやその他のテストスイートでは、次のように指定できます：
 
 ```rust,ignore
-// Force unstable features to be usable on stable rustc
+// 安定版 rustc で不安定な機能を使用可能にする
 //@ rustc-env:RUSTC_BOOTSTRAP=1
 
-// Or force nightly rustc to pretend it is a stable rustc
+// または nightly rustc に安定版 rustc のふりをさせる
 //@ rustc-env:RUSTC_BOOTSTRAP=-1
 ```
 
-For `run-make`/`run-make-cargo` tests, `//@ rustc-env` is not supported. You can do
-something like the following for individual `rustc` invocations.
+`run-make`/`run-make-cargo` テストでは、`//@ rustc-env` はサポートされていません。個々の `rustc` 呼び出しに対して次のようにすることができます。
 
 ```rust,ignore
 use run_make_support::rustc;
 
 fn main() {
     rustc()
-        // Pretend that I am very stable
+        // 私はとても安定しているふりをする
         .env("RUSTC_BOOTSTRAP", "-1")
         //...
         .run();

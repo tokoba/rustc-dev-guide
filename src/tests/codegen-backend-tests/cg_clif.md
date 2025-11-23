@@ -1,3 +1,3 @@
-# Cranelift codegen backend tests
+# Cranelift コード生成バックエンドのテスト
 
-TODO: please add some more information to this page.
+TODO: このページに詳細情報を追加してください。

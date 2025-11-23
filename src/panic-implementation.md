@@ -1,18 +1,15 @@
-# Panicking in Rust
+# Rustにおけるパニック
 
-## Step 1: Invocation of the `panic!` macro.
+## ステップ1: `panic!` マクロの呼び出し
 
-There are actually two panic macros - one defined in `core`, and one defined in `std`.
-This is due to the fact that code in `core` can panic. `core` is built before `std`,
-but we want panics to use the same machinery at runtime, whether they originate in `core`
-or `std`.
+実際には2つのパニックマクロがあります - 1つは `core` で定義され、もう1つは `std` で定義されています。これは、`core` のコードがパニックする可能性があるためです。`core` は `std` の前にビルドされますが、パニックが `core` で発生したか `std` で発生したかにかかわらず、実行時に同じ仕組みを使用することを望んでいます。
 
-### core definition of panic!
+### core でのパニックの定義
 
-The `core` `panic!` macro eventually makes the following call (in `library/core/src/panicking.rs`):
+`core` の `panic!` マクロは最終的に以下の呼び出しを行います（`library/core/src/panicking.rs` 内）：
 
 ```rust
-// NOTE This function never crosses the FFI boundary; it's a Rust-to-Rust call
+// NOTE この関数はFFI境界を越えません；Rust-to-Rustの呼び出しです
 extern "Rust" {
     #[lang = "panic_impl"]
     fn panic_impl(pi: &PanicInfo<'_>) -> !;
@@ -22,21 +19,16 @@ let pi = PanicInfo::internal_constructor(Some(&fmt), location);
 unsafe { panic_impl(&pi) }
 ```
 
-Actually resolving this goes through several layers of indirection:
+実際にこれを解決するには、いくつかの間接層を経ます：
 
-1. In `compiler/rustc_middle/src/middle/weak_lang_items.rs`, `panic_impl` is
-   declared as 'weak lang item', with the symbol `rust_begin_unwind`. This is
-   used in `rustc_hir_analysis/src/collect.rs` to set the actual symbol name to
-   `rust_begin_unwind`.
+1. `compiler/rustc_middle/src/middle/weak_lang_items.rs` で、`panic_impl` はシンボル `rust_begin_unwind` を持つ 'weak lang item' として宣言されています。これは `rustc_hir_analysis/src/collect.rs` で実際のシンボル名を `rust_begin_unwind` に設定するために使用されます。
 
-   Note that `panic_impl` is declared in an `extern "Rust"` block,
-   which means that core will attempt to call a foreign symbol called `rust_begin_unwind`
-   (to be resolved at link time)
+   `panic_impl` は `extern "Rust"` ブロックで宣言されていることに注意してください。これは、core が `rust_begin_unwind` という外部シンボルを呼び出そうとすることを意味します（リンク時に解決されます）。
 
-2. In `library/std/src/panicking.rs`, we have this definition:
+2. `library/std/src/panicking.rs` には、次の定義があります：
 
 ```rust
-/// Entry point of panic from the core crate.
+/// coreクレートからのパニックのエントリーポイント。
 #[cfg(not(test))]
 #[panic_handler]
 #[unwind(allowed)]
@@ -45,69 +37,37 @@ pub fn begin_panic_handler(info: &PanicInfo<'_>) -> ! {
 }
 ```
 
-The special `panic_handler` attribute is resolved via `compiler/rustc_middle/src/middle/lang_items`.
-The `extract` function converts the `panic_handler` attribute to a `panic_impl` lang item.
+特別な `panic_handler` 属性は `compiler/rustc_middle/src/middle/lang_items` を介して解決されます。`extract` 関数は `panic_handler` 属性を `panic_impl` lang item に変換します。
 
-Now, we have a matching `panic_handler` lang item in the `std`. This function goes
-through the same process as the `extern { fn panic_impl }` definition in `core`, ending
-up with a symbol name of `rust_begin_unwind`. At link time, the symbol reference in `core`
-will be resolved to the definition of `std` (the function called `begin_panic_handler` in the
-Rust source).
+これで、`std` に一致する `panic_handler` lang item が得られました。この関数は `core` の `extern { fn panic_impl }` 定義と同じプロセスを経て、最終的に `rust_begin_unwind` というシンボル名になります。リンク時に、`core` のシンボル参照は `std` の定義（Rustソースでは `begin_panic_handler` という関数）に解決されます。
 
-Thus, control flow will pass from core to std at runtime. This allows panics from `core`
-to go through the same infrastructure that other panics use (panic hooks, unwinding, etc)
+したがって、制御フローは実行時に core から std に渡されます。これにより、`core` からのパニックが他のパニックが使用するのと同じインフラストラクチャ（パニックフック、アンワインディングなど）を使用できるようになります。
 
-### std implementation of panic!
+### std でのパニックの実装
 
-This is where the actual panic-related logic begins. In `library/std/src/panicking.rs`,
-control passes to `rust_panic_with_hook`. This method is responsible
-for invoking the global panic hook, and checking for double panics. Finally,
-we call `__rust_start_panic`, which is provided by the panic runtime.
+ここから実際のパニック関連のロジックが始まります。`library/std/src/panicking.rs` で、制御は `rust_panic_with_hook` に渡されます。このメソッドはグローバルパニックフックの呼び出しと二重パニックのチェックを担当します。最後に、パニックランタイムによって提供される `__rust_start_panic` を呼び出します。
 
-The call to `__rust_start_panic` is very weird - it is passed a `*mut &mut dyn PanicPayload`,
-converted to an `usize`. Let's break this type down:
+`__rust_start_panic` への呼び出しは非常に奇妙です - `*mut &mut dyn PanicPayload` が `usize` に変換されて渡されます。この型を分解してみましょう：
 
-1. `PanicPayload` is an internal trait. It is implemented for `PanicPayload`
-(a wrapper around the user-supplied payload type), and has a method
-`fn take_box(&mut self) -> *mut (dyn Any + Send)`.
-This method takes the user-provided payload (`T: Any + Send`),
-boxes it, and converts the box to a raw pointer.
+1. `PanicPayload` は内部トレイトです。これは `PanicPayload`（ユーザー提供のペイロード型のラッパー）に実装されており、メソッド `fn take_box(&mut self) -> *mut (dyn Any + Send)` を持っています。このメソッドは、ユーザーが提供したペイロード（`T: Any + Send`）を受け取り、ボックス化して、そのボックスを生のポインタに変換します。
 
-2. When we call `__rust_start_panic`, we have an `&mut dyn PanicPayload`.
-However, this is a fat pointer (twice the size of a `usize`).
-To pass this to the panic runtime across an FFI boundary, we take a mutable
-reference *to this mutable reference* (`&mut &mut dyn PanicPayload`), and convert it to a raw
-pointer (`*mut &mut dyn PanicPayload`). The outer raw pointer is a thin pointer, since it points to
-a `Sized` type (a mutable reference). Therefore, we can convert this thin pointer into a `usize`,
-which is suitable for passing across an FFI boundary.
+2. `__rust_start_panic` を呼び出すとき、`&mut dyn PanicPayload` があります。しかし、これはファットポインタ（`usize` の2倍のサイズ）です。これをFFI境界を越えてパニックランタイムに渡すために、*この可変参照への*可変参照（`&mut &mut dyn PanicPayload`）を取り、それを生のポインタ（`*mut &mut dyn PanicPayload`）に変換します。外側の生のポインタは、`Sized` 型（可変参照）を指すため、シンポインタです。したがって、このシンポインタを `usize` に変換でき、FFI境界を越えて渡すのに適しています。
 
-Finally, we call `__rust_start_panic` with this `usize`. We have now entered the panic runtime.
+最後に、この `usize` で `__rust_start_panic` を呼び出します。これでパニックランタイムに入りました。
 
-## Step 2: The panic runtime
+## ステップ2: パニックランタイム
 
-Rust provides two panic runtimes: `panic_abort` and `panic_unwind`. The user chooses
-between them at build time via their `Cargo.toml`
+Rustは2つのパニックランタイムを提供します：`panic_abort` と `panic_unwind`。ユーザーは `Cargo.toml` でビルド時にこれらを選択します。
 
-`panic_abort` is extremely simple: its implementation of `__rust_start_panic` just aborts,
-as you would expect.
+`panic_abort` は非常にシンプルです：`__rust_start_panic` の実装は、予想通りに中止するだけです。
 
-`panic_unwind` is the more interesting case.
+`panic_unwind` はより興味深いケースです。
 
-In its implementation of `__rust_start_panic`, we take the `usize`, convert
-it back to a `*mut &mut dyn PanicPayload`, dereference it, and call `take_box`
-on the `&mut dyn PanicPayload`. At this point, we have a raw pointer to the payload
-itself (a `*mut (dyn Send + Any)`): that is, a raw pointer to the actual value
-provided by the user who called `panic!`.
+`__rust_start_panic` の実装では、`usize` を取り、それを `*mut &mut dyn PanicPayload` に戻し、それを参照解除し、`&mut dyn PanicPayload` で `take_box` を呼び出します。この時点で、ペイロード自体への生のポインタ（`*mut (dyn Send + Any)`）があります：つまり、`panic!` を呼び出したユーザーが提供した実際の値への生のポインタです。
 
-At this point, the platform-independent code ends. We now call into
-platform-specific unwinding logic (e.g `unwind`). This code is
-responsible for unwinding the stack, running any 'landing pads' associated
-with each frame (currently, running destructors), and transferring control
-to the `catch_unwind` frame.
+この時点で、プラットフォーム非依存のコードは終了します。次に、プラットフォーム固有のアンワインディングロジック（例えば `unwind`）を呼び出します。このコードは、スタックをアンワインドし、各フレームに関連付けられた「ランディングパッド」（現在、デストラクタ）を実行し、制御を `catch_unwind` フレームに転送する責任があります。
 
-Note that all panics either abort the process or get caught by some call to `catch_unwind`.
-In particular, in std's [runtime service],
-the call to the user-provided `main` function is wrapped in `catch_unwind`.
+すべてのパニックは、プロセスを中止するか、`catch_unwind` の呼び出しによってキャッチされることに注意してください。特に、stdの[ランタイムサービス][runtime service]では、ユーザー提供の `main` 関数への呼び出しは `catch_unwind` でラップされています。
 
 
 [runtime service]: https://github.com/rust-lang/rust/blob/HEAD/library/std/src/rt.rs

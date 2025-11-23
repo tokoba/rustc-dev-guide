@@ -1,47 +1,32 @@
-# Rust for Linux integration tests
+# Rust for Linux 統合テスト
 
-[Rust for Linux](https://rust-for-linux.com/) (RfL) is an effort for adding
-support for the Rust programming language into the Linux kernel.
+[Rust for Linux](https://rust-for-linux.com/)（RfL）は、Linux カーネルに Rust プログラミング言語のサポートを追加する取り組みです。
 
-## What to do if the Rust for Linux job breaks?
+## Rust for Linux ジョブが壊れた場合にどうすべきか？
 
-If a PR breaks the Rust for Linux CI job, then:
+PR が Rust for Linux CI ジョブを壊した場合は：
 
-- If the breakage was unintentional and seems spurious, then let [RfL][rfl-ping]
-  know and retry.
-    - If the PR is urgent and retrying doesn't fix it, then disable the CI job
-      temporarily (comment out the `image: x86_64-rust-for-linux` job in
-      `src/ci/github-actions/jobs.yml`).
-- If the breakage was unintentional, then change the PR to resolve the breakage.
-- If the breakage was intentional, then let [RfL][rfl-ping] know and discuss
-  what will the kernel need to change.
-    - If the PR is urgent, then disable the CI job temporarily (comment out
-      the `image: x86_64-rust-for-linux` job in `src/ci/github-actions/jobs.yml`).
-    - If the PR can wait a few days, then wait for RfL maintainers to provide a
-      new Linux kernel commit hash with the needed changes done, and apply it to
-      the PR, which would confirm the changes work (update the  `LINUX_VERSION`
-      environment variable in `src/ci/docker/scripts/rfl-build.sh`).
+- 破損が意図的でなく、一時的なものであるように見える場合は、[RfL][rfl-ping] に知らせて再試行してください。
+    - PR が緊急で、再試行で修正されない場合は、CI ジョブを一時的に無効にしてください
+      （`src/ci/github-actions/jobs.yml` の `image: x86_64-rust-for-linux` ジョブをコメントアウト）。
+- 破損が意図的でない場合は、PR を変更して破損を解決してください。
+- 破損が意図的である場合は、[RfL][rfl-ping] に知らせて、カーネルで何を変更する必要があるかを議論してください。
+    - PR が緊急の場合は、CI ジョブを一時的に無効にしてください（`src/ci/github-actions/jobs.yml` の `image: x86_64-rust-for-linux` ジョブをコメントアウト）。
+    - PR が数日待てる場合は、RfL メンテナが必要な変更を行った新しい Linux カーネルコミットハッシュを提供するのを待ち、それを PR に適用します。これにより、変更が機能することを確認できます（`src/ci/docker/scripts/rfl-build.sh` の `LINUX_VERSION` 環境変数を更新）。
 
-If you need to contact the RfL developers, you can ping the [Rust for Linux][rfl-ping]
-ping group to ask for help:
+RfL 開発者に連絡する必要がある場合は、[Rust for Linux][rfl-ping] ピンググループにピングして助けを求めることができます：
 
 ```text
 @rustbot ping rfl
 ```
 
-## Building Rust for Linux in CI
+## CI での Rust for Linux のビルド
 
-Rust for Linux builds as part of the suite of bors tests that run before a pull
-request is merged.
+Rust for Linux は、プルリクエストがマージされる前に実行される bors テストのスイートの一部としてビルドされます。
 
-The workflow builds a stage1 sysroot of the Rust compiler, downloads the Linux
-kernel, and tries to compile several Rust for Linux drivers and examples using
-this sysroot. RfL uses several unstable compiler/language features, therefore
-this workflow notifies us if a given compiler change would break it.
+ワークフローは Rust コンパイラの stage1 sysroot をビルドし、Linux カーネルをダウンロードして、この sysroot を使用していくつかの Rust for Linux ドライバと例をコンパイルしようとします。RfL はいくつかの不安定なコンパイラ/言語機能を使用しているため、このワークフローは特定のコンパイラ変更がそれを壊すかどうかを通知します。
 
-If you are worried that a pull request might break the Rust for Linux builder
-and want to test it out before submitting it to the bors queue, simply ask
-bors to run the try job that builds the Rust for Linux integration:
-`@bors try jobs=x86_64-rust-for-linux`.
+プルリクエストが Rust for Linux ビルダーを壊す可能性があり、bors キューに送信する前にテストしたい場合は、単に bors に Rust for Linux 統合をビルドする try ジョブを実行するように依頼してください：
+`@bors try jobs=x86_64-rust-for-linux`。
 
 [rfl-ping]: ../../notification-groups/rust-for-linux.md

@@ -1,92 +1,55 @@
-# Constraint propagation
+# 制約伝播
 
-The main work of the region inference is **constraint propagation**,
-which is done in the [`propagate_constraints`] function.  There are
-three sorts of constraints that are used in NLL, and we'll explain how
-`propagate_constraints` works by "layering" those sorts of constraints
-on one at a time (each of them is fairly independent from the others):
+領域推論の主な作業は**制約伝播**で、これは [`propagate_constraints`] 関数で行われます。NLL で使用される制約には 3 種類あり、それらの制約を 1 つずつ「レイヤー化」することで、`propagate_constraints` の動作を説明します（それぞれは他のものからかなり独立しています）:
 
-- liveness constraints (`R live at E`), which arise from liveness;
-- outlives constraints (`R1: R2`), which arise from subtyping;
-- [member constraints][m_c] (`member R_m of [R_c...]`), which arise from impl Trait.
+- 生存性制約（`R live at E`）、生存性から生じます;
+- outlives 制約（`R1: R2`）、サブタイピングから生じます;
+- [メンバー制約][m_c]（`member R_m of [R_c...]`）、impl Trait から生じます。
 
 [`propagate_constraints`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#method.propagate_constraints
 [m_c]: ./member_constraints.md
 
-In this chapter, we'll explain the "heart" of constraint propagation,
-covering both liveness and outlives constraints.
+この章では、制約伝播の「核心」を説明し、生存性制約と outlives 制約の両方をカバーします。
 
-## Notation and high-level concepts
+## 記法と高レベルの概念
 
-Conceptually, region inference is a "fixed-point" computation. It is
-given some set of constraints `{C}` and it computes a set of values
-`Values: R -> {E}` that maps each region `R` to a set of elements
-`{E}` (see [here][riv] for more notes on region elements):
+概念的に、領域推論は「不動点」計算です。いくつかの制約セット `{C}` が与えられ、各領域 `R` を要素のセット `{E}` にマッピングする値のセット `Values: R -> {E}` を計算します（領域要素に関する詳細については [こちら][riv] を参照してください）:
 
-- Initially, each region is mapped to an empty set, so `Values(R) =
-  {}` for all regions `R`.
-- Next, we process the constraints repeatedly until a fixed-point is reached:
-  - For each constraint C:
-    - Update `Values` as needed to satisfy the constraint
+- 最初に、各領域は空の集合にマッピングされます。したがって、すべての領域 `R` について `Values(R) = {}` です。
+- 次に、不動点に達するまで制約を繰り返し処理します:
+  - 各制約 C について:
+    - 制約を満たすために必要に応じて `Values` を更新します
 
 [riv]: ../region_inference.md#region-variables
 
-As a simple example, if we have a liveness constraint `R live at E`,
-then we can apply `Values(R) = Values(R) union {E}` to make the
-constraint be satisfied. Similarly, if we have an outlives constraints
-`R1: R2`, we can apply `Values(R1) = Values(R1) union Values(R2)`.
-(Member constraints are more complex and we discuss them [in this section][m_c].)
+簡単な例として、生存性制約 `R live at E` がある場合、`Values(R) = Values(R) union {E}` を適用して制約を満たすことができます。同様に、outlives 制約 `R1: R2` がある場合、`Values(R1) = Values(R1) union Values(R2)` を適用できます。
+（メンバー制約はより複雑で、[このセクション][m_c] で説明します。）
 
-In practice, however, we are a bit more clever. Instead of applying
-the constraints in a loop, we can analyze the constraints and figure
-out the correct order to apply them, so that we only have to apply
-each constraint once in order to find the final result.
+しかし、実際には、もう少し賢いです。制約をループで適用する代わりに、制約を分析して適用する正しい順序を把握できるため、最終結果を見つけるために各制約を 1 回だけ適用すれば済みます。
 
-Similarly, in the implementation, the `Values` set is stored in the
-`scc_values` field, but they are indexed not by a *region* but by a
-*strongly connected component* (SCC). SCCs are an optimization that
-avoids a lot of redundant storage and computation.  They are explained
-in the section on outlives constraints.
+同様に、実装では、`Values` セットは `scc_values` フィールドに格納されますが、*領域*ではなく*強連結成分*（SCC）によってインデックス化されます。SCC は、冗長なストレージと計算を大幅に回避する最適化です。これらは outlives 制約のセクションで説明されます。
 
-## Liveness constraints
+## 生存性制約
 
-A **liveness constraint** arises when some variable whose type
-includes a region R is live at some [point] P. This simply means that
-the value of R must include the point P. Liveness constraints are
-computed by the MIR type checker.
+**生存性制約**は、型に領域 R が含まれる変数がある [point] P で生きているときに発生します。これは単に、R の値がポイント P を含む必要があることを意味します。生存性制約は MIR 型チェッカーによって計算されます。
 
 [point]: ../../appendix/glossary.md#point
 
-A liveness constraint `R live at E` is satisfied if `E` is a member of
-`Values(R)`. So to "apply" such a constraint to `Values`, we just have
-to compute `Values(R) = Values(R) union {E}`.
+生存性制約 `R live at E` は、`E` が `Values(R)` のメンバーである場合に満たされます。したがって、そのような制約を `Values` に「適用」するには、`Values(R) = Values(R) union {E}` を計算するだけです。
 
-The liveness values are computed in the type-check and passed to the
-region inference upon creation in the `liveness_constraints` argument.
-These are not represented as individual constraints like `R live at E`
-though; instead, we store a (sparse) bitset per region variable (of
-type [`LivenessValues`]). This way we only need a single bit for each
-liveness constraint.
+生存性の値は型チェックで計算され、作成時に `liveness_constraints` 引数で領域推論に渡されます。
+これらは `R live at E` のような個別の制約としては表現されていません; 代わりに、領域変数ごとに（[`LivenessValues`] 型の）（スパース）bitset を格納します。このようにして、各生存性制約に 1 ビットしか必要ありません。
 
 [`liveness_constraints`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#structfield.liveness_constraints
 [`LivenessValues`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/values/struct.LivenessValues.html
 
-One thing that is worth mentioning: All lifetime parameters are always
-considered to be live over the entire function body. This is because
-they correspond to some portion of the *caller's* execution, and that
-execution clearly includes the time spent in this function, since the
-caller is waiting for us to return.
+言及する価値があることの 1 つ: すべてのライフタイムパラメータは常に関数本体全体で生きていると見なされます。これは、それらが*呼び出し元の*実行の一部に対応するためで、その実行には明らかにこの関数で過ごす時間が含まれます。なぜなら、呼び出し元は私たちが返るのを待っているからです。
 
-## Outlives constraints
+## Outlives 制約
 
-An outlives constraint `'a: 'b` indicates that the value of `'a` must
-be a **superset** of the value of `'b`. That is, an outlives
-constraint `R1: R2` is satisfied if `Values(R1)` is a superset of
-`Values(R2)`. So to "apply" such a constraint to `Values`, we just
-have to compute `Values(R1) = Values(R1) union Values(R2)`.
+outlives 制約 `'a: 'b` は、`'a` の値が `'b` の値の**スーパーセット**でなければならないことを示します。つまり、outlives 制約 `R1: R2` は、`Values(R1)` が `Values(R2)` のスーパーセットである場合に満たされます。したがって、そのような制約を `Values` に「適用」するには、`Values(R1) = Values(R1) union Values(R2)` を計算するだけです。
 
-One observation that follows from this is that if you have `R1: R2`
-and `R2: R1`, then `R1 = R2` must be true. Similarly, if you have:
+これから次のことが観察されます: `R1: R2` と `R2: R1` がある場合、`R1 = R2` でなければなりません。同様に、次のようなものがある場合:
 
 ```txt
 R1: R2
@@ -95,29 +58,19 @@ R3: R4
 R4: R1
 ```
 
-then `R1 = R2 = R3 = R4` follows. We take advantage of this to make things
-much faster, as described shortly.
+すると、`R1 = R2 = R3 = R4` になります。これをすぐに説明するように、これを利用してものを大幅に高速化します。
 
-In the code, the set of outlives constraints is given to the region
-inference context on creation in a parameter of type
-[`OutlivesConstraintSet`]. The constraint set is basically just a list of `'a:
-'b` constraints.
+コードでは、outlives 制約のセットは、[`OutlivesConstraintSet`] 型のパラメータで作成時に領域推論コンテキストに与えられます。制約セットは基本的に `'a: 'b` 制約のリストです。
 
-### The outlives constraint graph and SCCs
+### outlives 制約グラフと SCC
 
-In order to work more efficiently with outlives constraints, they are
-[converted into the form of a graph][graph-fn], where the nodes of the
-graph are region variables (`'a`, `'b`) and each constraint `'a: 'b`
-induces an edge `'a -> 'b`. This conversion happens in the
-[`RegionInferenceContext::new`] function that creates the inference
-context.
+outlives 制約をより効率的に扱うために、それらは[グラフの形式に変換][graph-fn]されます。グラフのノードは領域変数（`'a`、`'b`）で、各制約 `'a: 'b` はエッジ `'a -> 'b` を誘導します。この変換は、推論コンテキストを作成する [`RegionInferenceContext::new`] 関数で行われます。
 
 [`OutlivesConstraintSet`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/constraints/struct.OutlivesConstraintSet.html
 [graph-fn]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/constraints/struct.OutlivesConstraintSet.html#method.graph
 [`RegionInferenceContext::new`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#method.new
 
-When using a graph representation, we can detect regions that must be equal
-by looking for cycles. That is, if you have a constraint like
+グラフ表現を使用すると、サイクルを探すことで等しくなければならない領域を検出できます。つまり、次のような制約がある場合:
 
 ```txt
 'a: 'b
@@ -126,32 +79,18 @@ by looking for cycles. That is, if you have a constraint like
 'd: 'a
 ```
 
-then this will correspond to a cycle in the graph containing the
-elements `'a...'d`.
+これは、要素 `'a...'d` を含むグラフ内のサイクルに対応します。
 
-Therefore, one of the first things that we do in propagating region
-values is to compute the **strongly connected components** (SCCs) in
-the constraint graph. The result is stored in the [`constraint_sccs`]
-field. You can then easily find the SCC that a region `r` is a part of
-by invoking `constraint_sccs.scc(r)`.
+したがって、領域の値を伝播する最初のことの 1 つは、制約グラフ内の**強連結成分**（SCC）を計算することです。結果は [`constraint_sccs`] フィールドに格納されます。その後、`constraint_sccs.scc(r)` を呼び出すことで、領域 `r` が属する SCC を簡単に見つけることができます。
 
-Working in terms of SCCs allows us to be more efficient: if we have a
-set of regions `'a...'d` that are part of a single SCC, we don't have
-to compute/store their values separately. We can just store one value
-**for the SCC**, since they must all be equal.
+SCC の観点から作業することで、より効率的になります: 単一の SCC の一部である領域のセット `'a...'d` がある場合、それらの値を別々に計算/格納する必要はありません。すべて等しくなければならないため、**SCC に対して** 1 つの値を格納するだけで済みます。
 
-If you look over the region inference code, you will see that a number
-of fields are defined in terms of SCCs. For example, the
-[`scc_values`] field stores the values of each SCC. To get the value
-of a specific region `'a` then, we first figure out the SCC that the
-region is a part of, and then find the value of that SCC.
+領域推論コードを見ると、多くのフィールドが SCC の観点から定義されていることがわかります。例えば、[`scc_values`] フィールドは各 SCC の値を格納します。特定の領域 `'a` の値を取得するには、最初に領域が属する SCC を把握し、次にその SCC の値を見つけます。
 
 [`constraint_sccs`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#structfield.constraint_sccs
 [`scc_values`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_borrowck/region_infer/struct.RegionInferenceContext.html#structfield.scc_values
 
-When we compute SCCs, we not only figure out which regions are a
-member of each SCC, we also figure out the edges between them. So for example
-consider this set of outlives constraints:
+SCC を計算するとき、どの領域が各 SCC のメンバーであるかを把握するだけでなく、それらの間のエッジも把握します。したがって、例えば、次の outlives 制約のセットを考えてみましょう:
 
 ```txt
 'a: 'b
@@ -163,20 +102,11 @@ consider this set of outlives constraints:
 'd: 'c
 ```
 
-Here we have two SCCs: S0 contains `'a` and `'b`, and S1 contains `'c`
-and `'d`.  But these SCCs are not independent: because `'a: 'c`, that
-means that `S0: S1` as well. That is -- the value of `S0` must be a
-superset of the value of `S1`. One crucial thing is that this graph of
-SCCs is always a DAG -- that is, it never has cycles. This is because
-all the cycles have been removed to form the SCCs themselves.
+ここには 2 つの SCC があります: S0 には `'a` と `'b` が含まれ、S1 には `'c` と `'d` が含まれます。しかし、これらの SCC は独立していません: `'a: 'c` であるため、`S0: S1` も同様です。つまり -- `S0` の値は `S1` の値のスーパーセットでなければなりません。重要なことの 1 つは、この SCC のグラフが常に DAG であることです -- つまり、サイクルを持つことはありません。これは、すべてのサイクルが SCC 自体を形成するために削除されたためです。
 
-### Applying liveness constraints to SCCs
+### SCC への生存性制約の適用
 
-The liveness constraints that come in from the type-checker are
-expressed in terms of regions -- that is, we have a map like
-`Liveness: R -> {E}`.  But we want our final result to be expressed
-in terms of SCCs -- we can integrate these liveness constraints very
-easily just by taking the union:
+型チェッカーから入ってくる生存性制約は領域の観点から表現されます -- つまり、`Liveness: R -> {E}` のようなマップがあります。しかし、最終結果を SCC の観点から表現したいです -- 和を取るだけで、これらの生存性制約を非常に簡単に統合できます:
 
 ```txt
 for each region R:
@@ -184,16 +114,11 @@ for each region R:
   Values(S) = Values(S) union Liveness(R)
 ```
 
-In the region inferencer, this step is done in [`RegionInferenceContext::new`].
+領域推論器では、このステップは [`RegionInferenceContext::new`] で行われます。
 
-### Applying outlives constraints
+### outlives 制約の適用
 
-Once we have computed the DAG of SCCs, we use that to structure out
-entire computation. If we have an edge `S1 -> S2` between two SCCs,
-that means that `Values(S1) >= Values(S2)` must hold. So, to compute
-the value of `S1`, we first compute the values of each successor `S2`.
-Then we simply union all of those values together. To use a
-quasi-iterator-like notation:
+SCC の DAG を計算したら、それを使用して計算全体を構造化します。2 つの SCC 間にエッジ `S1 -> S2` がある場合、`Values(S1) >= Values(S2)` が成立する必要があることを意味します。したがって、`S1` の値を計算するには、最初に各後継 `S2` の値を計算します。次に、それらの値をすべて結合します。準イテレータ風の記法を使用すると:
 
 ```txt
 Values(S1) =
@@ -202,21 +127,6 @@ Values(S1) =
     .union()
 ```
 
-In the code, this work starts in the [`propagate_constraints`]
-function, which iterates over all the SCCs. For each SCC `S1`, we
-compute its value by first computing the value of its
-successors. Since SCCs form a DAG, we don't have to be concerned about
-cycles, though we do need to keep a set around to track whether we
-have already processed a given SCC or not. For each successor `S2`, once
-we have computed `S2`'s value, we can union those elements into the
-value for `S1`. (Although we have to be careful in this process to
-properly handle [higher-ranked
-placeholders](./placeholders_and_universes.html). Note that the value
-for `S1` already contains the liveness constraints, since they were
-added in [`RegionInferenceContext::new`].
+コードでは、この作業は [`propagate_constraints`] 関数で開始され、すべての SCC を反復します。各 SCC `S1` について、最初にその後継の値を計算してその値を計算します。SCC は DAG を形成するため、サイクルについて心配する必要はありませんが、特定の SCC を既に処理したかどうかを追跡するためのセットを保持する必要があります。各後継 `S2` について、`S2` の値を計算したら、それらの要素を `S1` の値に結合できます。（ただし、このプロセスでは、[高ランクプレースホルダー](./placeholders_and_universes.html) を適切に処理するように注意する必要があります。`S1` の値には既に生存性制約が含まれていることに注意してください。それらは [`RegionInferenceContext::new`] で追加されたためです。
 
-Once that process is done, we now have the "minimal value" for `S1`,
-taking into account all of the liveness and outlives
-constraints. However, in order to complete the process, we must also
-consider [member constraints][m_c], which are described in [a later
-section][m_c].
+そのプロセスが完了すると、すべての生存性および outlives 制約を考慮した `S1` の「最小値」が得られます。ただし、プロセスを完了するには、[メンバー制約][m_c] も考慮する必要があります。これについては [後のセクション][m_c] で説明します。

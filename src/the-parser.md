@@ -1,75 +1,43 @@
-# Lexing and parsing
+# 字句解析と構文解析
 
-The very first thing the compiler does is take the program (in UTF-8 Unicode text)
-and turn it into a data format the compiler can work with more conveniently than strings.
-This happens in two stages: Lexing and Parsing.
+コンパイラが最初に行うことは、プログラム（UTF-8 Unicodeテキスト）を受け取り、文字列よりも便利なデータ形式に変換することです。これは2つの段階で行われます：字句解析と構文解析。
 
-  1. _Lexing_ takes strings and turns them into streams of [tokens]. For
-  example, `foo.bar + buz` would be turned into the tokens `foo`, `.`, `bar`,
-  `+`, and `buz`. This is implemented in [`rustc_lexer`][lexer].
+  1. _字句解析_は、文字列を[トークン]のストリームに変換します。たとえば、`foo.bar + buz`は、トークン`foo`、`.`、`bar`、`+`、および`buz`に変換されます。これは[`rustc_lexer`][lexer]で実装されています。
 
-[tokens]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast/token/index.html
+[トークン]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast/token/index.html
 [lexer]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_lexer/index.html
 
-  2. _Parsing_ takes streams of tokens and turns them into a structured form
-  which is easier for the compiler to work with, usually called an [*Abstract
-  Syntax Tree* (AST)][ast] . 
+  2. _構文解析_は、トークンのストリームを受け取り、コンパイラが作業しやすい構造化された形式に変換します。通常、[*抽象構文木*（AST）][ast]と呼ばれます。
 
-## The AST
+## AST
 
-The AST mirrors the structure of a Rust program in memory, using a `Span` to
-link a particular AST node back to its source text. The AST is defined in
-[`rustc_ast`][rustc_ast], along with some definitions for tokens and token
-streams, data structures/traits for mutating ASTs, and shared definitions for
-other AST-related parts of the compiler (like the lexer and
-macro-expansion).
+ASTはメモリ内でRustプログラムの構造をミラーリングし、`Span`を使用して特定のASTノードをそのソーステキストにリンクします。ASTは[`rustc_ast`][rustc_ast]で定義されており、トークンとトークンストリームの定義、ASTを変更するためのデータ構造/トレイト、およびコンパイラのAST関連の他の部分の共有定義（レキサーやマクロ展開など）が含まれています。
 
-Every node in the AST has its own [`NodeId`], including top-level items
-such as structs, but also individual statements and expressions. A [`NodeId`]
-is an identifier number that uniquely identifies an AST node within a crate.
+AST内のすべてのノードには、独自の[`NodeId`]があります。これには、構造体などのトップレベルアイテムだけでなく、個々の文や式も含まれます。[`NodeId`]は、クレート内でASTノードを一意に識別する識別番号です。
 
-However, because they are absolute within a crate, adding or removing a single
-node in the AST causes all the subsequent [`NodeId`]s to change. This renders
-[`NodeId`]s pretty much useless for incremental compilation, where you want as
-few things as possible to change.
+ただし、クレート内で絶対的であるため、AST内の単一のノードを追加または削除すると、すべての後続の[`NodeId`]が変更されます。これにより、[`NodeId`]はインクリメンタルコンパイルにはほとんど役に立たなくなります。インクリメンタルコンパイルでは、できるだけ少ないものを変更したいためです。
 
-[`NodeId`]s are used in all the `rustc` bits that operate directly on the AST,
-like macro expansion and name resolution (more on these over the next couple chapters).
+[`NodeId`]は、マクロ展開や名前解決など、ASTで直接動作する`rustc`のすべてのビットで使用されます（これらについては次のいくつかの章で詳しく説明します）。
 
 [`NodeId`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast/node_id/struct.NodeId.html
 
-## Parsing
+## 構文解析
 
-The parser is defined in [`rustc_parse`][rustc_parse], along with a
-high-level interface to the lexer and some validation routines that run after
-macro expansion. In particular, the [`rustc_parse::parser`][parser] contains
-the parser implementation.
+パーサーは、レキサーへの高レベルインターフェースとマクロ展開後に実行される検証ルーチンとともに、[`rustc_parse`][rustc_parse]で定義されています。特に、[`rustc_parse::parser`][parser]にはパーサーの実装が含まれています。
 
-The main entrypoint to the parser is via the various `parse_*` functions and others in
-[rustc_parse][rustc_parse]. They let you do things like turn a [`SourceFile`][sourcefile]
-(e.g. the source in a single file) into a token stream, create a parser from
-the token stream, and then execute the parser to get a [`Crate`] (the root AST
-node).
+パーサーへのメインエントリーポイントは、[rustc_parse][rustc_parse]内のさまざまな`parse_*`関数などです。これらを使用すると、[`SourceFile`][sourcefile]（たとえば、単一ファイルのソース）をトークンストリームに変換したり、トークンストリームからパーサーを作成したり、パーサーを実行して[`Crate`]（ルートASTノード）を取得したりすることができます。
 
-To minimize the amount of copying that is done,
-both [`Lexer`] and [`Parser`] have lifetimes which bind them to the parent [`ParseSess`].
-This contains all the information needed while parsing, as well as the [`SourceMap`] itself.
+コピー量を最小限に抑えるために、[`Lexer`]と[`Parser`]の両方には、親の[`ParseSess`]にバインドするライフタイムがあります。これには、解析中に必要なすべての情報と、[`SourceMap`]自体が含まれています。
 
-Note that while parsing, we may encounter macro definitions or invocations.
-We set these aside to be expanded (see [Macro Expansion](./macro-expansion.md)).
-Expansion itself may require parsing the output of a macro, which may reveal more macros to be expanded, and so on.
+解析中に、マクロ定義または呼び出しに遭遇する場合があることに注意してください。これらは展開のために取り置きます（[マクロ展開](./macro-expansion.md)を参照）。展開自体にはマクロの出力を解析する必要がある場合があり、さらに多くのマクロが明らかになる可能性があります。
 
-## More on lexical analysis
+## 字句解析の詳細
 
-Code for lexical analysis is split between two crates:
+字句解析のコードは2つのクレートに分かれています：
 
-- [`rustc_lexer`] crate is responsible for breaking a `&str` into chunks
-  constituting tokens. Although it is popular to implement lexers as generated
-  finite state machines, the lexer in [`rustc_lexer`] is hand-written.
+- [`rustc_lexer`]クレートは、トークンを構成するチャンクに`&str`を分割する責任があります。[`rustc_lexer`]内のレキサーは手書きですが、生成された有限状態機械としてレキサーを実装するのが一般的です。
 
-- [`Lexer`] integrates [`rustc_lexer`] with data structures specific to
-  `rustc`. Specifically, it adds `Span` information to tokens returned by
-  [`rustc_lexer`] and interns identifiers.
+- [`Lexer`]は、[`rustc_lexer`]を`rustc`固有のデータ構造と統合します。具体的には、[`rustc_lexer`]によって返されるトークンに`Span`情報を追加し、識別子をインターンします。
 
 [`Crate`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_ast/ast/struct.Crate.html
 [`Parser`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_parse/parser/struct.Parser.html

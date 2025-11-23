@@ -1,12 +1,12 @@
-# Debugging bootstrap
+# ブートストラップのデバッグ
 
-There are two main ways of debugging (and profiling bootstrap). The first is through println logging, and the second is through the `tracing` feature.
+ブートストラップをデバッグ（およびプロファイリング）する主な方法は2つあります。1つ目は println によるロギング、2つ目は `tracing` 機能です。
 
-## `println` logging
+## `println` によるロギング
 
-Bootstrap has extensive unstructured logging. Most of it is gated behind the `--verbose` flag (pass `-vv` for even more detail).
+ブートストラップには広範な非構造化ロギングがあります。そのほとんどは `--verbose` フラグの後ろにゲートされています（さらに詳細な情報を得るには `-vv` を渡してください）。
 
-If you want to see verbose output of executed Cargo commands and other kinds of detailed logs, pass `-v` or `-vv` when invoking bootstrap. Note that the logs are unstructured and may be overwhelming.
+実行された Cargo コマンドの詳細な出力や他の種類の詳細なログを確認したい場合は、ブートストラップを呼び出す際に `-v` または `-vv` を渡してください。ログは非構造化されており、圧倒される可能性があることに注意してください。
 
 ```
 $ ./x dist rustc --dry-run -vv
@@ -16,20 +16,20 @@ running: RUSTC_BOOTSTRAP="1" "/home/jyn/src/rust2/build/x86_64-unknown-linux-gnu
 ...
 ```
 
-## `tracing` in bootstrap
+## ブートストラップにおける `tracing`
 
-Bootstrap has a conditional `tracing` feature, which provides the following features:
-- It enables structured logging using [`tracing`][tracing] events and spans.
-- It generates a [Chrome trace file] that can be used to visualize the hierarchy and durations of executed steps and commands.
-  - You can open the generated `chrome-trace.json` file using Chrome, on the `chrome://tracing` tab, or e.g. using [Perfetto].
-- It generates [GraphViz] graphs that visualize the dependencies between executed steps.
-  - You can open the generated `step-graph-*.dot` file using e.g. [xdot] to visualize the step graph, or use e.g. `dot -Tsvg` to convert the GraphViz file to an SVG file.
-- It generates a command execution summary, which shows which commands were executed, how many of their executions were cached, and what commands were the slowest to run.
-  - The generated `command-stats.txt` file is in a simple human-readable format.
+ブートストラップには条件付きの `tracing` 機能があり、以下の機能を提供します：
+- [`tracing`][tracing] のイベントとスパンを使用した構造化ロギングを有効にします。
+- 実行されたステップとコマンドの階層と期間を視覚化するために使用できる [Chrome trace file] を生成します。
+  - 生成された `chrome-trace.json` ファイルは、Chrome の `chrome://tracing` タブで開くか、例えば [Perfetto] を使用して開くことができます。
+- 実行されたステップ間の依存関係を視覚化する [GraphViz] グラフを生成します。
+  - 生成された `step-graph-*.dot` ファイルは、例えば [xdot] を使用してステップグラフを視覚化するか、例えば `dot -Tsvg` を使用して GraphViz ファイルを SVG ファイルに変換できます。
+- コマンド実行サマリーを生成します。これは、どのコマンドが実行され、それらの実行のうちいくつがキャッシュされたか、どのコマンドが最も遅かったかを示します。
+  - 生成された `command-stats.txt` ファイルは、シンプルで人間が読みやすい形式です。
 
-The structured logs will be written to standard error output (`stderr`), while the other outputs will be stored in files in the `<build-dir>/bootstrap-trace/<pid>` directory. For convenience, bootstrap will also create a symlink to the latest generated trace output directory at `<build-dir>/bootstrap-trace/latest`.
+構造化ログは標準エラー出力（`stderr`）に書き込まれ、他の出力は `<build-dir>/bootstrap-trace/<pid>` ディレクトリのファイルに保存されます。便宜上、ブートストラップは最新の生成されたトレース出力ディレクトリへのシンボリックリンクを `<build-dir>/bootstrap-trace/latest` に作成します。
 
-> Note that if you execute bootstrap with `--dry-run`, the tracing output directory might change. Bootstrap will always print a path where the tracing output files were stored at the end of its execution.
+> `--dry-run` でブートストラップを実行すると、トレース出力ディレクトリが変更される可能性があることに注意してください。ブートストラップは、実行の最後に常にトレース出力ファイルが保存されたパスを出力します。
 
 [tracing]: https://docs.rs/tracing/0.1.41/tracing/index.html
 [Chrome trace file]: https://www.chromium.org/developers/how-tos/trace-event-profiling-tool/
@@ -37,9 +37,9 @@ The structured logs will be written to standard error output (`stderr`), while t
 [GraphViz]: https://graphviz.org/doc/info/lang.html
 [xdot]: https://github.com/jrfonseca/xdot.py
 
-### Enabling `tracing` output
+### `tracing` 出力の有効化
 
-To enable the conditional `tracing` feature, run bootstrap with the `BOOTSTRAP_TRACING` environment variable.
+条件付き `tracing` 機能を有効にするには、`BOOTSTRAP_TRACING` 環境変数を使用してブートストラップを実行します。
 
 [tracing_subscriber filter]: https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html
 
@@ -47,7 +47,7 @@ To enable the conditional `tracing` feature, run bootstrap with the `BOOTSTRAP_T
 $ BOOTSTRAP_TRACING=trace ./x build library --stage 1
 ```
 
-Example output[^unstable]:
+出力例[^unstable]：
 
 ```
 $ BOOTSTRAP_TRACING=trace ./x build library --stage 1 --dry-run
@@ -69,25 +69,25 @@ Tracing/profiling output has been written to <src-root>/build/bootstrap-trace/la
 Build completed successfully in 0:00:00
 ```
 
-[^unstable]: This output is always subject to further changes.
+[^unstable]: この出力は常にさらなる変更の対象となります。
 
-#### Controlling tracing output
+#### トレース出力の制御
 
-The environment variable `BOOTSTRAP_TRACING` accepts a [`tracing_subscriber` filter][tracing-env-filter]. If you set `BOOTSTRAP_TRACING=trace`, you will enable all logs, but that can be overwhelming. You can thus use the filter to reduce the amount of data logged.
+環境変数 `BOOTSTRAP_TRACING` は [`tracing_subscriber` フィルター][tracing-env-filter] を受け入れます。`BOOTSTRAP_TRACING=trace` を設定すると、すべてのログを有効にしますが、これは圧倒的かもしれません。そのため、フィルターを使用してログデータの量を減らすことができます。
 
-There are two orthogonal ways to control which kind of tracing logs you want:
+どの種類のトレースログが必要かを制御するには、直交する2つの方法があります：
 
-1. You can specify the log **level**, e.g. `debug` or `trace`.
-   - If you select a level, all events/spans with an equal or higher priority level will be shown.
-2. You can also control the log **target**, e.g. `bootstrap` or `bootstrap::core::config` or a custom target like `CONFIG_HANDLING` or `STEP`.
-    - Custom targets are used to limit what kinds of spans you are interested in, as the `BOOTSTRAP_TRACING=trace` output can be quite verbose. Currently, you can use the following custom targets:
-        - `CONFIG_HANDLING`: show spans related to config handling.
-        - `STEP`: show all executed steps. Executed commands have `info` event level.
-        - `COMMAND`: show all executed commands. Executed commands have `trace` event level.
-        - `IO`: show performed I/O operations. Executed commands have `trace` event level.
-            - Note that many I/O are currently not being traced.
+1. ログ **レベル** を指定できます（例：`debug` または `trace`）。
+   - レベルを選択すると、同等以上の優先度レベルを持つすべてのイベント/スパンが表示されます。
+2. ログ **ターゲット** も制御できます（例：`bootstrap` または `bootstrap::core::config` または `CONFIG_HANDLING` や `STEP` のようなカスタムターゲット）。
+    - カスタムターゲットは、関心のあるスパンの種類を制限するために使用されます。`BOOTSTRAP_TRACING=trace` 出力はかなり冗長になる可能性があるためです。現在、以下のカスタムターゲットを使用できます：
+        - `CONFIG_HANDLING`：設定処理に関連するスパンを表示します。
+        - `STEP`：実行されたすべてのステップを表示します。実行されたコマンドは `info` イベントレベルを持ちます。
+        - `COMMAND`：実行されたすべてのコマンドを表示します。実行されたコマンドは `trace` イベントレベルを持ちます。
+        - `IO`：実行された I/O 操作を表示します。実行されたコマンドは `trace` イベントレベルを持ちます。
+            - 多くの I/O は現在トレースされていないことに注意してください。
 
-You can of course combine them (custom target logs are typically gated behind `TRACE` log level additionally):
+もちろん、それらを組み合わせることもできます（カスタムターゲットログは通常、追加で `TRACE` ログレベルの後ろにゲートされています）：
 
 ```bash
 $ BOOTSTRAP_TRACING=CONFIG_HANDLING=trace,STEP=info,COMMAND=trace ./x build library --stage 1
@@ -95,19 +95,17 @@ $ BOOTSTRAP_TRACING=CONFIG_HANDLING=trace,STEP=info,COMMAND=trace ./x build libr
 
 [tracing-env-filter]: https://docs.rs/tracing-subscriber/0.3.19/tracing_subscriber/filter/struct.EnvFilter.html
 
-Note that the level that you specify using `BOOTSTRAP_TRACING` also has an effect on the spans that will be recorded in the Chrome trace file.
+`BOOTSTRAP_TRACING` を使用して指定するレベルは、Chrome トレースファイルに記録されるスパンにも影響することに注意してください。
 
-##### FIXME(#96176): specific tracing for `compiler()` vs `compiler_for()`
+##### FIXME(#96176): `compiler()` と `compiler_for()` の特定のトレース
 
-The additional targets `COMPILER` and `COMPILER_FOR` are used to help trace what
-`builder.compiler()` and `builder.compiler_for()` does. They should be removed
-if [#96176][cleanup-compiler-for] is resolved.
+追加のターゲット `COMPILER` と `COMPILER_FOR` は、`builder.compiler()` と `builder.compiler_for()` が何をするかをトレースするために使用されます。[#96176][cleanup-compiler-for] が解決された場合、これらは削除されるべきです。
 
 [cleanup-compiler-for]: https://github.com/rust-lang/rust/issues/96176
 
-### Using `tracing` in bootstrap
+### ブートストラップでの `tracing` の使用
 
-Both `tracing::*` macros and the `tracing::instrument` proc-macro attribute need to be gated behind `tracing` feature. Examples:
+`tracing::*` マクロと `tracing::instrument` proc-macro 属性の両方を `tracing` 機能の後ろにゲートする必要があります。例：
 
 ```rs
 #[cfg(feature = "tracing")]
@@ -129,16 +127,16 @@ impl Step for Foo {
         trace!(?run, "entered Foo::run");
 
         todo!()
-    }    
+    }
 }
 ```
 
-For `#[instrument]`, it's recommended to:
+`#[instrument]` については、以下を推奨します：
 
-- Gate it behind `trace` level for fine-granularity, possibly `debug` level for core functions.
-- Explicitly pick an instrumentation name via `name = ".."` to distinguish between e.g. `run` of different steps.
-- Take care to not cause diverging behavior via tracing, e.g. building extra things only when tracing infra is enabled.
+- 細かい粒度のために `trace` レベルの後ろにゲートし、コア関数については `debug` レベルにする可能性があります。
+- `name = ".."` 経由で明示的にインストルメンテーション名を選択し、異なるステップの `run` などを区別します。
+- トレースインフラが有効な場合にのみ、追加のものをビルドするなど、トレースによって異なる動作を引き起こさないように注意してください。
 
-### rust-analyzer integration?
+### rust-analyzer 統合？
 
-Unfortunately, because bootstrap is a `rust-analyzer.linkedProjects`, you can't ask r-a to check/build bootstrap itself with `tracing` feature enabled to get relevant completions, due to lack of support as described in <https://github.com/rust-lang/rust-analyzer/issues/8521>.
+残念ながら、ブートストラップは `rust-analyzer.linkedProjects` であるため、<https://github.com/rust-lang/rust-analyzer/issues/8521> で説明されているサポートの欠如により、r-a にブートストラップ自体を `tracing` 機能を有効にしてチェック/ビルドするように依頼することはできません。

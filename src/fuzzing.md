@@ -1,43 +1,30 @@
-# Fuzzing
+# ファジング
 
 <!-- date-check: Mar 2023 -->
 
-For the purposes of this guide, *fuzzing* is any testing methodology that
-involves compiling a wide variety of programs in an attempt to uncover bugs in
-rustc. Fuzzing is often used to find internal compiler errors (ICEs). Fuzzing
-can be beneficial, because it can find bugs before users run into them and
-provide small, self-contained programs that make the bug easier to track down.
-However, some common mistakes can reduce the helpfulness of fuzzing and end up
-making contributors' lives harder. To maximize your positive impact on the Rust
-project, please read this guide before reporting fuzzer-generated bugs!
+このガイドの目的において、*ファジング*とは、rustc のバグを発見する目的で、さまざまなプログラムをコンパイルするテスト手法のことです。ファジングは、内部コンパイラエラー（ICE）を見つけるためによく使用されます。ファジングは、ユーザーがバグに遭遇する前にバグを見つけ、バグを追跡しやすくする小さな自己完結型のプログラムを提供できるため、有益です。しかし、いくつかの一般的な間違いは、ファジングの有用性を低下させ、コントリビューターの生活を困難にする可能性があります。Rust プロジェクトに対する肯定的な影響を最大化するために、ファジングで生成されたバグを報告する前に、このガイドをお読みください！
 
-## Guidelines
+## ガイドライン
 
-### In a nutshell
+### 要約
 
-*Please do:*
+*お願い：*
 
-- Ensure the bug is still present on the latest nightly rustc
-- Include a reasonably minimal, standalone example along with any bug report
-- Include all of the information requested in the bug report template
-- Search for existing reports with the same message and query stack
-- Format the test case with `rustfmt`, if it maintains the bug
-- Indicate that the bug was found by fuzzing
+- バグが最新の nightly rustc でまだ存在することを確認する
+- バグレポートとともに、合理的に最小限の自己完結型の例を含める
+- バグレポートテンプレートで要求されたすべての情報を含める
+- 同じメッセージとクエリスタックを持つ既存のレポートを検索する
+- バグが維持される場合、`rustfmt` でテストケースをフォーマットする
+- バグがファジングによって見つかったことを示す
 
-*Please don't:*
+*お願いしないこと：*
 
-- Don't report lots of bugs that use internal features, including but not
-  limited to `custom_mir`, `lang_items`, `no_core`, and `rustc_attrs`.
-- Don't seed your fuzzer with inputs that are known to crash rustc (details
-  below).
+- `custom_mir`、`lang_items`、`no_core`、`rustc_attrs` を含む（ただし、これらに限定されない）内部機能を使用する多数のバグを報告しないでください。
+- rustc をクラッシュさせることが知られている入力でファジングをシードしないでください（詳細は以下）。
 
-### Discussion
+### 議論
 
-If you're not sure whether or not an ICE is a duplicate of one that's already
-been reported, please go ahead and report it and link to issues you think might
-be related. In general, ICEs on the same line but with different *query stacks*
-are usually distinct bugs. For example, [#109020][#109020] and [#109129][#109129]
-had similar error messages:
+ICE が既に報告されているものの重複であるかどうか確信が持てない場合は、関連すると思われる issue にリンクして報告してください。一般に、同じ行にあるが異なる*クエリスタック*を持つ ICE は、通常、異なるバグです。例えば、[#109020][#109020] と [#109129][#109129] は類似したエラーメッセージを持っていました：
 
 ```
 error: internal compiler error: compiler/rustc_middle/src/ty/normalize_erasing_regions.rs:195:90: Failed to normalize <[closure@src/main.rs:36:25: 36:28] as std::ops::FnOnce<(Emplacable<()>,)>>::Output, maybe try to call `try_normalize_erasing_regions` instead
@@ -45,7 +32,7 @@ error: internal compiler error: compiler/rustc_middle/src/ty/normalize_erasing_r
 ```
 error: internal compiler error: compiler/rustc_middle/src/ty/normalize_erasing_regions.rs:195:90: Failed to normalize <() as Project>::Assoc, maybe try to call `try_normalize_erasing_regions` instead
 ```
-but different query stacks:
+しかし、異なるクエリスタックを持っていました：
 ```
 query stack during panic:
 #0 [fn_abi_of_instance] computing call ABI of `<[closure@src/main.rs:36:25: 36:28] as core::ops::function::FnOnce<(Emplacable<()>,)>>::call_once - shim(vtable)`
@@ -61,99 +48,66 @@ end of query stack
 [#109020]: https://github.com/rust-lang/rust/issues/109020
 [#109129]: https://github.com/rust-lang/rust/issues/109129
 
-## Building a corpus
+## コーパスの構築
 
-When building a corpus, be sure to avoid collecting tests that are already
-known to crash rustc. A fuzzer that is seeded with such tests is more likely to
-generate bugs with the same root cause, wasting everyone's time. The simplest
-way to avoid this is to loop over each file in the corpus, see if it causes an
-ICE, and remove it if so.
+コーパスを構築するときは、rustc をクラッシュさせることが既に知られているテストの収集を避けてください。そのようなテストでシードされたファジングは、同じ根本原因を持つバグを生成する可能性が高く、全員の時間を無駄にします。これを避ける最も簡単な方法は、コーパス内の各ファイルをループし、ICE を引き起こすかどうかを確認し、そうである場合は削除することです。
 
-To build a corpus, you may want to use:
+コーパスを構築するには、以下を使用することをお勧めします：
 
-- The rustc/rust-analyzer/clippy test suites (or even source code) --- though avoid
-  tests that are already known to cause failures, which often begin with comments
-  like `//@ failure-status: 101` or `//@ known-bug: #NNN`.
-- The already-fixed ICEs in the archived [Glacier][glacier] repository --- though
-  avoid the unfixed ones in `ices/`!
+- rustc/rust-analyzer/clippy テストスイート（またはソースコード）--- ただし、既に失敗することが知られているテストは避けてください。これらは多くの場合、`//@ failure-status: 101` または `//@ known-bug: #NNN` のようなコメントで始まります。
+- アーカイブされた [Glacier][glacier] リポジトリの既に修正された ICE --- ただし、`ices/` にある未修正のものは避けてください！
 
 [glacier]: https://github.com/rust-lang/glacier
 
-## Extra credit
+## エクストラクレジット
 
-Here are a few things you can do to help the Rust project after filing an ICE.
+ICE を提出した後、Rust プロジェクトを支援するためにできることがいくつかあります。
 
-- [Bisect][bisect] the bug to figure out when it was introduced.
-  If you find the regressing PR / commit, you can mark the issue with the label
-  `S-has-bisection`. If not, consider applying `E-needs-bisection` instead.
-- Fix "distractions": problems with the test case that don't contribute to
-  triggering the ICE, such as syntax errors or borrow-checking errors
-- Minimize the test case (see below). If successful, you can label the
-  issue with `S-has-mcve`. Otherwise, you can apply `E-needs-mcve`.
-- Add the minimal test case to the rust-lang/rust repo as a [crash test].
-  While you're at it, consider including other "untracked" crashes in your PR.
-  Please don't forget to mark all relevant issues with `S-bug-has-test` once
-  your PR is merged.
+- バグを[二分探索][bisect]して、いつ導入されたかを把握します。回帰している PR/コミットを見つけた場合は、issue に `S-has-bisection` ラベルを付けることができます。見つからない場合は、代わりに `E-needs-bisection` を適用することを検討してください。
+- 「気を散らすもの」を修正する：構文エラーや借用チェックエラーなど、ICE のトリガーに寄与しないテストケースの問題
+- テストケースを最小化します（以下を参照）。成功した場合、issue に `S-has-mcve` ラベルを付けることができます。そうでない場合は、`E-needs-mcve` を適用できます。
+- 最小限のテストケースを[クラッシュテスト][crash test]として rust-lang/rust リポジトリに追加します。その際、PR に他の「追跡されていない」クラッシュを含めることを検討してください。PR がマージされたら、関連するすべての issue に `S-bug-has-test` を付けることを忘れないでください。
 
-See also [applying and removing labels][labeling].
+[ラベルの適用と削除][labeling]も参照してください。
 
 [bisect]: https://rust-lang.github.io/cargo-bisect-rustc/
 [crash test]: tests/compiletest.html#crash-tests
 [labeling]: https://forge.rust-lang.org/release/issue-triaging.html#applying-and-removing-labels
 
-## Minimization
+## 最小化
 
-It is helpful to carefully *minimize* the fuzzer-generated input. When
-minimizing, be careful to preserve the original error, and avoid introducing
-distracting problems such as syntax, type-checking, or borrow-checking errors.
+ファジングで生成された入力を注意深く*最小化*することは役立ちます。最小化するときは、元のエラーを保持するように注意し、構文、型チェック、借用チェックエラーなどの気を散らす問題を導入しないようにしてください。
 
-There are some tools that can help with minimization. If you're not sure how
-to avoid introducing syntax, type-, and borrow-checking errors while using
-these tools, post both the complete and minimized test cases. Generally,
-*syntax-aware* tools give the best results in the least amount of time.
-[`treereduce-rust`][treereduce] and [picireny][picireny] are syntax-aware.
-[`halfempty`][halfempty] is not, but is generally a high-quality tool.
+最小化を支援するツールがいくつかあります。これらのツールを使用する際に、構文、型、借用チェックエラーを導入しないようにする方法がわからない場合は、完全なテストケースと最小化されたテストケースの両方を投稿してください。一般的に、*構文を認識する*ツールは、最小限の時間で最良の結果を提供します。[`treereduce-rust`][treereduce] と [picireny][picireny] は構文を認識します。[`halfempty`][halfempty] はそうではありませんが、一般的に高品質なツールです。
 
 [halfempty]: https://github.com/googleprojectzero/halfempty
 [picireny]: https://github.com/renatahodovan/picireny
 [treereduce]: https://github.com/langston-barrett/treereduce
 
-## Effective fuzzing
+## 効果的なファジング
 
-When fuzzing rustc, you may want to avoid generating machine code, since this
-is mostly done by LLVM. Try `--emit=mir` instead.
+rustc をファジングするときは、機械語の生成を避けることをお勧めします。これは主に LLVM によって行われるためです。代わりに `--emit=mir` を試してください。
 
-A variety of compiler flags can uncover different issues. `-Zmir-opt-level=4`
-will turn on MIR optimization passes that are not run by default, potentially
-uncovering interesting bugs. `-Zvalidate-mir` can help uncover such bugs.
+さまざまなコンパイラフラグは、さまざまな問題を明らかにすることができます。`-Zmir-opt-level=4` は、デフォルトでは実行されない MIR 最適化パスをオンにし、興味深いバグを明らかにする可能性があります。`-Zvalidate-mir` は、そのようなバグを明らかにするのに役立ちます。
 
-If you're fuzzing a compiler you built, you may want to build it with `-C
-target-cpu=native` or even PGO/BOLT to squeeze out a few more executions per
-second. Of course, it's best to try multiple build configurations and see
-what actually results in superior throughput.
+自分でビルドしたコンパイラをファジングしている場合は、1秒あたりの実行回数を増やすために、`-C target-cpu=native` または PGO/BOLT でビルドすることをお勧めします。もちろん、複数のビルド構成を試して、実際にどれが優れたスループットをもたらすかを確認することが最善です。
 
-You may want to build rustc from source with debug assertions to find
-additional bugs, though this is a trade-off: it can slow down fuzzing by
-requiring extra work for every execution. To enable debug assertions, add this
-to `bootstrap.toml` when compiling rustc:
+追加のバグを見つけるために、デバッグアサーションを有効にして rustc をソースからビルドすることをお勧めしますが、これはトレードオフです：すべての実行に余分な作業が必要になるため、ファジングを遅くする可能性があります。デバッグアサーションを有効にするには、rustc をコンパイルするときに `bootstrap.toml` に以下を追加します：
 
 ```toml
 [rust]
 debug-assertions = true
 ```
 
-ICEs that require debug assertions to reproduce should be tagged 
-[`requires-debug-assertions`][requires-debug-assertions].
+再現にデバッグアサーションが必要な ICE は、[`requires-debug-assertions`][requires-debug-assertions] タグを付ける必要があります。
 
 [requires-debug-assertions]: https://github.com/rust-lang/rust/labels/requires-debug-assertions
 
-## Existing projects
+## 既存のプロジェクト
 
-- [fuzz-rustc][fuzz-rustc] demonstrates how to fuzz rustc with libfuzzer
-- [icemaker][icemaker] runs rustc and other tools on a large number of source
-  files with a variety of flags to catch ICEs
-- [tree-splicer][tree-splicer] generates new source files by combining existing
-  ones while maintaining correct syntax
+- [fuzz-rustc][fuzz-rustc] は、libfuzzer で rustc をファジングする方法を示しています
+- [icemaker][icemaker] は、ICE をキャッチするために、さまざまなフラグで多数のソースファイルに対して rustc や他のツールを実行します
+- [tree-splicer][tree-splicer] は、正しい構文を維持しながら既存のファイルを組み合わせることで、新しいソースファイルを生成します
 
 [fuzz-rustc]: https://github.com/dwrensha/fuzz-rustc
 [icemaker]: https://github.com/matthiaskrgr/icemaker/

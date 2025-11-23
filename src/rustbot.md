@@ -1,65 +1,39 @@
-# Mastering @rustbot
+# @rustbotをマスターする
 
-`@rustbot` (also known as `triagebot`) is a utility robot that is mostly used to
-allow any contributor to achieve certain tasks that would normally require GitHub
-membership to the `rust-lang` organization. Its most interesting features for
-contributors to `rustc` are issue claiming and relabeling.
+`@rustbot`（`triagebot`とも呼ばれます）は、通常であれば`rust-lang`組織のGitHubメンバーシップが必要な特定のタスクを、すべてのコントリビューターが実行できるようにするユーティリティロボットです。`rustc`へのコントリビューターにとって最も興味深い機能は、issueのクレームとラベルの再設定です。
 
-## Issue claiming
+## Issueのクレーム
 
-`@rustbot` exposes a command that allows anyone to assign an issue to themselves.
-If you see an issue you want to work on, you can send the following message as a
-comment on the issue at hand:
+`@rustbot`は、誰でもissueを自分に割り当てることができるコマンドを提供しています。作業したいissueを見つけたら、そのissueのコメントとして次のメッセージを送信できます：
 
     @rustbot claim
 
-This will tell `@rustbot` to assign the issue to you if it has no assignee yet.
-Note that because of some GitHub restrictions, you may be assigned indirectly,
-i.e. `@rustbot` will assign itself as a placeholder and edit the top comment to
-reflect the fact that the issue is now assigned to you.
+これにより、まだ割り当て先がない場合、`@rustbot`にそのissueをあなたに割り当てるように指示します。GitHubの制限により、間接的に割り当てられる場合があることに注意してください。つまり、`@rustbot`が代わりにプレースホルダーとして自身を割り当て、トップコメントを編集してissueがあなたに割り当てられたことを反映します。
 
-If you want to unassign from an issue, `@rustbot` has a different command:
+issueの割り当てを解除したい場合は、`@rustbot`に別のコマンドがあります：
 
     @rustbot release-assignment
 
-## Issue relabeling
+## Issueのラベル再設定
 
-Changing labels for an issue or PR is also normally reserved for members of the
-organization. However, `@rustbot` allows you to relabel an issue yourself, only
-with a few restrictions. This is mostly useful in two cases:
+issueやPRのラベルを変更することも、通常は組織のメンバーのみが行えます。しかし、`@rustbot`を使えば、いくつかの制限付きではありますが、自分でissueにラベルを付け直すことができます。これは主に2つの場合に役立ちます：
 
-**Helping with issue triage**: Rust's issue tracker has more than 5,000 open
-issues at the time of this writing, so labels are the most powerful tool that we
-have to keep it as tidy as possible. You don't need to spend hours in the issue tracker
-to triage issues, but if you open an issue, you should feel free to label it if
-you are comfortable with doing it yourself.
+**Issueトリアージの支援**：この記事を書いている時点で、Rustのissueトラッカーには5,000を超えるオープンなissueがあります。そのため、ラベルは可能な限り整理するための最も強力なツールです。issueトラッカーで何時間も過ごしてトリアージする必要はありませんが、issueを開く場合、自分でラベルを付けることに抵抗がなければ、自由にラベルを付けてください。
 
-**Updating the status of a PR**: We use "status labels" to reflect the status of
-PRs. For example, if your PR has merge conflicts, it will automatically be assigned
-the `S-waiting-on-author`, and reviewers might not review it until you rebase your
-PR. Once you do rebase your branch, you should change the labels yourself to remove
-the `S-waiting-on-author` label and add back `S-waiting-on-review`. In this case,
-the `@rustbot` command will look like this:
+**PRのステータスの更新**：私たちは「ステータスラベル」を使ってPRのステータスを反映させています。たとえば、PRにマージの競合がある場合、自動的に`S-waiting-on-author`が割り当てられ、レビュアーはあなたがPRをリベースするまでレビューしない可能性があります。ブランチをリベースしたら、自分でラベルを変更して`S-waiting-on-author`ラベルを削除し、`S-waiting-on-review`を追加する必要があります。この場合、`@rustbot`コマンドは次のようになります：
 
     @rustbot label -S-waiting-on-author +S-waiting-on-review
 
-The syntax for this command is pretty loose, so there are other variants of this
-command invocation. There are also some shortcuts to update labels,
-for instance `@rustbot ready` will do the same thing with above command.
-For more details, see [the docs page about labeling][labeling] and [shortcuts][shortcuts].
+このコマンドの構文はかなり緩いので、このコマンド呼び出しには他のバリエーションもあります。ラベルを更新するためのショートカットもあります。たとえば、`@rustbot ready`は上記のコマンドと同じことを行います。詳細については、[ラベリングに関するドキュメントページ][labeling]と[ショートカット][shortcuts]を参照してください。
 
 [labeling]: https://forge.rust-lang.org/triagebot/labeling.html
 [shortcuts]: https://forge.rust-lang.org/triagebot/shortcuts.html
 
-## Other commands
+## その他のコマンド
 
-If you are interested in seeing what `@rustbot` is capable of, check out its [documentation],
-which is meant as a reference for the bot and should be kept up to date every time the
-bot gets an upgrade.
+`@rustbot`の機能について興味がある場合は、その[ドキュメント]を確認してください。これはボットのリファレンスとして意図されており、ボットがアップグレードされるたびに最新の状態に保たれるべきです。
 
-`@rustbot` is maintained by the Release team. If you have any feedback regarding
-existing commands or suggestions for new commands, feel free to reach out
-[on Zulip][zulip] or file an issue in [the triagebot repository][repo]
+`@rustbot`はリリースチームによって保守されています。既存のコマンドに関するフィードバックや新しいコマンドの提案がある場合は、[Zulip][zulip]で気軽に連絡するか、[triagebot リポジトリ][repo]にissueを提出してください。
 
 [documentation]: https://forge.rust-lang.org/triagebot/index.html
 [zulip]: https://rust-lang.zulipchat.com/#narrow/stream/224082-t-release.2Ftriagebot

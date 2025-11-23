@@ -1,19 +1,12 @@
-# Walkthrough: a typical contribution
+# ウォークスルー：典型的なコントリビューション
 
-There are _a lot_ of ways to contribute to the Rust compiler, including fixing
-bugs, improving performance, helping design features, providing feedback on existing features, etc.
-This chapter does not claim to scratch the surface.
-Instead, it walks through the design and implementation of a new feature.
-Not all of the steps and processes described here are needed for every
-contribution, and I will try to point those out as they arise.
+Rustコンパイラにコントリビュートする方法は_たくさん_あります。バグ修正、パフォーマンス改善、機能の設計支援、既存機能へのフィードバック提供などがあります。この章はそれらの表面をなぞることすら主張しません。代わりに、新しい機能の設計と実装を順を追って説明します。ここで説明するすべてのステップとプロセスがすべてのコントリビューションに必要なわけではなく、それらが発生する際に指摘するように努めます。
 
-In general, if you are interested in making a contribution and aren't sure
-where to start, please feel free to ask!
+一般的に、コントリビューションに興味があり、どこから始めればよいかわからない場合は、遠慮なくお尋ねください！
 
-## Overview
+## 概要
 
-The feature I will discuss in this chapter is the `?` Kleene operator for macros.
-Basically, we want to be able to write something like this:
+この章で説明する機能は、マクロのための`?` Kleene演算子です。基本的に、次のようなものを書けるようにしたいと考えています：
 
 ```rust,ignore
 macro_rules! foo {
@@ -28,39 +21,21 @@ macro_rules! foo {
 
 fn main() {
     let x = 0;
-    foo!(x); // ok! prints "0"
-    foo!(x, x); // ok! prints "0 0"
+    foo!(x); // ok! "0"を出力
+    foo!(x, x); // ok! "0 0"を出力
 }
 ```
 
-So basically, the `$(pat)?` matcher in the macro means "this pattern can occur
-0 or 1 times", similar to other regex syntaxes.
+つまり、マクロの`$(pat)?`マッチャーは「このパターンは0回または1回出現できる」ことを意味し、他の正規表現構文と同様です。
 
-There were a number of steps to go from an idea to stable Rust feature.
-Here is a quick list.
-We will go through each of these in order below.
-As I mentioned before, not all of these are needed for every type of contribution.
+アイデアから安定したRust機能に至るまでには、いくつかのステップがありました。以下に簡単なリストを示します。これらのそれぞれについて、以下で順を追って説明します。前述のように、これらのすべてがすべてのタイプのコントリビューションに必要なわけではありません。
 
-- **Idea discussion/Pre-RFC**  A Pre-RFC is an early draft or design discussion
-  of a feature.
-  This stage is intended to flesh out the design space a bit and
-  get a grasp on the different merits and problems with an idea.
-  It's a great way to get early feedback on your idea before presenting it to the wider
-  audience.
-  You can find the original discussion [here][prerfc].
-- **RFC**  This is when you formally present your idea to the community for
-  consideration.
-  You can find the RFC [here][rfc].
-- **Implementation** Implement your idea unstably in the compiler. You can
-  find the original implementation [here][impl1].
-- **Possibly iterate/refine** As the community gets experience with your
-  feature on the nightly compiler and in `std`, there may be additional
-  feedback about design choice that might be adjusted.
-  This particular feature went [through][impl2] a [number][impl3] of [iterations][impl4].
-- **Stabilization** When your feature has baked enough, a Rust team member may
-  [propose to stabilize it][merge].
-  If there is consensus, this is done.
-- **Relax** Your feature is now a stable Rust feature!
+- **アイデアの議論/Pre-RFC** Pre-RFCは、機能の早期ドラフトまたは設計ディスカッションです。このステージは、設計空間を少し具体化し、アイデアのさまざまなメリットと問題を把握することを目的としています。より広い聴衆に提示する前に、アイデアに対する早期フィードバックを得る素晴らしい方法です。元のディスカッションは[こちら][prerfc]で見つけることができます。
+- **RFC** これは、あなたのアイデアをコミュニティに正式に提示して検討してもらうときです。RFCは[こちら][rfc]で見つけることができます。
+- **実装** コンパイラでアイデアを不安定に実装します。元の実装は[こちら][impl1]で見つけることができます。
+- **反復/洗練の可能性** コミュニティがnightlyコンパイラおよび`std`であなたの機能を体験するにつれて、調整される可能性のある設計選択に関する追加のフィードバックがあるかもしれません。この特定の機能は、多数の[反復][impl2]を[経て][impl3][進みました][impl4]。
+- **安定化** 機能が十分に熟成した場合、Rustチームのメンバーが[安定化を提案][merge]する可能性があります。コンセンサスがある場合、これが行われます。
+- **リラックス** これであなたの機能は安定したRust機能です！
 
 [prerfc]: https://internals.rust-lang.org/t/pre-rfc-at-most-one-repetition-macro-patterns/6557
 [rfc]: https://github.com/rust-lang/rfcs/pull/2298
@@ -70,220 +45,108 @@ As I mentioned before, not all of these are needed for every type of contributio
 [impl4]: https://github.com/rust-lang/rust/pull/51587
 [merge]: https://github.com/rust-lang/rust/issues/48075#issuecomment-433177613
 
-## Pre-RFC and RFC
+## Pre-RFCとRFC
 
-> NOTE: In general, if you are not proposing a _new_ feature or substantial
-> change to Rust or the ecosystem, you don't need to follow the RFC process.
-> Instead, you can just jump to [implementation](#impl).
+> 注意：一般的に、_新しい_機能やRustまたはエコシステムへの大きな変更を提案していない場合は、RFCプロセスに従う必要はありません。代わりに、[実装](#impl)にジャンプできます。
 >
-> You can find the official guidelines for when to open an RFC [here][rfcwhen].
+> RFCをいつ開くべきかの公式ガイドラインは[こちら][rfcwhen]で見つけることができます。
 
 [rfcwhen]: https://github.com/rust-lang/rfcs#when-you-need-to-follow-this-process
 
-An RFC is a document that describes the feature or change you are proposing in detail.
-Anyone can write an RFC;
-the process is the same for everyone, including Rust team members.
+RFCは、提案している機能または変更を詳細に説明するドキュメントです。誰でもRFCを書くことができます。プロセスはすべての人、Rustチームメンバーを含めて同じです。
 
-To open an RFC, open a PR on the [rust-lang/rfcs](https://github.com/rust-lang/rfcs) repo on GitHub.
-You can find detailed instructions in the
-[README](https://github.com/rust-lang/rfcs#what-the-process-is).
+RFCを開くには、GitHub上の[rust-lang/rfcs](https://github.com/rust-lang/rfcs)リポジトリに対してPRを開きます。詳細な手順は[README](https://github.com/rust-lang/rfcs#what-the-process-is)で見つけることができます。
 
-Before opening an RFC, you should do the research to "flesh out" your idea.
-Hastily-proposed RFCs tend not to be accepted.
-You should generally have a good description of the motivation, impact, disadvantages, and potential
-interactions with other features.
+RFCを開く前に、アイデアを「具体化」するための調査を行う必要があります。急いで提案されたRFCは受け入れられない傾向があります。動機、影響、デメリット、他の機能との潜在的な相互作用について、良い説明をしておく必要があります。
 
-If that sounds like a lot of work, it's because it is.
-But no fear!
-Even if you're not a compiler hacker, you can get great feedback by doing a _pre-RFC_.
-This is an _informal_ discussion of the idea.
-The best place to do this is internals.rust-lang.org.
-Your post doesn't have to follow any particular structure.
-It doesn't even need to be a cohesive idea.
-Generally, you will get tons of feedback that you can integrate back to produce a good RFC.
+それが多くの作業のように聞こえる場合、それは実際にそうだからです。しかし、心配しないでください！コンパイラハッカーでなくても、_pre-RFC_を行うことで素晴らしいフィードバックを得ることができます。これは、アイデアの_非公式な_ディスカッションです。これを行うのに最適な場所はinternals.rust-lang.orgです。投稿は特定の構造に従う必要はありません。まとまったアイデアである必要すらありません。一般的に、良いRFCを作成するために統合できる大量のフィードバックを得ることができます。
 
-(Another pro-tip: try searching the RFCs repo and internals for prior related ideas.
-A lot of times an idea has already been considered and was either
-rejected or postponed to be tried again later.
-This can save you and everybody else some time)
+（もう1つのプロのヒント：関連する過去のアイデアのためにRFCsリポジトリとinternalsを検索してみてください。アイデアがすでに検討されていて、拒否されたか、後で再試行するために延期されたことがよくあります。これにより、あなたと他のすべての人の時間を節約できます）
 
-In the case of our example, a participant in the pre-RFC thread pointed out a
-syntax ambiguity and a potential resolution.
-Also, the overall feedback seemed positive.
-In this case, the discussion converged pretty quickly, but for some
-ideas, a lot more discussion can happen (e.g. see [this RFC][nonascii] which
-received a whopping 684 comments!).
-If that happens, don't be discouraged;
-it means the community is interested in your idea, but it perhaps needs some
-adjustments.
+私たちの例の場合、pre-RFCスレッドの参加者が構文の曖昧性と潜在的な解決策を指摘しました。また、全体的なフィードバックは肯定的でした。このケースでは、ディスカッションはかなり迅速に収束しましたが、いくつかのアイデアについては、はるかに多くのディスカッションが発生する可能性があります（たとえば、684件のコメントを受け取った[このRFC][nonascii]を参照してください！）。それが起こった場合、落胆しないでください。それはコミュニティがあなたのアイデアに興味を持っていることを意味しますが、おそらくいくつかの調整が必要です。
 
 [nonascii]: https://github.com/rust-lang/rfcs/pull/2457
 
-The RFC for our `?` macro feature did receive some discussion on the RFC thread too.
-As with most RFCs, there were a few questions that we couldn't answer by
-discussion: we needed experience using the feature to decide.
-Such questions are listed in the "Unresolved Questions" section of the RFC.
-Also, over the course of the RFC discussion, you will probably want to update the RFC document
-itself to reflect the course of the discussion (e.g. new alternatives or prior
-work may be added or you may decide to change parts of the proposal itself).
+`?`マクロ機能のRFCも、RFCスレッドでいくつかのディスカッションを受けました。ほとんどのRFCと同様に、ディスカッションだけでは答えられないいくつかの質問がありました：機能を使用した経験が必要でした。そのような質問はRFCの「未解決の質問」セクションにリストされます。また、RFCディスカッションの過程で、RFC文書自体を更新してディスカッションの経過を反映したい場合があります（たとえば、新しい代替案や過去の作業が追加されたり、提案自体の一部を変更することを決定したりする場合があります）。
 
-In the end, when the discussion seems to reach a consensus and die down a bit,
-a Rust team member may propose to move to "final comment period" (FCP) with one
-of three possible dispositions.
-This means that they want the other members of
-the appropriate teams to review and comment on the RFC.
-More discussion may ensue, which may result in more changes or unresolved questions being added.
-At some point, when everyone is satisfied, the RFC enters the FCP, which is the
-last chance for people to bring up objections.
-When the FCP is over, the disposition is adopted.
-Here are the three possible dispositions:
+最終的に、ディスカッションがコンセンサスに達し、少し落ち着いたように見えたら、Rustチームのメンバーが3つの可能な処分のうちの1つで「最終コメント期間」（FCP）に移行することを提案する場合があります。これは、適切なチームの他のメンバーにRFCをレビューしてコメントしてもらいたいことを意味します。さらにディスカッションが続く可能性があり、それによりさらに多くの変更や未解決の質問が追加される可能性があります。ある時点で、全員が満足すると、RFCはFCPに入ります。これは、人々が異議を唱える最後のチャンスです。FCPが終了すると、処分が採用されます。以下は3つの可能な処分です：
 
-- _Merge_: accept the feature. Here is the proposal to merge for our [`?` macro
-  feature][rfcmerge].
-- _Close_: this feature in its current form is not a good fit for rust. Don't
-  be discouraged if this happens to your RFC, and don't take it personally.
-  This is not a reflection on you, but rather a community decision that rust
-  will go a different direction.
-- _Postpone_: there is interest in going this direction but not at the moment.
-  This happens most often because the appropriate Rust team doesn't have the
-  bandwidth to shepherd the feature through the process to stabilization.
-  Often this is the case when the feature doesn't fit into the team's roadmap.
-  Postponed ideas may be revisited later.
+- _マージ_：機能を受け入れます。これは、[`?`マクロ機能][rfcmerge]のマージ提案です。
+- _クローズ_：現在の形式でのこの機能はrustに適していません。これがあなたのRFCに起こっても落胆しないでください。個人的に受け取らないでください。これはあなたを反映したものではなく、rustが別の方向に進むというコミュニティの決定です。
+- _延期_：この方向に進むことには興味がありますが、今はその時ではありません。これは、適切なRustチームが安定化までのプロセスを通じて機能を導く帯域幅を持っていないために最も頻繁に発生します。多くの場合、これは機能がチームのロードマップに適合しない場合です。延期されたアイデアは後で再訪される可能性があります。
 
 [rfcmerge]: https://github.com/rust-lang/rfcs/pull/2298#issuecomment-360582667
 
-When an RFC is merged, the PR is merged into the RFCs repo.
-A new _tracking issue_ is created in the [rust-lang/rust] repo to track progress on the feature
-and discuss unresolved questions, implementation progress and blockers, etc.
-Here is the tracking issue on for our [`?` macro feature][tracking].
+RFCがマージされると、PRはRFCsリポジトリにマージされます。新しい_追跡issue_が[rust-lang/rust]リポジトリに作成され、機能の進捗を追跡し、未解決の質問、実装の進捗、ブロッカーなどについて議論します。これは、[`?`マクロ機能][tracking]の追跡issueです。
 
 [tracking]: https://github.com/rust-lang/rust/issues/48075
 
 <a id="impl"></a>
 
-## Implementation
+## 実装
 
-To make a change to the compiler, open a PR against the [rust-lang/rust] repo.
+コンパイラに変更を加えるには、[rust-lang/rust]リポジトリに対してPRを開きます。
 
 [rust-lang/rust]: https://github.com/rust-lang/rust
 
-Depending on the feature/change/bug fix/improvement, implementation may be
-relatively-straightforward or it may be a major undertaking.
-You can always ask for help or mentorship from more experienced compiler devs.
-Also, you don't have to be the one to implement your feature;
-but keep in mind that if you don't, it might be a while before someone else does.
+機能/変更/バグ修正/改善によっては、実装は比較的簡単な場合もあれば、大きな取り組みになる場合もあります。より経験豊富なコンパイラ開発者からのヘルプやメンターシップをいつでも依頼できます。また、あなたが機能を実装する必要はありません。しかし、あなたがそうしなければ、他の誰かがするまでしばらくかかるかもしれないことを覚えておいてください。
 
-For the `?` macro feature, I needed to go understand the relevant parts of
-macro expansion in the compiler.
-Personally, I find that [improving the
-comments][comments] in the code is a helpful way of making sure I understand
-it, but you don't have to do that if you don't want to.
+`?`マクロ機能については、コンパイラのマクロ展開の関連部分を理解する必要がありました。個人的には、[コード内のコメントを改善][comments]することが、それを理解したことを確認するのに役立つ方法であると思いますが、そうしたくない場合はそうする必要はありません。
 
 [comments]: https://github.com/rust-lang/rust/pull/47732
 
-I then [implemented][impl1] the original feature, as described in the RFC.
-When a new feature is implemented, it goes behind a _feature gate_, which means that
-you have to use `#![feature(my_feature_name)]` to use the feature.
-The feature gate is removed when the feature is stabilized.
+次に、RFCで説明されているとおりに元の機能を[実装][impl1]しました。新しい機能が実装されると、_機能ゲート_の後ろに置かれます。つまり、機能を使用するには`#![feature(my_feature_name)]`を使用する必要があります。機能ゲートは、機能が安定化されると削除されます。
 
-**Most bug fixes and improvements** don't require a feature gate. You can just
-make your changes/improvements.
+**ほとんどのバグ修正と改善**は機能ゲートを必要としません。変更/改善を行うだけです。
 
-When you open a PR on the [rust-lang/rust], a bot will assign your PR to a reviewer.
-If there is a particular Rust team member you are working with, you can
-request that reviewer by leaving a comment on the thread with `r?
-@reviewer-github-id` (e.g. `r? @eddyb`). If you don't know who to request,
-don't request anyone;
-the bot will assign someone automatically based on which files you changed.
+[rust-lang/rust]でPRを開くと、ボットがPRにレビュアーを割り当てます。特定のRustチームメンバーと一緒に作業している場合、スレッドに`r? @reviewer-github-id`のようなコメントを残すことでそのレビュアーをリクエストできます（たとえば、`r? @eddyb`）。誰にリクエストすればよいかわからない場合は、誰もリクエストしないでください。ボットは、変更したファイルに基づいて自動的に誰かを割り当てます。
 
-The reviewer may request changes before they approve your PR, they may mark the PR with label 
-"S-waiting-on-author" after leaving comments, this means that the PR is blocked on you to make 
-some requested changes.
-When you finished iterating on the changes, you can mark the PR as
-`S-waiting-on-review` again by leaving a comment with `@rustbot ready`, this will remove the 
-`S-waiting-on-author` label and add the `S-waiting-on-review` label.
+レビュアーは、PRを承認する前に変更をリクエストする場合があります。コメントを残した後、PRに「S-waiting-on-author」ラベルをマークする場合があります。これは、PRが要求された変更を行うためにあなたがブロックされていることを意味します。変更の反復が完了したら、`@rustbot ready`のコメントを残すことで、PRを再び`S-waiting-on-review`としてマークできます。これにより、`S-waiting-on-author`ラベルが削除され、`S-waiting-on-review`ラベルが追加されます。
 
-Feel free to ask questions or discuss things you don't understand or disagree with.
-However, recognize that the PR won't be merged unless someone on the Rust team approves
-it.
-If a reviewer leave a comment like `r=me after fixing ...`, that means they approve the PR and
-you can merge it with comment with `@bors r=reviewer-github-id`(e.g. `@bors r=eddyb`) to merge it 
-after fixing trivial issues.
-Note that `r=someone` requires permission and bors could say
-something like "🔑 Insufficient privileges..." when commenting `r=someone`.
-In that case, you have to ask the reviewer to revisit your PR.
+質問をしたり、理解できないことや同意できないことについて議論したりすることは自由です。ただし、Rustチームの誰かが承認しない限り、PRはマージされないことを認識してください。レビュアーが`r=me after fixing ...`のようなコメントを残した場合、それは彼らがPRを承認し、些細な問題を修正した後にマージできることを意味します。`@bors r=reviewer-github-id`（例：`@bors r=eddyb`）のコメントでマージできます。`r=someone`には許可が必要で、`r=someone`とコメントすると、borsが「🔑 Insufficient privileges...」のようなことを言う可能性があることに注意してください。その場合は、レビュアーにPRを再訪するように依頼する必要があります。
 
-When your reviewer approves the PR, it will go into a queue for yet another bot called `@bors`.
-`@bors` manages the CI build/merge queue.
-When your PR reaches the head of the `@bors` queue, `@bors` will test out the merge by running all
-tests against your PR on GitHub Actions.
-This takes a lot of time to finish.
-If all tests pass, the PR is merged and becomes part of the next nightly compiler!
+レビュアーがPRを承認すると、それは`@bors`という別のボットのキューに入ります。`@bors`はCI ビルド/マージキューを管理します。PRが`@bors`キューの先頭に達すると、`@bors`はGitHub Actions上でPRに対してすべてのテストを実行してマージをテストします。これは完了するのに多くの時間がかかります。すべてのテストが合格すると、PRはマージされ、次のnightlyコンパイラの一部になります！
 
-There are a couple of things that may happen for some PRs during the review process
+レビュープロセス中にいくつかのPRで発生する可能性のあることがいくつかあります
 
-- If the change is substantial enough, the reviewer may request an FCP on
-  the PR.
-  This gives all members of the appropriate team a chance to review the changes.
-- If the change may cause breakage, the reviewer may request a [crater] run.
-  This compiles the compiler with your changes and then attempts to compile all
-  crates on crates.io with your modified compiler.
-  This is a great smoke test
-  to check if you introduced a change to compiler behavior that affects a large
-  portion of the ecosystem.
-- If the diff of your PR is large or the reviewer is busy, your PR may have
-  some merge conflicts with other PRs that happen to get merged first.
-  You should fix these merge conflicts using the normal git procedures.
+- 変更が十分に実質的である場合、レビュアーはPR上でFCPをリクエストする場合があります。これにより、適切なチームのすべてのメンバーに変更をレビューする機会が与えられます。
+- 変更が破壊を引き起こす可能性がある場合、レビュアーは[crater]実行をリクエストする場合があります。これは、変更を加えたコンパイラをコンパイルし、次に変更されたコンパイラでcrates.io上のすべてのクレートをコンパイルしようとします。これは、エコシステムの大部分に影響を与えるコンパイラの動作への変更を導入したかどうかをチェックする素晴らしいスモークテストです。
+- PRのdiffが大きい場合、またはレビュアーが忙しい場合、PRは最初にマージされた他のPRとマージの競合がある可能性があります。通常のgit手順を使用してこれらのマージ競合を修正する必要があります。
 
 [crater]: ./tests/crater.html
 
-If you are not doing a new feature or something like that (e.g. if you are
-fixing a bug), then that's it!
-Thanks for your contribution :)
+新しい機能やそのようなものをしていない場合（たとえば、バグを修正している場合）、それで終わりです！コントリビューションありがとうございます :)
 
-## Refining your implementation
+## 実装の洗練
 
-As people get experience with your new feature on nightly, slight changes may
-be proposed and unresolved questions may become resolved.
-Updates/changes go through the same process for implementing any other changes, as described
-above (i.e. submit a PR, go through review, wait for `@bors`, etc).
+人々がnightlyで新しい機能を体験するにつれて、わずかな変更が提案され、未解決の質問が解決される可能性があります。更新/変更は、上記で説明したように、他の変更を実装するための同じプロセスを経ます（つまり、PRを提出し、レビューを経て、`@bors`を待つなど）。
 
-Some changes may be major enough to require an FCP and some review by Rust team members.
+一部の変更は、FCPとRustチームメンバーによるレビューが必要なほど大きい場合があります。
 
-For the `?` macro feature, we went through a few different iterations after the
-original implementation: [1][impl2], [2][impl3], [3][impl4].
+`?`マクロ機能については、元の実装の後、いくつかの異なる反復を経ました：[1][impl2]、[2][impl3]、[3][impl4]。
 
-Along the way, we decided that `?` should not take a separator, which was
-previously an unresolved question listed in the RFC.
-We also changed the disambiguation strategy: we decided to remove the ability to use `?` as a
-separator token for other repetition operators (e.g. `+` or `*`). However,
-since this was a breaking change, we decided to do it over an edition boundary.
-Thus, the new feature can be enabled only in edition 2018. These deviations
-from the original RFC required [another FCP](https://github.com/rust-lang/rust/issues/51934).
+その過程で、`?`はセパレータを取るべきではないと決定しました。これはRFCにリストされていた以前の未解決の質問でした。また、曖昧性解消戦略を変更しました：他の繰り返し演算子（たとえば、`+`または`*`）のセパレータトークンとして`?`を使用する機能を削除することにしました。ただし、これは破壊的変更であったため、エディション境界を越えて行うことにしました。したがって、新しい機能はエディション2018でのみ有効にできます。これらの元のRFCからの逸脱には、[別のFCP](https://github.com/rust-lang/rust/issues/51934)が必要でした。
 
-## Stabilization
+## 安定化
 
-Finally, after the feature had baked for a while on nightly, a language team member
-[moved to stabilize it][stabilizefcp].
+最後に、機能がnightlyで十分に熟成した後、言語チームのメンバーが[安定化を移行][stabilizefcp]しました。
 
 [stabilizefcp]: https://github.com/rust-lang/rust/issues/48075#issuecomment-433177613
 
-A _stabilization report_ needs to be written that includes
+_安定化レポート_を書く必要があります。これには次が含まれます
 
-- brief description of the behavior and any deviations from the RFC
-- which edition(s) are affected and how
-- links to a few tests to show the interesting aspects
+- 動作の簡単な説明とRFCからの逸脱
+- 影響を受けるエディションと方法
+- 興味深い側面を示すためのいくつかのテストへのリンク
 
-The stabilization report for our feature is [here][stabrep].
+私たちの機能の安定化レポートは[こちら][stabrep]です。
 
 [stabrep]: https://github.com/rust-lang/rust/issues/48075#issuecomment-433243048
 
-After this, [a PR is made][stab] to remove the feature gate, enabling the feature by
-default (on the 2018 edition).
-A note is added to the [Release notes][relnotes] about the feature.
+この後、機能ゲートを削除してデフォルトで機能を有効にする（2018エディションで）ために[PRが作成されます][stab]。機能に関するメモが[リリースノート][relnotes]に追加されます。
 
 [stab]: https://github.com/rust-lang/rust/pull/56245
 
-Steps to stabilize the feature can be found at [Stabilizing Features](./stabilization_guide.md).
+機能を安定化する手順は、[機能の安定化](./stabilization_guide.md)で見つけることができます。
 
 [relnotes]: https://github.com/rust-lang/rust/blob/HEAD/RELEASES.md

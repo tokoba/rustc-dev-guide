@@ -1,31 +1,22 @@
-# AST validation
+# AST 検証
 
-_AST validation_ is a separate AST pass that visits each
-item in the tree and performs simple checks. This pass
-doesn't perform any complex analysis, type checking or
-name resolution.
+_AST 検証_は、ツリー内の各アイテムを訪問し、簡単なチェックを実行する別個の AST パスです。このパスは、複雑な解析、型チェック、名前解決を実行しません。
 
-Before performing any validation, the compiler first expands
-the macros. Then this pass performs validations to check
-that each AST item is in the correct state. And when this pass
-is done, the compiler runs the crate resolution pass.
+検証を実行する前に、コンパイラはまずマクロを展開します。次に、このパスは各 AST アイテムが正しい状態にあることを確認するための検証を実行します。そして、このパスが完了すると、コンパイラはクレート解決パスを実行します。
 
-## Validations
+## 検証
 
-Validations are defined in `AstValidator` type, which 
-itself is located in `rustc_ast_passes` crate. This
-type implements various simple checks which emit errors
-when certain language rules are broken.
+検証は `AstValidator` 型で定義されており、
+これ自体は `rustc_ast_passes` クレートに配置されています。この
+型は、特定の言語ルールが破られたときにエラーを出力する様々な簡単なチェックを実装しています。
 
-In addition, `AstValidator` implements `Visitor` trait
-that defines how to visit AST items (which can be functions,
-traits, enums, etc).
+さらに、`AstValidator` は `Visitor` トレイトを実装しており、
+これは AST アイテム（関数、トレイト、列挙型など）を訪問する方法を定義します。
 
-For each item, visitor performs specific checks. For
-example, when visiting a function declaration,
-`AstValidator` checks that the function has:
+各アイテムに対して、ビジターは特定のチェックを実行します。たとえば、
+関数宣言を訪問する際、`AstValidator` は関数が以下を持つことをチェックします：
 
-* no more than `u16::MAX` parameters;
-* c-variadic argument goes the last in the declaration;
-* documentation comments aren't applied to function parameters;
-* and other validations.
+* `u16::MAX` 以下のパラメータ；
+* c-variadic 引数が宣言の最後に来る；
+* ドキュメントコメントが関数パラメータに適用されていない；
+* その他の検証。

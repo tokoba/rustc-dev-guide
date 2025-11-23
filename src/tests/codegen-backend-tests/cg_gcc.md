@@ -1,16 +1,14 @@
-# GCC codegen backend
+# GCC コード生成バックエンド
 
-We run a subset of the compiler test suite with the GCC codegen backend on our CI, to help find changes that could break the integration of this backend with the compiler.
+コンパイラテストスイートのサブセットを GCC コード生成バックエンドで CI 上で実行し、このバックエンドとコンパイラの統合を壊す可能性のある変更を見つけるのに役立てています。
 
-If you encounter any bugs or problems with the GCC codegen backend in general, don't hesitate to open issues on the
-[`rustc_codegen_gcc` repository](https://github.com/rust-lang/rustc_codegen_gcc).
+GCC コード生成バックエンドに関する一般的なバグや問題に遭遇した場合は、遠慮なく [`rustc_codegen_gcc` リポジトリ](https://github.com/rust-lang/rustc_codegen_gcc) に issue を開いてください。
 
-Note that the backend currently only supports the `x86_64-unknown-linux-gnu` target.
+現在、バックエンドは `x86_64-unknown-linux-gnu` ターゲットのみをサポートしていることに注意してください。
 
-## Running into GCC backend CI errors
+## GCC バックエンド CI エラーに遭遇した場合
 
-If you ran into an error related to tests executed with the GCC codegen backend on CI in the `x86_64-gnu-gcc` job,
-you can use the following command to run UI tests locally using the GCC backend, which reproduces what happens on CI:
+CI の `x86_64-gnu-gcc` ジョブで GCC コード生成バックエンドで実行されたテストに関連するエラーに遭遇した場合、次のコマンドを使用して GCC バックエンドを使用して UI テストをローカルで実行できます。これは CI で起こることを再現します：
 
 ```bash
 ./x test tests/ui \
@@ -19,72 +17,67 @@ you can use the following command to run UI tests locally using the GCC backend,
   --test-codegen-backend gcc
 ```
 
-If a different test suite has failed on CI, you will have to modify the `tests/ui` part.
+別のテストスイートが CI で失敗した場合は、`tests/ui` の部分を変更する必要があります。
 
-To reproduce the whole CI job locally, you can run `cargo run --manifest-path src/ci/citool/Cargo.toml run-local x86_64-gnu-gcc`.
-See [Testing with Docker](../docker.md) for more information.
+CI ジョブ全体をローカルで再現するには、`cargo run --manifest-path src/ci/citool/Cargo.toml run-local x86_64-gnu-gcc` を実行できます。
+詳細については、[Docker を使用したテスト](../docker.md) を参照してください。
 
-### What to do in case of a GCC job failure?
+### GCC ジョブが失敗した場合にどうすべきか？
 
-If the GCC job test fails and it seems like the failure could be caused by the GCC backend, you can ping the [cg-gcc working group](https://github.com/orgs/rust-lang/teams/wg-gcc-backend) using `@rust-lang/wg-gcc-backend`
+GCC ジョブテストが失敗し、その失敗が GCC バックエンドによって引き起こされた可能性があるように見える場合は、`@rust-lang/wg-gcc-backend` を使用して [cg-gcc ワーキンググループ](https://github.com/orgs/rust-lang/teams/wg-gcc-backend) にピングできます。
 
-If fixing a compiler test that fails with the GCC backend is non-trivial, you can ignore that test when executed with `cg_gcc` using the `//@ ignore-backends: gcc` [compiletest directive](../directives.md).
+GCC バックエンドで実行時に失敗するコンパイラテストの修正が自明でない場合は、`//@ ignore-backends: gcc` [compiletest ディレクティブ](../directives.md) を使用して `cg_gcc` で実行されるときにそのテストを無視できます。
 
-## Choosing which codegen backends are built
+## どのコード生成バックエンドがビルドされるかを選択
 
-The `rust.codegen-backends = [...]` bootstrap option affects which codegen backends will be built and
-included in the sysroot of the produced `rustc`.
-To use the GCC codegen backend, `"gcc"` has to be included in this array in `bootstrap.toml`:
+`rust.codegen-backends = [...]` bootstrap オプションは、どのコード生成バックエンドがビルドされ、
+生成される `rustc` の sysroot に含まれるかに影響します。
+GCC コード生成バックエンドを使用するには、`bootstrap.toml` でこの配列に `"gcc"` を含める必要があります：
 
 ```toml
 rust.codegen-backends = ["llvm", "gcc"]
 ```
 
-If you don't want to change your `bootstrap.toml` file, you can alternatively run your `x`
-commands with `--set 'rust.codegen-backends=["llvm", "gcc"]'`.
-For example:
+`bootstrap.toml` ファイルを変更したくない場合は、代わりに `--set 'rust.codegen-backends=["llvm", "gcc"]'` を指定して `x` コマンドを実行できます。
+例：
 
 ```bash
 ./x build --set 'rust.codegen-backends=["llvm", "gcc"]'
 ```
 
-The first backend in the `codegen-backends` array will determine which backend will be used as the
-*default backend* of the built `rustc`.
-This also determines which backend will be used to compile the
-stage 1 standard library (or anything built in stage 2+).
-To produce `rustc` that uses the GCC backend
-by default, you can thus put `"gcc"` as the first element of this array:
+`codegen-backends` 配列の最初のバックエンドが、ビルドされた `rustc` の*デフォルトバックエンド*として使用されるバックエンドを決定します。
+これはまた、stage 1 標準ライブラリ（または stage 2 以降でビルドされるもの）のコンパイルに使用されるバックエンドも決定します。
+デフォルトで GCC バックエンドを使用する `rustc` を生成するには、
+この配列の最初の要素として `"gcc"` を配置できます：
 
 ```bash
 ./x build --set 'rust.codegen-backends=["gcc"]' library
 ```
 
-## Choosing the codegen backend used in tests
+## テストで使用されるコード生成バックエンドを選択
 
-To run compiler tests with the GCC codegen backend being used to build the test Rust programs, you can use the
-`--test-codegen-backend` flag:
+GCC コード生成バックエンドを使用してテスト Rust プログラムをビルドするコンパイラテストを実行するには、`--test-codegen-backend` フラグを使用できます：
 
 ```bash
 ./x test tests/ui --test-codegen-backend gcc
 ```
 
-Note that in order for this to work, the tested compiler must have the GCC codegen backend [available](#choosing-which-codegen-backends-are-built) in its sysroot directory.
+これが機能するためには、テスト対象のコンパイラの sysroot ディレクトリに GCC コード生成バックエンドが[利用可能](#choosing-which-codegen-backends-are-built)である必要があることに注意してください。
 
-## Downloading GCC from CI
+## CI から GCC をダウンロード
 
-The `gcc.download-ci-gcc` bootstrap option controls if GCC (which is a dependency of the GCC codegen backend)
-will be downloaded from CI or built locally.
-The default value is `true`, which will download GCC from CI
-if there are no local changes to the GCC sources and the given host target is available on CI.
+`gcc.download-ci-gcc` bootstrap オプションは、GCC（GCC コード生成バックエンドの依存関係）を
+CI からダウンロードするか、ローカルでビルドするかを制御します。
+デフォルト値は `true` で、GCC ソースにローカルな変更がなく、指定されたホストターゲットが CI で利用可能な場合は、GCC を CI からダウンロードします。
 
-## Running tests of the backend itself
+## バックエンド自体のテストを実行
 
-In addition to running the compiler's test suites using the GCC codegen backend, you can also run the test suite of the backend itself.
+コンパイラのテストスイートを GCC コード生成バックエンドを使用して実行するだけでなく、バックエンド自体のテストスイートを実行することもできます。
 
-Now you do that using the following command:
+次のコマンドを使用してそれを行います：
 
 ```text
 ./x test rustc_codegen_gcc
 ```
 
-The backend needs to be [enabled](#choosing-which-codegen-backends-are-built) for this to work.
+これが機能するためには、バックエンドを[有効](#choosing-which-codegen-backends-are-built)にする必要があります。

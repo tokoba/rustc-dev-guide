@@ -1,33 +1,31 @@
-# About this guide
+# このガイドについて
 
-This guide is meant to help document how rustc – the Rust compiler – works,
-as well as to help new contributors get involved in rustc development.
+このガイドは、rustc（Rust コンパイラ）がどのように動作するかを文書化し、
+rustc の開発に関わる新しい貢献者を支援することを目的としています。
 
-There are several parts to this guide:
+このガイドにはいくつかのパートがあります：
 
-1. [Building and debugging `rustc`][p1]:
-   Contains information that should be useful no matter how you are contributing,
-   about building, debugging, profiling, etc.
-1. [Contributing to Rust][p2]:
-   Contains information that should be useful no matter how you are contributing,
-   about procedures for contribution, using git and Github, stabilizing features, etc.
-1. [Bootstrapping][p3]:
-   Describes how the Rust compiler builds itself using previous versions, including
-   an introduction to the bootstrap process and debugging methods.
-1. [High-level Compiler Architecture][p4]:
-   Discusses the high-level architecture of the compiler and stages of the compile process.
-1. [Source Code Representation][p5]:
-   Describes the process of taking raw source code from the user
-   and transforming it into various forms that the compiler can work with easily.
-1. [Supporting Infrastructure][p6]:
-   Covers command-line argument conventions, compiler entry points like rustc_driver and
-   rustc_interface, and the design and implementation of errors and lints.
-1. [Analysis][p7]:
-   Discusses the analyses that the compiler uses to check various properties of the code
-   and inform later stages of the compile process (e.g., type checking).
-1. [MIR to Binaries][p8]: How linked executable machine code is generated.
-1. [Appendices][p9] at the end with useful reference information.
-   There are a few of these with different information, including a glossary.
+1. [Building and debugging `rustc`][p1]：
+   ビルド、デバッグ、プロファイリングなど、どのような形で貢献する場合でも役立つ情報が含まれています。
+1. [Contributing to Rust][p2]：
+   貢献の手順、git と Github の使用、機能の安定化など、どのような形で貢献する場合でも役立つ情報が含まれています。
+1. [Bootstrapping][p3]：
+   Rust コンパイラが以前のバージョンを使用して自身をビルドする方法について説明し、
+   ブートストラッププロセスとデバッグ方法の紹介が含まれています。
+1. [High-level Compiler Architecture][p4]：
+   コンパイラの高レベルアーキテクチャとコンパイルプロセスの段階について説明します。
+1. [Source Code Representation][p5]：
+   ユーザーからの生のソースコードを取得し、
+   コンパイラが簡単に扱える様々な形式に変換するプロセスについて説明します。
+1. [Supporting Infrastructure][p6]：
+   コマンドライン引数の規約、rustc_driver や rustc_interface などのコンパイラのエントリポイント、
+   エラーと lint の設計と実装について説明します。
+1. [Analysis][p7]：
+   コンパイラがコードの様々な特性をチェックし、
+   コンパイルプロセスの後続段階に情報を提供するために使用する解析について説明します（例：型チェック）。
+1. [MIR to Binaries][p8]：リンクされた実行可能な機械語コードがどのように生成されるか。
+1. 最後に、有用な参照情報を含む[Appendices][p9]があります。
+   用語集を含むいくつかの異なる情報があります。
 
 [p1]: ./building/how-to-build-and-run.html
 [p2]: ./contributing.md
@@ -39,58 +37,57 @@ There are several parts to this guide:
 [p8]: ./part-5-intro.md
 [p9]: ./appendix/background.md
 
-### Constant change
+### 絶え間ない変化
 
-Keep in mind that `rustc` is a real production-quality product,
-being worked upon continuously by a sizeable set of contributors.
-As such, it has its fair share of codebase churn and technical debt.
-In addition, many of the ideas discussed throughout this guide are idealized designs
-that are not fully realized yet.
-All this makes keeping this guide completely up to date on everything very hard!
+`rustc` は実際の製品品質のプロダクトであり、
+かなりの数の貢献者によって継続的に作業されていることを心に留めておいてください。
+そのため、コードベースの変更や技術的負債はかなりあります。
+さらに、このガイド全体で議論されているアイデアの多くは、
+まだ完全には実現されていない理想的な設計です。
+これらすべてにより、このガイドをすべてにおいて完全に最新の状態に保つことは非常に困難です！
 
-The guide itself is of course open source as well,
-and the sources are hosted on [a GitHub repository].
-If you find any mistakes in the guide, please file an issue.
-Even better, open a PR with a correction!
+ガイド自体ももちろんオープンソースであり、
+ソースは [a GitHub repository] でホストされています。
+ガイドに間違いを見つけた場合は、issue を報告してください。
+さらに良いのは、修正の PR を開くことです！
 
-If you do contribute to the guide,
-please see the corresponding [subsection on writing documentation in this guide].
+ガイドに貢献する場合は、
+[このガイドのドキュメント作成に関する対応するサブセクション][subsection on writing documentation in this guide]をご覧ください。
 
 [subsection on writing documentation in this guide]: contributing.md#contributing-to-rustc-dev-guide
 
-> “‘All conditioned things are impermanent’ — 
-> when one sees this with wisdom, one turns away from suffering.”
-> _The Dhammapada, verse 277_
+> 「諸行無常なり——
+> これを智慧をもって見るとき、苦しみから離れる。」
+> _ダンマパダ、第 277 節_
 
-## Other places to find information
+## その他の情報源
 
-You might also find the following sites useful:
+以下のサイトも役に立つかもしれません：
 
-- This guide contains information about how various parts of the
-  compiler work and how to contribute to the compiler.
-- [rustc API docs] -- rustdoc documentation for the compiler, devtools, and internal tools
-- [Forge] -- contains documentation about Rust infrastructure, team procedures, and more
-- [compiler-team] -- the home-base for the Rust compiler team, with description
-  of the team procedures, active working groups, and the team calendar.
-- [std-dev-guide] -- a similar guide for developing the standard library.
+- このガイドには、コンパイラの様々な部分がどのように動作するか、
+  またコンパイラに貢献する方法についての情報が含まれています。
+- [rustc API docs] -- コンパイラ、開発ツール、内部ツールの rustdoc ドキュメント
+- [Forge] -- Rust のインフラストラクチャ、チームの手順などに関するドキュメントが含まれています
+- [compiler-team] -- Rust コンパイラチームのホームベースで、チームの手順、
+  アクティブなワーキンググループ、チームのカレンダーについての説明があります。
+- [std-dev-guide] -- 標準ライブラリの開発に関する同様のガイド。
 - [The t-compiler Zulip][z]
-- The [Rust Internals forum][rif], a place to ask questions and
-  discuss Rust's internals
-- The [Rust reference][rr], even though it doesn't specifically talk about
-  Rust's internals, is a great resource nonetheless
-- Although out of date, [Tom Lee's great blog article][tlgba] is very helpful
-- The [Rust Compiler Testing Docs][rctd]
-- For [@bors], [this cheat sheet][cheatsheet] is helpful
-- Google is always helpful when programming.
-  You can [search all Rust documentation][gsearchdocs] (the standard library,
-  the compiler, the books, the references, and the guides) to quickly find
-  information about the language and compiler.
-- You can also use Rustdoc's built-in search feature to find documentation on
-  types and functions within the crates you're looking at. You can also search
-  by type signature! For example, searching for `* -> vec` should find all
-  functions that return a `Vec<T>`.
-  _Hint:_ Find more tips and keyboard shortcuts by typing `?` on any Rustdoc
-  page!
+- [Rust Internals forum][rif]、質問をしたり Rust の内部について議論する場所
+- [Rust reference][rr]、Rust の内部について特に話しているわけではありませんが、
+  それでも素晴らしいリソースです
+- 古くなっていますが、[Tom Lee の素晴らしいブログ記事][tlgba]は非常に役に立ちます
+- [Rust Compiler Testing Docs][rctd]
+- [@bors] については、[このチートシート][cheatsheet]が役に立ちます
+- プログラミング時には、Google は常に役に立ちます。
+  [すべての Rust ドキュメント][gsearchdocs]（標準ライブラリ、
+  コンパイラ、書籍、リファレンス、ガイド）を検索して、
+  言語とコンパイラに関する情報をすばやく見つけることができます。
+- Rustdoc の組み込み検索機能を使用して、
+  見ているクレート内の型や関数に関するドキュメントを見つけることもできます。
+  型シグネチャでも検索できます！たとえば、`* -> vec` を検索すると、
+  `Vec<T>` を返すすべての関数が見つかるはずです。
+  _ヒント：_ 任意の Rustdoc ページで `?` を入力すると、
+  より多くのヒントとキーボードショートカットを見つけることができます！
 
 
 [rustc dev guide]: about-this-guide.md

@@ -1,36 +1,26 @@
-# High-level overview of the compiler source
+# コンパイラソースの高レベル概要
 
-Now that we have [seen what the compiler does][orgch],
-let's take a look at the structure of the [`rust-lang/rust`] repository,
-where the rustc source code lives.
+[コンパイラが何をするか][orgch]を見てきたので、次にrustcのソースコードが存在する[`rust-lang/rust`]リポジトリの構造を見てみましょう。
 
 [`rust-lang/rust`]: https://github.com/rust-lang/rust
 
-> You may find it helpful to read the ["Overview of the compiler"][orgch]
-> chapter, which introduces how the compiler works, before this one.
+> この章を読む前に、コンパイラがどのように動作するかを紹介する["Overview of the compiler"][orgch]章を読むと役立つかもしれません。
 
 [orgch]: ./overview.md
 
-## Workspace structure
+## ワークスペース構造
 
-The [`rust-lang/rust`] repository consists of a single large cargo workspace
-containing the compiler, the standard libraries ([`core`], [`alloc`], [`std`],
-[`proc_macro`], [`etc`]), and [`rustdoc`], along with the build system and a
-bunch of tools and submodules for building a full Rust distribution.
+[`rust-lang/rust`]リポジトリは、コンパイラ、標準ライブラリ([`core`]、[`alloc`]、[`std`]、[`proc_macro`]、[`etc`])、および[`rustdoc`]を含む単一の大きなcargoワークスペースで構成されており、ビルドシステムと完全なRustディストリビューションを構築するための多数のツールとサブモジュールも含まれています。
 
-The repository consists of three main directories:
+リポジトリは3つの主要なディレクトリで構成されています:
 
-- [`compiler/`] contains the source code for `rustc`. It consists of many crates
-  that together make up the compiler.
-  
-- [`library/`] contains the standard libraries ([`core`], [`alloc`], [`std`],
-  [`proc_macro`], [`test`]), as well as the Rust runtime ([`backtrace`], [`rtstartup`],
-  [`lang_start`]).
-  
-- [`tests/`] contains the compiler tests.
-  
-- [`src/`] contains the source code for [`rustdoc`], [`clippy`], [`cargo`], the build system,
-  language docs, etc.
+- [`compiler/`]は`rustc`のソースコードを含んでいます。これは、一緒にコンパイラを構成する多くのクレートで構成されています。
+
+- [`library/`]は標準ライブラリ([`core`]、[`alloc`]、[`std`]、[`proc_macro`]、[`test`])、およびRustランタイム([`backtrace`]、[`rtstartup`]、[`lang_start`])を含んでいます。
+
+- [`tests/`]はコンパイラテストを含んでいます。
+
+- [`src/`]は[`rustdoc`]、[`clippy`]、[`cargo`]、ビルドシステム、言語ドキュメントなどのソースコードを含んでいます。
 
 [`alloc`]: https://github.com/rust-lang/rust/tree/HEAD/library/alloc
 [`backtrace`]: https://github.com/rust-lang/backtrace-rs/
@@ -50,30 +40,19 @@ The repository consists of three main directories:
 [`test`]: https://github.com/rust-lang/rust/tree/HEAD/library/test
 [`tests/`]: https://github.com/rust-lang/rust/tree/HEAD/tests
 
-## Compiler
+## コンパイラ
 
-The compiler is implemented in the various [`compiler/`] crates.
-The [`compiler/`] crates all have names starting with `rustc_*`. These are a
-collection of around 50 interdependent crates ranging in size from tiny to
-huge. There is also the `rustc` crate which is the actual binary (i.e. the
-`main` function); it doesn't actually do anything besides calling the
-[`rustc_driver`] crate, which drives the various parts of compilation in other
-crates.
+コンパイラは、さまざまな[`compiler/`]クレートで実装されています。
+[`compiler/`]クレートはすべて`rustc_*`で始まる名前を持っています。これらは、極小から巨大まで、約50の相互依存するクレートのコレクションです。実際のバイナリ(つまり`main`関数)である`rustc`クレートもありますが、これは[`rustc_driver`]クレートを呼び出す以外は何もしません。[`rustc_driver`]クレートは、他のクレートでのコンパイルのさまざまな部分を駆動します。
 
-The dependency order of these crates is complex, but roughly it is
-something like this:
+これらのクレートの依存関係順序は複雑ですが、大まかには次のようになります:
 
-1. `rustc` (the binary) calls [`rustc_driver::main`][main].
-1. [`rustc_driver`] depends on a lot of other crates, but the main one is
-   [`rustc_interface`].
-1. [`rustc_interface`] depends on most of the other compiler crates. It is a
-   fairly generic interface for driving the whole compilation.
-1. Most of the other `rustc_*` crates depend on [`rustc_middle`], which defines
-   a lot of central data structures in the compiler.
-1. [`rustc_middle`] and most of the other crates depend on a handful of crates
-   representing the early parts of the compiler (e.g. the parser), fundamental
-   data structures (e.g. [`Span`]), or error reporting:
-   [`rustc_data_structures`], [`rustc_span`], [`rustc_errors`], etc.
+1. `rustc`(バイナリ)は[`rustc_driver::main`][main]を呼び出します。
+1. [`rustc_driver`]は他の多くのクレートに依存していますが、主なものは[`rustc_interface`]です。
+1. [`rustc_interface`]は他のほとんどのコンパイラクレートに依存しています。これは、コンパイル全体を駆動するためのかなり汎用的なインターフェースです。
+1. 他のほとんどの`rustc_*`クレートは[`rustc_middle`]に依存しており、これはコンパイラ内の多くの中心的なデータ構造を定義しています。
+1. [`rustc_middle`]と他のほとんどのクレートは、コンパイラの初期部分を表すいくつかのクレート(例:パーサー)、基本的なデータ構造(例:[`Span`])、またはエラー報告に依存しています:
+   [`rustc_data_structures`]、[`rustc_span`]、[`rustc_errors`]など。
 
 [`rustc_data_structures`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_data_structures/index.html
 [`rustc_driver`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_driver/index.html
@@ -84,64 +63,36 @@ something like this:
 [`Span`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_span/struct.Span.html
 [main]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_driver/fn.main.html
 
-You can see the exact dependencies by running `cargo tree`,
-just like you would for any other Rust package:
+正確な依存関係は、他のRustパッケージと同様に`cargo tree`を実行することで確認できます:
 
 ```console
 cargo tree --package rustc_driver
 ```
 
-One final thing: [`src/llvm-project`] is a submodule for our fork of LLVM.
-During bootstrapping, LLVM is built and the [`compiler/rustc_llvm`] crate
-contains Rust wrappers around LLVM (which is written in C++), so that the
-compiler can interface with it.
+最後に一つ: [`src/llvm-project`]はLLVMのフォークのサブモジュールです。
+ブートストラップ中に、LLVMがビルドされ、[`compiler/rustc_llvm`]クレートには(C++で書かれた)LLVMのRustラッパーが含まれており、コンパイラがそれとインターフェースできるようになっています。
 
-Most of this book is about the compiler, so we won't have any further
-explanation of these crates here.
+この本のほとんどはコンパイラに関するものなので、ここではこれらのクレートについてこれ以上説明しません。
 
 [`compiler/rustc_llvm`]: https://github.com/rust-lang/rust/tree/HEAD/compiler/rustc_llvm
 [`src/llvm-project`]: https://github.com/rust-lang/rust/tree/HEAD/src/
 [`Cargo.toml`]: https://github.com/rust-lang/rust/blob/HEAD/Cargo.toml
 
-### Big picture
+### 全体像
 
-The dependency structure of the compiler is influenced by two main factors:
+コンパイラの依存関係構造は、2つの主な要因によって影響を受けています:
 
-1. Organization. The compiler is a _huge_ codebase; it would be an impossibly
-   large crate. In part, the dependency structure reflects the code structure
-   of the compiler.
-2. Compile-time. By breaking the compiler into multiple crates, we can take
-   better advantage of incremental/parallel compilation using cargo. In
-   particular, we try to have as few dependencies between crates as possible so
-   that we don't have to rebuild as many crates if you change one.
+1. 組織化。コンパイラは_巨大な_コードベースです。1つの不可能に大きなクレートになってしまうでしょう。部分的には、依存関係構造はコンパイラのコード構造を反映しています。
+2. コンパイル時間。コンパイラを複数のクレートに分割することで、cargoを使用したインクリメンタル/並列コンパイルをより有効に活用できます。特に、クレート間の依存関係をできるだけ少なくして、1つを変更した場合に再ビルドするクレートの数を減らすよう努めています。
 
-At the very bottom of the dependency tree are a handful of crates that are used
-by the whole compiler (e.g. [`rustc_span`]). The very early parts of the
-compilation process (e.g. [parsing and the Abstract Syntax Tree (`AST`)][parser]) 
-depend on only these.
+依存関係ツリーの最下部には、コンパイラ全体で使用されるいくつかのクレート(例:[`rustc_span`])があります。コンパイルプロセスの非常に初期の部分(例:[パーシングと抽象構文木(`AST`)][parser])は、これらのみに依存しています。
 
-After the [`AST`][parser] is constructed and other early analysis is done, the
-compiler's [query system][query] gets set up. The query system is set up in a
-clever way using function pointers. This allows us to break dependencies
-between crates, allowing more parallel compilation. The query system is defined
-in [`rustc_middle`], so nearly all subsequent parts of the compiler depend on
-this crate. It is a really large crate, leading to long compile times. Some
-efforts have been made to move stuff out of it with varying success. Another
-side-effect is that sometimes related functionality gets scattered across
-different crates. For example, linting functionality is found across earlier
-parts of the crate, [`rustc_lint`], [`rustc_middle`], and other places.
+[`AST`][parser]が構築され、他の初期分析が完了した後、コンパイラの[クエリシステム][query]がセットアップされます。クエリシステムは、関数ポインタを使用して巧妙にセットアップされます。これにより、クレート間の依存関係を壊し、より多くの並列コンパイルが可能になります。クエリシステムは[`rustc_middle`]で定義されているため、その後のコンパイラのほぼすべての部分がこのクレートに依存しています。これは非常に大きなクレートであり、コンパイル時間が長くなります。いくつかの試みがなされましたが、成功の度合いは様々です。別の副作用として、関連する機能が異なるクレートに散在することがあります。例えば、リント機能は初期の部分、[`rustc_lint`]、[`rustc_middle`]、およびその他の場所に見られます。
 
-Ideally there would be fewer, more cohesive crates, with incremental and
-parallel compilation making sure compile times stay reasonable. However,
-incremental and parallel compilation haven't gotten good enough for that yet,
-so breaking things into separate crates has been our solution so far.
+理想的には、インクリメンタルおよび並列コンパイルがコンパイル時間を妥当に保つことで、より少ない、より凝集性の高いクレートにすることができるでしょう。しかし、インクリメンタルおよび並列コンパイルはまだそこまで優れていないため、今のところ別々のクレートに分割することが私たちの解決策です。
 
-At the top of the dependency tree is [`rustc_driver`] and [`rustc_interface`]
-which is an unstable wrapper around the query system helping drive various
-stages of compilation. Other consumers of the compiler may use this interface
-in different ways (e.g. [`rustdoc`] or maybe eventually `rust-analyzer`). The
-[`rustc_driver`] crate first parses command line arguments and then uses
-[`rustc_interface`] to drive the compilation to completion.
+依存関係ツリーの最上部には[`rustc_driver`]と[`rustc_interface`]があり、これはクエリシステムの不安定なラッパーで、コンパイルのさまざまな段階を駆動するのに役立ちます。コンパイラの他のコンシューマー(例:[`rustdoc`]または将来的には`rust-analyzer`)は、このインターフェースを異なる方法で使用する可能性があります。
+[`rustc_driver`]クレートは、最初にコマンドライン引数を解析し、次に[`rustc_interface`]を使用してコンパイルを完了まで駆動します。
 
 [parser]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_parse/index.html
 [`rustc_lint`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustc_lint/index.html
@@ -149,14 +100,11 @@ in different ways (e.g. [`rustdoc`] or maybe eventually `rust-analyzer`). The
 
 ## rustdoc
 
-The bulk of [`rustdoc`] is in [`librustdoc`]. However, the [`rustdoc`] binary
-itself is [`src/tools/rustdoc`], which does nothing except call [`rustdoc::main`].
+[`rustdoc`]のほとんどは[`librustdoc`]にあります。ただし、[`rustdoc`]バイナリ自体は[`src/tools/rustdoc`]であり、[`rustdoc::main`]を呼び出す以外は何もしません。
 
-There is also `JavaScript` and `CSS` for the docs in [`src/tools/rustdoc-js`]
-and [`src/tools/rustdoc-themes`]. The type definitions for `--output-format=json`
-are in a separate crate in [`src/rustdoc-json-types`].
+ドキュメント用の`JavaScript`と`CSS`も[`src/tools/rustdoc-js`]と[`src/tools/rustdoc-themes`]にあります。`--output-format=json`の型定義は[`src/rustdoc-json-types`]の別のクレートにあります。
 
-You can read more about [`rustdoc`] in [this chapter][rustdoc-chapter].
+[`rustdoc`]の詳細については、[this chapter][rustdoc-chapter]を参照してください。
 
 [`librustdoc`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustdoc/index.html
 [`rustdoc::main`]: https://doc.rust-lang.org/nightly/nightly-rustc/rustdoc/fn.main.html
@@ -166,25 +114,20 @@ You can read more about [`rustdoc`] in [this chapter][rustdoc-chapter].
 [`src/rustdoc-json-types`]: https://github.com/rust-lang/rust/tree/HEAD/src/rustdoc-json-types
 [rustdoc-chapter]: ./rustdoc.md
 
-## Tests
+## テスト
 
-The test suite for all of the above is in [`tests/`]. You can read more
-about the test suite [in this chapter][testsch].
+上記のすべてのテストスイートは[`tests/`]にあります。テストスイートの詳細については、[in this chapter][testsch]を参照してください。
 
-The test harness is in [`src/tools/compiletest/`][`compiletest/`].
+テストハーネスは[`src/tools/compiletest/`][`compiletest/`]にあります。
 
 [`tests/`]: https://github.com/rust-lang/rust/tree/HEAD/tests
 [testsch]: ./tests/intro.md
 
-## Build System
+## ビルドシステム
 
-There are a number of tools in the repository just for building the compiler,
-standard library, [`rustdoc`], etc, along with testing, building a full Rust
-distribution, etc.
+リポジトリには、コンパイラ、標準ライブラリ、[`rustdoc`]などをビルドするためのツール、テスト、完全なRustディストリビューションのビルドなどのためのツールがいくつかあります。
 
-One of the primary tools is [`src/bootstrap/`]. You can read more about
-bootstrapping [in this chapter][bootstch]. The process may also use other tools
-from [`src/tools/`], such as [`tidy/`] or [`compiletest/`].
+主要なツールの1つは[`src/bootstrap/`]です。ブートストラップの詳細については、[in this chapter][bootstch]を参照してください。このプロセスでは、[`tidy/`]や[`compiletest/`]などの[`src/tools/`]の他のツールも使用される場合があります。
 
 [`compiletest/`]: https://github.com/rust-lang/rust/tree/HEAD/src/tools/compiletest
 [`src/bootstrap/`]: https://github.com/rust-lang/rust/tree/HEAD/src/bootstrap
@@ -192,26 +135,23 @@ from [`src/tools/`], such as [`tidy/`] or [`compiletest/`].
 [`tidy/`]: https://github.com/rust-lang/rust/tree/HEAD/src/tools/tidy
 [bootstch]: ./building/bootstrapping/intro.md
 
-## Standard library
+## 標準ライブラリ
 
-This code is fairly similar to most other Rust crates except that it must be
-built in a special way because it can use unstable ([`nightly`]) features.
-The standard library is sometimes referred to as [`libstd or the "standard facade"`].
+このコードは、不安定な([`nightly`])機能を使用できることを除いて、他のほとんどのRustクレートとかなり似ています。
+標準ライブラリは、[`libstd or the "standard facade"`]と呼ばれることがあります。
 
 [`libstd or the "standard facade"`]: https://rust-lang.github.io/rfcs/0040-libstd-facade.html
 [`nightly`]: https://doc.rust-lang.org/nightly/nightly-rustc/
 
-## Other
+## その他
 
-There are a lot of other things in the `rust-lang/rust` repo that are related
-to building a full Rust distribution. Most of the time you don't need to worry about them.
+`rust-lang/rust`リポジトリには、完全なRustディストリビューションのビルドに関連する他の多くのものがあります。ほとんどの場合、これらについて心配する必要はありません。
 
-These include:
-- [`src/ci`]: The CI configuration. This actually quite extensive because we
-  run a lot of tests on a lot of platforms.
-- [`src/doc`]: Various documentation, including submodules for a few books.
-- [`src/etc`]: Miscellaneous utilities.
-- And more...
+これらには次のものが含まれます:
+- [`src/ci`]: CI設定。多くのプラットフォームで多くのテストを実行するため、これは実際にはかなり広範囲にわたります。
+- [`src/doc`]: サブモジュールを含む様々なドキュメント。
+- [`src/etc`]: その他のユーティリティ。
+- その他...
 
 [`src/ci`]: https://github.com/rust-lang/rust/tree/HEAD/src/ci
 [`src/doc`]: https://github.com/rust-lang/rust/tree/HEAD/src/doc

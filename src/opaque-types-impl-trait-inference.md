@@ -1,16 +1,15 @@
-# Inference of opaque types (`impl Trait`)
+# 不透明型の推論（`impl Trait`）
 
-This page describes how the compiler infers the [hidden type] for an [opaque type].
-This kind of type inference is particularly complex because,
-unlike other kinds of type inference,
-it can work across functions and function bodies.
+このページでは、コンパイラが不透明型の[隠蔽型]をどのように推論するかを説明します。
+この種の型推論は、他の種類の型推論とは異なり、
+関数や関数本体をまたいで機能するため、特に複雑です。
 
-[hidden type]: ./borrow_check/region_inference/member_constraints.html?highlight=%22hidden%20type%22#member-constraints
+[隠蔽型]: ./borrow_check/region_inference/member_constraints.html?highlight=%22hidden%20type%22#member-constraints
 [opaque type]: ./opaque-types-type-alias-impl-trait.md
 
-## Running example
+## 実行例
 
-To help explain how it works, let's consider an example.
+動作を説明するために、例を考えてみましょう。
 
 ```rust
 #![feature(type_alias_impl_trait)]
@@ -41,49 +40,49 @@ pub fn main() {
 }
 ```
 
-In this code, the *opaque type* is `Seq<T>`.
-Its defining scope is the module `m`.
-Its *hidden type* is `Vec<T>`,
-which is inferred from `m::produce_singleton` and `m::produce_doubleton`.
+このコードでは、*不透明型*は`Seq<T>`です。
+その定義スコープはモジュール`m`です。
+その*隠蔽型*は`Vec<T>`で、
+これは`m::produce_singleton`と`m::produce_doubleton`から推論されます。
 
-In the `main` function, the opaque type is out of its defining scope.
-When `main` calls `m::produce_singleton`, it gets back a reference to the opaque type `Seq<i32>`.
-The `is_send` call checks that `Seq<i32>: Send`.
-`Send` is not listed amongst the bounds of the impl trait,
-but because of auto-trait leakage, we are able to infer that it holds.
-The `for` loop desugaring requires that `Seq<T>: IntoIterator`,
-which is provable from the bounds declared on `Seq<T>`.
+`main`関数では、不透明型はその定義スコープの外にあります。
+`main`が`m::produce_singleton`を呼び出すと、不透明型`Seq<i32>`への参照を受け取ります。
+`is_send`呼び出しは`Seq<i32>: Send`をチェックします。
+`Send`はimpl traitの境界に列挙されていませんが、
+自動トレイト漏洩のおかげで、それが成り立つことを推論できます。
+`for`ループの脱糖には`Seq<T>: IntoIterator`が必要で、
+これは`Seq<T>`に宣言された境界から証明可能です。
 
-### Type-checking `main`
+### `main`の型チェック
 
-Let's start by looking what happens when we type-check `main`.
-Initially we invoke `produce_singleton` and the return type is an opaque type
-[`OpaqueTy`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/hir/enum.ItemKind.html#variant.OpaqueTy).
+まず、`main`を型チェックするときに何が起こるかを見てみましょう。
+最初に`produce_singleton`を呼び出すと、戻り値の型は不透明型
+[`OpaqueTy`](https://doc.rust-lang.org/nightly/nightly-rustc/rustc_hir/hir/enum.ItemKind.html#variant.OpaqueTy)です。
 
-#### Type-checking the for loop
+#### forループの型チェック
 
-The for loop desugars the `in elems` part to `IntoIterator::into_iter(elems)`.
-`elems` is of type `Seq<T>`, so the type checker registers a `Seq<T>: IntoIterator` obligation.
-This obligation is trivially satisfied,
-because `Seq<T>` is an opaque type (`impl IntoIterator<Item = T>`) that has a bound for the trait.
-Similar to how a `U: Foo` where bound allows `U` to trivially satisfy `Foo`,
-opaque types' bounds are available to the type checker and are used to fulfill obligations.
+forループは`in elems`の部分を`IntoIterator::into_iter(elems)`に脱糖します。
+`elems`の型は`Seq<T>`なので、型チェッカーは`Seq<T>: IntoIterator`という責務を登録します。
+この責務は簡単に満たされます。
+なぜなら、`Seq<T>`は不透明型（`impl IntoIterator<Item = T>`）であり、そのトレイトの境界を持っているからです。
+`U: Foo`というwhere境界が`U`を簡単に`Foo`を満たすようにするのと同様に、
+不透明型の境界は型チェッカーに利用可能であり、責務を満たすために使用されます。
 
-The type of `elem` in the for loop is inferred to be `<Seq<T> as IntoIterator>::Item`, which is `T`.
-At no point is the type checker interested in the hidden type.
+forループ内の`elem`の型は`<Seq<T> as IntoIterator>::Item`と推論され、これは`T`です。
+型チェッカーが隠蔽型に興味を持つことは一度もありません。
 
-#### Type-checking the `is_send` call
+#### `is_send`呼び出しの型チェック
 
-When trying to prove auto trait bounds,
-we first repeat the process as above,
-to see if the auto trait is in the bound list of the opaque type.
-If that fails, we reveal the hidden type of the opaque type,
-but only to prove this specific trait bound, not in general.
-Revealing is done by invoking the `type_of` query on the `DefId` of the opaque type.
-The query will internally request the hidden types from the defining function(s)
-and return that (see [the section on `type_of`](#within-the-type_of-query) for more details).
+自動トレイト境界を証明しようとするとき、
+まず上記と同じプロセスを繰り返して、
+自動トレイトが不透明型の境界リストにあるかどうかを確認します。
+それが失敗した場合、不透明型の隠蔽型を明らかにしますが、
+この特定のトレイト境界を証明するためだけであり、一般的にではありません。
+明らかにするには、不透明型の`DefId`に対して`type_of`クエリを呼び出します。
+クエリは、定義関数から隠蔽型を内部的に要求し、
+それを返します（詳細については[`type_of`に関するセクション](#within-the-type_of-query)を参照してください）。
 
-#### Flowchart of type checking steps
+#### 型チェックステップのフローチャート
 
 ```mermaid
 flowchart TD
@@ -119,11 +118,11 @@ flowchart TD
     Done --> Substitute --> CheckSend
 ```
 
-### Within the `type_of` query
+### `type_of`クエリ内
 
-The `type_of` query, when applied to an opaque type O, returns the hidden type.
-That hidden type is computed by combining the results
-from each constraining function within the defining scope of O.
+`type_of`クエリは、不透明型Oに適用されると、隠蔽型を返します。
+その隠蔽型は、Oの定義スコープ内の各制約関数から
+結果を結合して計算されます。
 
 ```mermaid
 flowchart TD
@@ -148,13 +147,13 @@ flowchart TD
     Done["Done"]
 ```
 
-### Relating an opaque type to another type
+### 不透明型を別の型に関連付ける
 
-There is one central place where an opaque type gets its hidden type constrained,
-and that is the `handle_opaque_type` function.
-Amusingly it takes two types, so you can pass any two types,
-but one of them should be an opaque type.
-The order is only important for diagnostics.
+不透明型が隠蔽型に制約される中心的な場所が1つあり、
+それは`handle_opaque_type`関数です。
+面白いことに、この関数は2つの型を受け取るため、任意の2つの型を渡すことができますが、
+そのうちの1つは不透明型である必要があります。
+順序は診断にのみ重要です。
 
 ```mermaid
 flowchart TD
@@ -188,53 +187,53 @@ flowchart TD
     end
 ```
 
-### Interactions with queries
+### クエリとの相互作用
 
-When queries handle opaque types,
-they cannot figure out whether they are in a defining scope,
-so they just assume they are.
+クエリが不透明型を処理するとき、
+定義スコープにいるかどうかを判断できないため、
+いるものと仮定するだけです。
 
-The registered hidden types are stored into the `QueryResponse` struct
-in the `opaque_types` field (the function
-`take_opaque_types_for_query_response` reads them out).
+登録された隠蔽型は`QueryResponse`構造体の
+`opaque_types`フィールドに格納されます（関数
+`take_opaque_types_for_query_response`がそれらを読み出します）。
 
-When the `QueryResponse` is instantiated into the surrounding infcx in
-`query_response_substitution_guess`,
-we convert each hidden type constraint by invoking `handle_opaque_type` (as above).
+`query_response_substitution_guess`で`QueryResponse`が
+周囲のinfcxにインスタンス化されるとき、
+各隠蔽型制約を（上記のように）`handle_opaque_type`を呼び出して変換します。
 
-There is one bit of "weirdness".
-The instantiated opaque types have an order
-(if one opaque type was compared with another,
-and we have to pick one opaque type to use as the one that gets its hidden type assigned).
-We use the one that is considered "expected".
-But really both of the opaque types may have defining uses.
-When the query result is instantiated,
-that will be re-evaluated from the context that is using the query.
-The final context (typeck of a function, mir borrowck or wf-checks)
-will know which opaque type can actually be instantiated
-and then handle it correctly.
+1つの「奇妙さ」があります。
+インスタンス化された不透明型には順序があります
+（ある不透明型が別の不透明型と比較され、
+隠蔽型が割り当てられる不透明型として使用する不透明型を1つ選択する必要がある場合）。
+「期待される」と見なされる不透明型を使用します。
+しかし実際には、両方の不透明型が定義の使用を持っている可能性があります。
+クエリ結果がインスタンス化されるとき、
+それはクエリを使用しているコンテキストから再評価されます。
+最終的なコンテキスト（関数のtypeck、mir borrowckまたはwf-checks）は、
+どの不透明型が実際にインスタンス化できるかを知り、
+正しく処理します。
 
-### Within the MIR borrow checker
+### MIR借用チェッカー内
 
-The MIR borrow checker relates things via `nll_relate` and only cares about regions.
-Any type relation will trigger the binding of hidden types,
-so the borrow checker is doing the same thing as the type checker,
-but ignores obviously dead code (e.g. after a panic).
-The borrow checker is also the source of truth when it comes to hidden types,
-as it is the only one who can properly figure out what lifetimes on the hidden type correspond
-to which lifetimes on the opaque type declaration.
+MIR借用チェッカーは`nll_relate`を介して物事を関連付け、領域のみを気にします。
+任意の型関係は隠蔽型のバインディングをトリガーするため、
+借用チェッカーは型チェッカーと同じことを行いますが、
+明らかにデッドコード（例：パニック後）を無視します。
+借用チェッカーは、隠蔽型に関しては真実の源でもあります。
+なぜなら、隠蔽型のどのライフタイムが
+不透明型宣言のどのライフタイムに対応するかを適切に理解できる唯一のものだからです。
 
-## Backwards compatibility hacks
+## 後方互換性ハック
 
-`impl Trait` in return position has various quirks that were not part
-of any RFCs and are likely accidental stabilization.
-To support these,
-the `replace_opaque_types_with_inference_vars` is being used to reintroduce the previous behaviour.
+戻り位置の`impl Trait`には、RFCの一部ではなく、
+おそらく偶発的な安定化である様々な癖があります。
+これらをサポートするために、
+`replace_opaque_types_with_inference_vars`を使用して、以前の動作を再導入します。
 
-There are three backwards compatibility hacks:
+3つの後方互換性ハックがあります：
 
-1. All return sites share the same inference variable,
-   so some return sites may only compile if another return site uses a concrete type.
+1. すべての戻りサイトが同じ推論変数を共有するため、
+   一部の戻りサイトは、別の戻りサイトが具体的な型を使用する場合にのみコンパイルされる可能性があります。
     ```rust
     fn foo() -> impl Debug {
         if false {
@@ -243,9 +242,9 @@ There are three backwards compatibility hacks:
         vec![42]
     }
     ```
-2. Associated type equality constraints for `impl Trait` can be used
-   as long as the hidden type  satisfies the trait bounds on the associated type.
-   The opaque `impl Trait` signature does not need to satisfy them.
+2. `impl Trait`の関連型等価性制約は、
+   隠蔽型が関連型のトレイト境界を満たす限り使用できます。
+   不透明な`impl Trait`シグネチャはそれらを満たす必要はありません。
 
     ```rust
     trait Duh {}
@@ -274,7 +273,7 @@ There are three backwards compatibility hacks:
         || 42
     }
     ```
-3. Closures cannot create hidden types for their parent function's `impl Trait`.
-   This point is mostly moot,
-   because of point 1 introducing inference vars,
-   so the closure only ever sees the inference var, but should we fix 1, this will become a problem.
+3. クロージャは親関数の`impl Trait`の隠蔽型を作成できません。
+   この点はほとんど問題になりません。
+   なぜなら、ポイント1が推論変数を導入するため、
+   クロージャは推論変数しか見ないからですが、1を修正すればこれが問題になります。
