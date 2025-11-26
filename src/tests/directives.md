@@ -306,7 +306,6 @@ comparison](ui.md#output-comparison)、[Rustfix tests](ui.md#rustfix-tests)を�
 この置換を使用するテストの例については、
 [`tests/ui/argfile/commandline-argfile.rs`](https://github.com/rust-lang/rust/blob/HEAD/tests/ui/argfile/commandline-argfile.rs)を参照してください。
 
-
 ## ディレクティブの追加
 
 テストプロパティや動作を個々のテストごとに定義する必要がある場合、新しいディレクティブを追加します。ディレクティブプロパティは、実行時にディレクティブのバッキングストア（コマンドの現在の値を保持）として機能します。

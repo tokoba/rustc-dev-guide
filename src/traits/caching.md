@@ -23,7 +23,6 @@ where 句 `X : Foo<Y>` を適用する）。
 必要があります。例えば、次の唯一可能な impl が def-id 22 の
 ものであるという結論に達したとします：
 
-
 ```rust,ignore
 impl Foo<isize> for usize { ... } // Impl #22
 ```
@@ -31,7 +30,6 @@ impl Foo<isize> for usize { ... } // Impl #22
 次に、キャッシュに `usize : Foo<$0> => ImplCandidate(22)` を記録します。次に
 `ImplCandidate(22)` を[確認]し、それが（副作用として）`$t` を
 `isize` に単一化します。
-
 
 さて、後でいつか、`usize : Foo<$u>` を見かけることがあります。プレースホルダーに
 置き換えると、これは以前と同じように `usize : Foo<$0>` になり、

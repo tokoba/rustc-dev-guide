@@ -113,7 +113,6 @@ Rustコードも、コード生成中に[*monomorphization*]されます。
 これを行うには、どの具体的な型のコードを生成するかのリストを収集する必要があります。
 これは_monomorphizationコレクション_と呼ばれ、`MIR`レベルで行われます。
 
-
 ### コード生成
 
 次に、単に_コード生成_または_codegen_と呼ばれるものを開始します。
@@ -362,7 +361,6 @@ Rustの主要なユーザーの1つがRustコンパイラ自体であること�
 ブートストラップの詳細については、
 [ガイドのブートストラップセクション][rustc-bootstrap]を参照してください。
 
-[_bootstrapping_]: https://en.wikipedia.org/wiki/Bootstrapping_(compilers)
 [rustc-bootstrap]: building/bootstrapping/intro.md
 
 <!--

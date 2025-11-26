@@ -42,7 +42,6 @@ running: RUSTC_BOOTSTRAP="1" "/home/jyn/src/rust2/build/x86_64-unknown-linux-gnu
 
 条件付き `tracing` 機能を有効にするには、`BOOTSTRAP_TRACING` 環境変数を使用してブートストラップを実行します。
 
-
 ```bash
 BOOTSTRAP_TRACING=trace ./x build library --stage 1
 ```

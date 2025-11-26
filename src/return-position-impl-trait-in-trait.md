@@ -58,9 +58,12 @@ It may be better if we were able to lower without duplicates and for
 that I think we would need to stop distinguishing between early and late
 bound lifetimes. So we would need a solution like [Account for
 late-bound lifetimes in generics
-# 103448](https://github.com/rust-lang/rust/pull/103448) and then also a
+
+# 103448](<https://github.com/rust-lang/rust/pull/103448>) and then also a
+
 PR similar to [Inherit function lifetimes for impl-trait
-# 103449](https://github.com/rust-lang/rust/pull/103449).
+
+# 103449](<https://github.com/rust-lang/rust/pull/103449>)
 
 ### HIR ty lowering
 

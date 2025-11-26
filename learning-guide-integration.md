@@ -1,8 +1,85 @@
+# rustc-dev-guide 学習ガイド 既存SUMMARY.mdへの統合方法
+
+## 統合の基本方針
+
+1. **既存構造の尊重**: 現在のSUMMARY.mdの構造を破壊せず、学習ガイドを新しいセクションとして追加
+2. **論理的な配置**: 学習者が自然な流れで学習ガイドにたどり着けるような配置
+3. **相互参照の促進**: 既存の技術ドキュメントと学習ガイド間の円滑な移動
+4. **段階的導入**: 学習ガイドの導入によって既存ユーザーの混乱を最小限に抑える
+
+## 現在のSUMMARY.md構造の分析
+
+### 現在の主要セクション
+
+1. はじめに (getting-started.md)
+2. このガイドについて (about-this-guide.md)
+3. `rustc` のビルドとデバッグ
+4. Rust への貢献
+5. ブートストラップ
+6. コンパイラの高レベルアーキテクチャ
+7. ソースコード表現
+8. サポートインフラストラクチャ
+9. 解析
+10. MIR からバイナリへ
+11. 付録
+
+## 提案する統合構造
+
+### 1. 学習ガイドセクションの追加位置
+
+学習ガイドは「はじめに」セクションの直後に配置することを提案します。
+
+**理由**:
+
+- 初心者が技術的な詳細に入る前に、体系的な学習パスを認識できる
+- 既存の「このガイドについて」との相乗効果
+- 学習ガイドから既存の技術ドキュメントへの自然な移行
+
+### 2. 新しいSUMMARY.mdの完全な構造
+
+```markdown
 # 目次
 
 [はじめに](./getting-started.md)
 
 [このガイドについて](./about-this-guide.md)
+
+---
+
+# 学習ガイド
+
+- [学習ガイドの概要](./learning-guide/README.md)
+  - [学習パスの選択ガイド](./learning-guide/README.md#学習パスの選択)
+  - [学習の進め方](./learning-guide/README.md#学習の進め方)
+  
+- [初級者向け学習パス](./learning-guide/getting-started/README.md)
+  - [学習目標と計画](./learning-guide/getting-started/README.md#学習目標と計画)
+  - [コンパイラの基本概念](./learning-guide/getting-started/compiler-basics.md)
+  - [最初の貢献](./learning-guide/getting-started/first-contribution.md)
+  - [ビルドとデバッグの基礎](./learning-guide/getting-started/build-and-debug.md)
+  
+- [中級者向け学習パス](./learning-guide/intermediate/README.md)
+  - [学習目標と計画](./learning-guide/intermediate/README.md#学習目標と計画)
+  - [コンパイラアーキテクチャ](./learning-guide/intermediate/compiler-architecture.md)
+  - [ソースコード表現](./learning-guide/intermediate/source-representation.md)
+  - [型システム](./learning-guide/intermediate/type-system.md)
+  
+- [上級者向け学習パス](./learning-guide/advanced/README.md)
+  - [学習目標と計画](./learning-guide/advanced/README.md#学習目標と計画)
+  - [クエリシステム](./learning-guide/advanced/query-system.md)
+  - [最適化](./learning-guide/advanced/optimization.md)
+  - [コード生成](./learning-guide/advanced/code-generation.md)
+  
+- [特定目的別学習パス](./learning-guide/specialization/README.md)
+  - [学習目的別の分類](./learning-guide/specialization/README.md#学習目的別の分類)
+  - [診断システム](./learning-guide/specialization/diagnostics.md)
+  - [テストインフラ](./learning-guide/specialization/testing.md)
+  - [パフォーマンス](./learning-guide/specialization/performance.md)
+  
+- [学習リソース](./learning-guide/resources/README.md)
+  - [演習問題](./learning-guide/resources/exercises.md)
+  - [実践プロジェクト](./learning-guide/resources/projects.md)
+  - [参考資料](./learning-guide/resources/references.md)
 
 ---
 
@@ -98,9 +175,9 @@
 - [並列コンパイル](./parallel-rustc.md)
 - [Rustdoc の内部](./rustdoc-internals.md)
   - [検索](./rustdoc-internals/search.md)
-    - [`rustdoc` テストスイート](./rustdoc-internals/rustdoc-test-suite.md)
-    - [`rustdoc-gui` テストスイート](./rustdoc-internals/rustdoc-gui-test-suite.md)
-    - [`rustdoc-json` テストスイート](./rustdoc-internals/rustdoc-json-test-suite.md)
+  - [`rustdoc` テストスイート](./rustdoc-internals/rustdoc-test-suite.md)
+  - [`rustdoc-gui` テストスイート](./rustdoc-internals/rustdoc-gui-test-suite.md)
+  - [`rustdoc-json` テストスイート](./rustdoc-internals/rustdoc-json-test-suite.md)
 - [GPU オフロードの内部](./offload/internals.md)
   - [インストール](./offload/installation.md)
   - [使用方法](./offload/usage.md)
@@ -252,3 +329,185 @@
 
 [pau]: ./borrow_check/region_inference/placeholders_and_universes.md
 [opaque-infer]: ./borrow_check/opaque-types-region-inference-restrictions.md
+```
+
+## 統合の実装手順
+
+### 1. 段階的導入
+
+#### フェーズ1: 基本的な学習ガイドの追加
+
+- 学習ガイドの基本構造のみをSUMMARY.mdに追加
+- 各学習パスのREADME.mdのみを作成
+- 既存ユーザーへの影響を最小限に抑える
+
+#### フェーズ2: 詳細なコンテンツの追加
+
+- 各学習パスの詳細なコンテンツを追加
+- ナビゲーションリンクの実装
+- 既存ドキュメントとの相互参照の追加
+
+#### フェーズ3: 高度な機能の実装
+
+- インタラクティブなナビゲーション機能
+- 学習進捗の追跡機能
+- コミュニティとの連携機能
+
+### 2. 既存コンテンツとの関連付け
+
+#### 学習ガイドから既存ドキュメントへの参照
+
+```markdown
+## 詳細情報
+- [コンパイラの概要](../../overview.md) - 全体的なコンパイラアーキテクチャ
+- [クエリ：デマンド駆動コンパイル](../../query.md) - クエリシステムの詳細
+- [高レベルコンパイラアーキテクチャ](../../part-2-intro.md) - アーキテクチャの理論的背景
+```
+
+#### 既存ドキュメントから学習ガイドへの参照
+
+既存のドキュメントに学習ガイドへのリンクを追加：
+
+```markdown
+<!-- about-this-guide.mdに追加 -->
+## 学習リソース
+体系的な学習を希望される方は、[学習ガイド](./learning-guide/README.md)をご利用ください。
+
+<!-- getting-started.mdに追加 -->
+## 体系的な学習
+より体系的な学習を希望される方は、[学習ガイド](./learning-guide/README.md)を参照してください。
+```
+
+### 3. ユーザーエクスペリエンスの配慮
+
+#### 新規ユーザー向けの導入
+
+- はじめにセクションから学習ガイドへ自然に誘導
+- 学習パスの選択ガイドの提供
+- 初心者向けの明確な開始点の提示
+
+#### 既存ユーザー向けの配慮
+
+- 既存のナビゲーション構造の維持
+- 学習ガイドがオプションであることの明示
+- 既存ドキュメントへの直接的なアクセスの維持
+
+### 4. メンテナンスと更新
+
+#### コンテンツの同期
+
+- 学習ガイドと既存ドキュメントの内容の整合性維持
+- 既存ドキュメントの更新に合わせた学習ガイドの更新
+- 重複コンテンツの管理
+
+#### フィードバックの収集
+
+- 学習ガイドの利用状況の監視
+- ユーザーからのフィードバックの収集
+- 継続的な改善の実施
+
+## 技術的な実装詳細
+
+### 1. mdBookの設定
+
+#### book.tomlへの追加設定
+
+```toml
+[build]
+build-dir = "book"
+
+[output.html]
+additional-css = ["learning-guide.css"]
+additional-js = ["learning-guide.js"]
+
+[output.html.playground]
+editable = true
+```
+
+### 2. スタイルシートの追加
+
+#### learning-guide.cssの作成
+
+```css
+/* 学習ガイド固有のスタイル */
+.learning-path {
+  background-color: #f8f9fa;
+  border-left: 4px solid #007bff;
+  padding: 1rem;
+  margin: 1rem 0;
+}
+
+.progress-indicator {
+  background-color: #e9ecef;
+  border-radius: 0.25rem;
+  height: 0.5rem;
+  margin: 1rem 0;
+}
+
+.progress-fill {
+  background-color: #007bff;
+  height: 100%;
+  border-radius: 0.25rem;
+  transition: width 0.3s ease;
+}
+```
+
+### 3. JavaScript機能の追加
+
+#### learning-guide.jsの作成
+
+```javascript
+// 学習進捗の管理
+class LearningProgress {
+  constructor() {
+    this.progress = this.loadProgress();
+    this.updateProgressIndicators();
+  }
+
+  loadProgress() {
+    const saved = localStorage.getItem('rustc-learning-progress');
+    return saved ? JSON.parse(saved) : {};
+  }
+
+  saveProgress() {
+    localStorage.setItem('rustc-learning-progress', JSON.stringify(this.progress));
+  }
+
+  markCompleted(topic) {
+    this.progress[topic] = true;
+    this.saveProgress();
+    this.updateProgressIndicators();
+  }
+
+  updateProgressIndicators() {
+    // 進捗インジケーターの更新
+  }
+}
+
+// 初期化
+document.addEventListener('DOMContentLoaded', () => {
+  new LearningProgress();
+});
+```
+
+## 成功の評価基準
+
+### 1. 利用状況の指標
+
+- 学習ガイドの訪問数と滞在時間
+- 各学習パスの完了率
+- 学習ガイドから既存ドキュメントへの移行率
+
+### 2. ユーザー満足度
+
+- フィードバックと評価
+- 学習効果の自己評価
+- コミュニティでの言及
+
+### 3. 貢献への影響
+
+- 新規貢献者の増加
+- 貢献の質の向上
+- 学習ガイド経由での貢献数
+
+この統合方法により、学習ガイドは既存のrustc-dev-guideプロジェクトにシームレスに統合され、学習者にとって効果的なナビゲーションツールとなります。

@@ -103,7 +103,6 @@ let y: x = 2; // See? x is still a type here.
 内側の関数は、通常のスコープルールでは表示されるべきであっても、
 外側の関数のパラメータとローカルバインディングにアクセスできません。例：
 
-
 ```rust
 fn do_something<T: Default>(val: T) { // <- New rib in both types and values (1)
     // `val` is accessible, as is the helper function

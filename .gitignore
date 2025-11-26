@@ -7,3 +7,6 @@ ci/sembr/target/
 pulls.json
 
 josh-sync/target
+
+.codanna/
+.codannaignore
